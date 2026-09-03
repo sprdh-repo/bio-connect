@@ -41,11 +41,8 @@ button { color: inherit; font: inherit; }
   color: white; border-bottom: 1px solid rgba(255,255,255,0.2); transition: 0.3s ease;
 }
 .site-header.scrolled { height: 76px; color: var(--ink); background: rgba(251,250,245,0.94); backdrop-filter: blur(16px); border-color: var(--line); }
-.brand { display: inline-flex; align-items: center; gap: 10px; width: max-content; }
-.brand-mark { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-.brand-type { display: flex; flex-direction: column; font-family: Manrope, sans-serif; line-height: 1; }
-.brand-type > span { font-size: 14px; font-weight: 800; letter-spacing: 0.09em; }
-.brand-type small { margin-top: 5px; font-size: 8px; font-weight: 600; letter-spacing: 0.25em; opacity: 0.7; }
+.brand { width: 178px; padding: 8px 10px; display: inline-flex; align-items: center; background: white; border-radius: 4px; }
+.brand img { width: 100%; height: auto; display: block; }
 .desktop-nav { justify-self: center; display: flex; gap: 34px; }
 .desktop-nav a { position: relative; font-size: 13px; font-weight: 600; }
 .desktop-nav a::after { content: ""; position: absolute; inset: auto 0 -7px; height: 1px; background: currentColor; transform: scaleX(0); transform-origin: right; transition: transform 0.25s; }
@@ -98,8 +95,7 @@ button { color: inherit; font: inherit; }
 .stats-grid article + article { padding-left: 30px; }
 .stats-grid article:last-child { border-right: 0; }
 .stats-grid strong { font: 600 clamp(44px, 5vw, 70px)/1 Manrope, sans-serif; letter-spacing: -0.06em; }
-.stats-grid strong::after { content: "+"; color: #5b8e44; font-size: 0.55em; vertical-align: top; }
-.stats-grid article:last-child strong::after { content: ""; }
+.stats-grid strong::after { content: attr(data-suffix); color: #5b8e44; font-size: 0.55em; vertical-align: top; }
 .stats-grid span { margin-top: 13px; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
 
 .focus { background: var(--cream); }
@@ -159,7 +155,7 @@ button { color: inherit; font: inherit; }
 
 .site-footer { padding: 90px 0 25px; color: rgba(255,255,255,0.78); background: var(--forest-deep); }
 .footer-grid { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 80px; }
-.footer-brand .brand { color: white; }
+.footer-brand .brand { width: 220px; }
 .footer-brand > p { max-width: 310px; margin: 26px 0 0; color: rgba(255,255,255,0.62); line-height: 1.6; }
 .footer-label { margin: 0 0 25px; color: var(--lime); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .footer-contact, .footer-location { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -204,8 +200,7 @@ button { color: inherit; font: inherit; }
 @media (max-width: 600px) {
   :root { --shell: calc(100% - 32px); }
   .section { padding-block: 90px; }
-  .brand-mark { width: 32px; height: 32px; }
-  .brand-type > span { font-size: 12px; }
+  .brand { width: 158px; padding: 7px 8px; }
   .hero { min-height: 780px; }
   .hero-media { background-image: linear-gradient(180deg, rgba(2,20,15,0.65) 0%, rgba(2,20,15,0.82) 55%, rgba(2,20,15,0.96) 100%), url("assets/hero-biotech.webp"); }
   .hero-content { padding-top: 145px; }

@@ -15,3 +15,5 @@ Then open <http://localhost:4173>.
 ## Assets
 
 The hero artwork in `assets/hero-biotech.webp` was generated specifically for this project with OpenAI image generation.
+
+The Bio Connect logo and favicon are the official, unmodified brand assets from <https://bioconnect.kerala.gov.in/>.
