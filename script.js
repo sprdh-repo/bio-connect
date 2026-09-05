@@ -1,28 +1,91 @@
 const header = document.querySelector("[data-header]");
+const progress = document.querySelector("[data-progress]");
 const menuButton = document.querySelector("[data-menu-button]");
 const mobileMenu = document.querySelector("[data-mobile-menu]");
+const heroMedia = document.querySelector("[data-parallax]");
+const hero = document.querySelector(".hero");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const updateHeader = () => header.classList.toggle("scrolled", window.scrollY > 24);
-updateHeader();
-window.addEventListener("scroll", updateHeader, { passive: true });
+/* Nav links paired with their section, so the header can show where you are. */
+const navLinks = [...document.querySelectorAll("[data-nav-link]")];
+const navTargets = [...new Set(navLinks.map((link) => link.hash))]
+  .map((hash) => ({ hash, section: document.querySelector(hash) }))
+  .filter((target) => target.section);
 
-const closeMenu = () => {
-  menuButton.setAttribute("aria-expanded", "false");
-  mobileMenu.classList.remove("open");
-  document.body.classList.remove("menu-open");
+const setActiveSection = (hash) => {
+  navLinks.forEach((link) => {
+    if (link.hash === hash) link.setAttribute("aria-current", "true");
+    else link.removeAttribute("aria-current");
+  });
 };
 
-menuButton.addEventListener("click", () => {
-  const willOpen = menuButton.getAttribute("aria-expanded") !== "true";
-  menuButton.setAttribute("aria-expanded", String(willOpen));
-  mobileMenu.classList.toggle("open", willOpen);
-  document.body.classList.toggle("menu-open", willOpen);
-});
+const onScroll = () => {
+  const scrolled = window.scrollY;
+  header.classList.toggle("scrolled", scrolled > 24);
 
-mobileMenu.querySelectorAll("a").forEach((link) => link.addEventListener("click", closeMenu));
-window.addEventListener("keydown", (event) => event.key === "Escape" && closeMenu());
+  const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+  progress.style.setProperty("--progress", scrollable > 0 ? Math.min(scrolled / scrollable, 1) : 0);
 
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (heroMedia && !reduceMotion) {
+    const offset = Math.min(scrolled, hero.offsetHeight) * 0.12;
+    heroMedia.style.setProperty("--parallax", `${offset}px`);
+  }
+
+  /* Active nav = last section whose top has passed under the header. The final
+     target (the footer) sits below the deepest scroll position, so the bottom of
+     the page counts as reaching it. */
+  const line = scrolled + 140;
+  let active = null;
+  navTargets.forEach((target) => {
+    if (target.section.offsetTop <= line) active = target.hash;
+  });
+  if (scrolled + window.innerHeight >= document.documentElement.scrollHeight - 2) {
+    active = navTargets[navTargets.length - 1].hash;
+  }
+  setActiveSection(active);
+};
+
+let scrollQueued = false;
+window.addEventListener(
+  "scroll",
+  () => {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(() => {
+      scrollQueued = false;
+      onScroll();
+    });
+  },
+  { passive: true },
+);
+window.addEventListener("resize", onScroll, { passive: true });
+onScroll();
+
+const setMenu = (open) => {
+  menuButton.setAttribute("aria-expanded", String(open));
+  mobileMenu.classList.toggle("open", open);
+  mobileMenu.inert = !open;
+  document.body.classList.toggle("menu-open", open);
+  /* Keep focus inside the panel while it covers the page. */
+  document.querySelectorAll("main, .site-footer").forEach((region) => {
+    region.inert = open;
+  });
+  /* Wait a frame: the panel is visibility:hidden until the open class lands. */
+  if (open) requestAnimationFrame(() => mobileMenu.querySelector("a").focus());
+};
+
+const closeMenu = ({ restoreFocus = false } = {}) => {
+  if (menuButton.getAttribute("aria-expanded") !== "true") return;
+  setMenu(false);
+  if (restoreFocus) menuButton.focus();
+};
+
+menuButton.addEventListener("click", () => setMenu(menuButton.getAttribute("aria-expanded") !== "true"));
+mobileMenu.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => closeMenu()));
+window.addEventListener("keydown", (event) => event.key === "Escape" && closeMenu({ restoreFocus: true }));
+/* The panel only exists below 900px - never leave the page inert on resize. */
+window.matchMedia("(min-width: 901px)").addEventListener("change", (event) => event.matches && closeMenu());
+
 const revealObserver = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -35,8 +98,14 @@ const revealObserver = new IntersectionObserver(
   { threshold: 0.12 },
 );
 
+const heroReveals = [...document.querySelectorAll(".hero-content .reveal")];
 document.querySelectorAll(".reveal").forEach((element, index) => {
-  if (!reduceMotion) element.style.transitionDelay = `${Math.min(index % 4, 2) * 70}ms`;
+  if (!reduceMotion) {
+    /* The hero reads as one deliberate sequence; everything else stays quick. */
+    const heroIndex = heroReveals.indexOf(element);
+    element.style.transitionDelay =
+      heroIndex >= 0 ? `${120 + heroIndex * 110}ms` : `${Math.min(index % 4, 2) * 70}ms`;
+  }
   revealObserver.observe(element);
 });
 

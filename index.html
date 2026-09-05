@@ -23,15 +23,16 @@
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header" data-header>
+      <span class="scroll-progress" data-progress aria-hidden="true"></span>
       <a class="brand" href="#home" aria-label="Bio Connect 4.0 home">
         <img src="assets/bio-connect-logo.png" alt="Bio Connect - Connecting Science to Business" />
       </a>
 
       <nav class="desktop-nav" aria-label="Main navigation">
-        <a href="#about">About</a>
-        <a href="#impact">Impact</a>
-        <a href="#highlights">Highlights</a>
-        <a href="#contact">Contact</a>
+        <a href="#about" data-nav-link>About</a>
+        <a href="#impact" data-nav-link>Impact</a>
+        <a href="#highlights" data-nav-link>Highlights</a>
+        <a href="#contact" data-nav-link>Contact</a>
       </nav>
 
       <a class="header-cta" href="#updates">Event updates</a>
@@ -40,18 +41,18 @@
         <span></span><span></span><span></span>
       </button>
 
-      <nav class="mobile-nav" id="mobile-menu" aria-label="Mobile navigation" data-mobile-menu>
-        <a href="#about">About</a>
-        <a href="#impact">Impact</a>
-        <a href="#highlights">Highlights</a>
-        <a href="#contact">Contact</a>
+      <nav class="mobile-nav" id="mobile-menu" aria-label="Mobile navigation" data-mobile-menu inert>
+        <a href="#about" data-nav-link>About</a>
+        <a href="#impact" data-nav-link>Impact</a>
+        <a href="#highlights" data-nav-link>Highlights</a>
+        <a href="#contact" data-nav-link>Contact</a>
         <a class="button button-primary" href="#updates">Event updates</a>
       </nav>
     </header>
 
     <main id="main">
       <section class="hero" id="home" aria-labelledby="hero-title">
-        <div class="hero-media" aria-hidden="true"></div>
+        <div class="hero-media" aria-hidden="true" data-parallax><span class="hero-media-image"></span></div>
         <div class="hero-grid" aria-hidden="true"></div>
         <div class="hero-content shell">
           <p class="eyebrow reveal">Kerala's international life sciences summit</p>
@@ -64,7 +65,7 @@
             more sustainable future.
           </p>
           <div class="hero-actions reveal">
-            <a class="button button-primary" href="#updates">Event updates</a>
+            <a class="button button-primary" href="#updates">Event updates<span class="button-arrow" aria-hidden="true">→</span></a>
             <a class="text-link" href="#about">Discover the summit <span aria-hidden="true">↘</span></a>
           </div>
         </div>
@@ -83,16 +84,24 @@
               <span class="detail-label">Edition</span>
               <strong>Bio Connect 4.0</strong>
             </div>
-            <a class="event-arrow" href="#updates" aria-label="View event updates">↗</a>
+            <a class="scroll-cue" href="#about">
+              <span class="scroll-cue-label">Scroll to explore</span>
+              <span class="scroll-cue-icon" aria-hidden="true">↓</span>
+            </a>
           </div>
         </div>
       </section>
 
       <section class="marquee" aria-label="Event themes">
         <div class="marquee-track">
-          <span>Biotechnology</span><i></i><span>Health innovation</span><i></i><span>Research</span><i></i>
-          <span>Sustainability</span><i></i><span>Enterprise</span><i></i><span>Biotechnology</span><i></i>
-          <span>Health innovation</span><i></i><span>Research</span><i></i><span>Sustainability</span><i></i>
+          <div class="marquee-group">
+            <span>Biotechnology</span><i></i><span>Health innovation</span><i></i><span>Research</span><i></i>
+            <span>Sustainability</span><i></i><span>Enterprise</span><i></i>
+          </div>
+          <div class="marquee-group" aria-hidden="true">
+            <span>Biotechnology</span><i></i><span>Health innovation</span><i></i><span>Research</span><i></i>
+            <span>Sustainability</span><i></i><span>Enterprise</span><i></i>
+          </div>
         </div>
       </section>
 
@@ -174,6 +183,16 @@
                   </div>
                 </div>
               </div>
+              <dl class="trend-deltas" aria-label="Growth from 2023 to 2025">
+                <div>
+                  <dt>Delegate growth</dt>
+                  <dd><strong data-count="157" data-prefix="+" data-suffix="%">0</strong><span>2023 → 2025</span></dd>
+                </div>
+                <div>
+                  <dt>Exhibitor growth</dt>
+                  <dd><strong data-count="67" data-prefix="+" data-suffix="%">0</strong><span>2023 → 2025</span></dd>
+                </div>
+              </dl>
               <p class="impact-source">Source: Bio Connect 3.0 Synopsis, 2025</p>
             </article>
 
