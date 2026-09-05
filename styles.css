@@ -84,6 +84,8 @@ button { color: inherit; font: inherit; }
 .event-detail + .event-detail { padding-left: 36px; }
 .detail-label { margin-bottom: 8px; color: var(--lime); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .event-detail strong { font: 600 15px Manrope, sans-serif; }
+.venue-inline-link span { display: inline-block; margin-left: 5px; color: var(--lime); transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
+.venue-inline-link:hover span, .venue-inline-link:focus-visible span { transform: translate(3px, -3px); }
 .scroll-cue { padding: 0 30px; display: flex; align-items: center; gap: 14px; transition: background 0.25s, color 0.25s; }
 .scroll-cue-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .scroll-cue-icon { width: 34px; height: 34px; display: grid; place-items: center; font-size: 15px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; animation: nudge 2.6s ease-in-out infinite; transition: border-color 0.25s; }
@@ -230,9 +232,10 @@ button { color: inherit; font: inherit; }
 .footer-brand > p { max-width: 310px; margin: 26px 0 0; color: rgba(255,255,255,0.62); line-height: 1.6; }
 .footer-label { margin: 0 0 25px; color: var(--lime); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
 .footer-contact, .footer-location { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-.footer-contact a, .social-links a { transition: color 0.2s, transform 0.25s; }
-.footer-contact a:hover, .social-links a:hover { color: var(--lime); transform: translateX(3px); }
+.footer-contact a, .footer-map-link, .social-links a { transition: color 0.2s, transform 0.25s; }
+.footer-contact a:hover, .footer-map-link:hover, .social-links a:hover { color: var(--lime); transform: translateX(3px); }
 .footer-location address { font-style: normal; line-height: 1.65; }
+.footer-map-link { margin-top: 7px; color: var(--lime); font-size: 11px; border-bottom: 1px solid rgba(185,220,114,0.35); }
 .social-links { display: flex; gap: 22px; margin-top: 18px; font-size: 13px; }
 .footer-bottom { margin-top: 80px; padding-top: 22px; display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.58); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .footer-bottom p { margin: 0; }
