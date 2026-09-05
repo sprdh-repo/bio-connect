@@ -185,6 +185,19 @@ button { color: inherit; font: inherit; }
 .orbit-one { width: 650px; height: 650px; }
 .orbit-two { width: 900px; height: 360px; transform: rotate(-14deg); }
 
+.institutional-partners { padding-block: 78px; background: var(--paper); }
+.partners-heading { display: flex; justify-content: space-between; align-items: end; gap: 40px; padding-bottom: 30px; }
+.partners-heading .footer-label { margin: 0; color: #4f7f3b; }
+.partners-heading h2 { margin: 0; font: 600 clamp(24px, 2.5vw, 34px)/1.1 Manrope, sans-serif; letter-spacing: -0.045em; }
+.partner-logos { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); }
+.partner-logo { min-width: 0; min-height: 145px; padding: 28px 32px; display: grid; place-items: center; }
+.partner-logo + .partner-logo { border-left: 1px solid var(--line); }
+.partner-logo img { width: auto; max-width: 100%; height: auto; display: block; object-fit: contain; }
+.partner-logo-ksidc img { max-height: 74px; }
+.partner-logo-bio360 img { max-height: 78px; }
+.partner-logo-klip img { max-height: 69px; }
+.partner-logo-invest img { max-height: 76px; }
+
 .site-footer { padding: 90px 0 25px; color: rgba(255,255,255,0.78); background: var(--forest-deep); }
 .footer-grid { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 80px; }
 .footer-brand .brand { width: 220px; }
@@ -228,6 +241,9 @@ button { color: inherit; font: inherit; }
   .stats-grid article:nth-child(2) { border-right: 0; }
   .impact-dashboard { grid-template-columns: 1fr; }
   .outcome-grid .outcome-feature { min-height: 190px; }
+  .partner-logos { grid-template-columns: 1fr 1fr; }
+  .partner-logo:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+  .partner-logo:nth-child(4) { border-top: 1px solid var(--line); }
   .experience-title { position: static; }
 }
 
@@ -274,6 +290,16 @@ button { color: inherit; font: inherit; }
   .video-meta h3 { font-size: 23px; }
   .register { min-height: 560px; }
   .register h2 { font-size: 48px; }
+  .institutional-partners { padding: 56px 0 40px; }
+  .partners-heading { align-items: flex-start; flex-direction: column; gap: 14px; padding-bottom: 26px; }
+  .partners-heading h2 { max-width: 280px; }
+  .partner-logos { grid-template-columns: 1fr; }
+  .partner-logo { min-height: 116px; padding: 20px 28px; }
+  .partner-logo + .partner-logo { border-left: 0; border-top: 1px solid var(--line); }
+  .partner-logo-ksidc img { max-height: 74px; }
+  .partner-logo-bio360 img { max-height: 74px; }
+  .partner-logo-klip img { max-height: 68px; }
+  .partner-logo-invest img { max-height: 75px; }
   .footer-grid { grid-template-columns: 1fr; gap: 50px; }
   .footer-bottom { margin-top: 55px; }
 }
