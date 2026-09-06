@@ -165,3 +165,26 @@ document.querySelectorAll("[data-video-url]").forEach((trigger) => {
 document.querySelector("[data-dialog-close]").addEventListener("click", closeVideo);
 videoDialog.addEventListener("click", (event) => event.target === videoDialog && closeVideo());
 videoDialog.addEventListener("cancel", () => dialogFrame.replaceChildren());
+
+/* Registration tabs: one panel at a time, with roving focus across the tablist. */
+const regTabs = [...document.querySelectorAll("[data-reg-tab]")];
+
+const selectRegTab = (tab, { focus = false } = {}) => {
+  regTabs.forEach((item) => {
+    const selected = item === tab;
+    item.setAttribute("aria-selected", String(selected));
+    item.tabIndex = selected ? 0 : -1;
+    document.getElementById(item.getAttribute("aria-controls")).hidden = !selected;
+  });
+  if (focus) tab.focus();
+};
+
+regTabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => selectRegTab(tab));
+  tab.addEventListener("keydown", (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1, Home: -index, End: regTabs.length - 1 - index }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    selectRegTab(regTabs[(index + step + regTabs.length) % regTabs.length], { focus: true });
+  });
+});
