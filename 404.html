@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#092f26" />
+    <title>Page not found | Bio Connect 4.0</title>
+    <link rel="icon" href="/assets/favicon.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      /* The 404 is served for every unknown path, including the old Bio Connect 3.0
+         URLs still in search results, so it stands on its own with no header or footer. */
+      .notfound { min-height: 100vh; display: grid; align-content: center; justify-items: start;
+        gap: 20px; background: var(--forest-deep); color: white;
+        padding: 80px max(24px, calc((100vw - 1240px) / 2)); }
+      .notfound img { height: 44px; width: auto; margin-bottom: 20px; }
+      .notfound h1 { margin: 0; }
+      .notfound p { margin: 0; max-width: 46ch; opacity: 0.78; }
+    </style>
+  </head>
+  <body>
+    <main class="notfound">
+      <img src="/assets/bio-connect-logo.png" alt="Bio Connect - Connecting Science to Business" />
+      <h1>This page has moved on.</h1>
+      <p>
+        The address you followed is not part of the Bio Connect 4.0 site. It may have belonged to an
+        earlier edition of the conclave.
+      </p>
+      <a class="button button-primary" href="/">Go to the home page<span class="button-arrow" aria-hidden="true">&rarr;</span></a>
+    </main>
+  </body>
+</html>

@@ -17,10 +17,42 @@ Then open <http://localhost:4173>.
 - `index.html` - the landing page.
 - `committee.html` - the Advisory, Organising and Monitoring, and Programme Committees
   constituted by G.O.(Rt) No. 879/2026/ID.
+- `404.html` - served by CloudFront for any unknown path.
+  The domain previously hosted Bio Connect 3.0, so search engines still request old
+  URLs like `/about/` and `/agenda/`; without this they get an S3 `AccessDenied` 403,
+  which Google reads as "blocked" and keeps the stale entry alive instead of dropping it.
 
 Both pages share `styles.css` and `script.js`.
 `script.js` is page-agnostic: the home-page-only widgets are feature-detected, and
 scroll-spy only tracks nav links that point into the page you are on.
+
+## Search engines
+
+`robots.txt` and `sitemap.xml` are part of the deployed site and both name the canonical
+host `https://bioconnect.kerala.gov.in`, which is the only hostname the distribution
+answers on. Every page also carries a `rel=canonical` pointing at it.
+
+`infra/legacy-redirects.js` is a CloudFront viewer-request function on the default cache
+behaviour. The domain hosted Bio Connect 3.0 until September 2026, so press coverage still
+links to pages like `/about` and `/speakers`; the function 301s them to the home page so
+those referrals are not lost. Anything else that is missing still returns a 404, which is
+what lets search engines drop the old pages from their index.
+
+The function is deployed by hand, not by `scripts/deploy.sh`:
+
+```sh
+aws cloudfront create-function --name bioconnect4-legacy-redirects \
+  --function-config Comment="301 Bio Connect 3.0 URLs to the 4.0 home page",Runtime=cloudfront-js-2.0 \
+  --function-code fileb://infra/legacy-redirects.js
+# then: test-function against a sample event, publish-function, and confirm the
+# distribution still associates it with the default cache behaviour.
+```
+
+`index.html` carries an `Event` JSON-LD block. Keep its dates and venue in step with the
+event bar in the hero; a mismatch between the two is what search engines flag.
+
+When the sitemap changes, submit it again in Google Search Console for the
+`bioconnect.kerala.gov.in` property.
 
 ## Assets
 

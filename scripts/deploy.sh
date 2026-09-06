@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html committee.html styles.css script.js; do
+for file in index.html committee.html 404.html styles.css script.js robots.txt sitemap.xml; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -43,6 +43,22 @@ aws s3 cp committee.html "s3://$BUCKET/committee.html" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --only-show-errors
 
+aws s3 cp 404.html "s3://$BUCKET/404.html" \
+  --content-type "text/html; charset=utf-8" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --only-show-errors
+
+# Crawler-facing files: short cache so a sitemap edit reaches Google the same day.
+aws s3 cp robots.txt "s3://$BUCKET/robots.txt" \
+  --content-type "text/plain; charset=utf-8" \
+  --cache-control "public, max-age=300" \
+  --only-show-errors
+
+aws s3 cp sitemap.xml "s3://$BUCKET/sitemap.xml" \
+  --content-type "application/xml; charset=utf-8" \
+  --cache-control "public, max-age=300" \
+  --only-show-errors
+
 aws s3 cp styles.css "s3://$BUCKET/styles.css" \
   --content-type "text/css; charset=utf-8" \
   --cache-control "public, max-age=300" \
@@ -61,7 +77,8 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/committee.html" "/styles.css" "/script.js" "/assets/*" \
+    --paths "/" "/index.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" \
+            "/styles.css" "/script.js" "/assets/*" \
     --query 'Invalidation.Id' \
     --output text
 )"

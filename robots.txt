@@ -1,0 +1,5 @@
+# Bio Connect 4.0 - https://bioconnect.kerala.gov.in/
+User-agent: *
+Allow: /
+
+Sitemap: https://bioconnect.kerala.gov.in/sitemap.xml
