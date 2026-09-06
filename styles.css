@@ -35,6 +35,41 @@ button { color: inherit; font: inherit; }
 }
 .skip-link:focus { transform: none; }
 
+/* Intro curtain. Hidden by default so a no-JS or reduced-motion visit never
+   sees it - script.js only ever adds .intro-on to the root when it should run. */
+.intro {
+  position: fixed; inset: 0; z-index: 200; display: none; grid-template-rows: 1fr auto;
+  overflow: hidden; color: white; background: var(--forest-deep);
+}
+/* Stays laid out while it lifts, after the root class is dropped. */
+html.intro-on .intro, .intro.is-done { display: grid; }
+html.intro-on, html.intro-on body { overflow: hidden; }
+.intro-grid { position: absolute; inset: 0; opacity: 0.18; background-image: linear-gradient(rgba(255,255,255,0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.18) 1px, transparent 1px); background-size: 80px 80px; mask-image: radial-gradient(circle at 50% 45%, black, transparent 70%); }
+.intro::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--lime); }
+/* Sits precisely where the header brand sits, so the lift is a match cut:
+   the panel slides out from behind a logo that never moves. */
+.intro-head { position: absolute; inset: 0 0 auto; z-index: 3; height: 92px; padding: 0 max(40px, calc((100vw - 1240px) / 2)); display: flex; align-items: center; border-bottom: 1px solid transparent; }
+.intro-inner { position: relative; z-index: 2; align-self: center; padding-block: 40px; }
+.intro-foot { position: relative; z-index: 2; display: flex; align-items: center; gap: 22px; padding-bottom: 44px; }
+.intro-line { margin: 0; overflow: hidden; }
+.intro-line > span { display: block; transform: translateY(115%); animation: intro-rise 0.95s cubic-bezier(.2,.8,.2,1) forwards; }
+.intro-eyebrow { margin-bottom: 26px; color: var(--lime); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+/* Flex items, so a narrow screen breaks between the two facts rather than
+   through the middle of the venue name. */
+.intro-eyebrow > span { display: flex; flex-wrap: wrap; gap: 0 10px; }
+.intro-eyebrow i { font-style: normal; }
+.intro-eyebrow > span { animation-delay: 0.1s; }
+.intro-word { font: 700 clamp(52px, 9vw, 128px)/0.94 Manrope, sans-serif; letter-spacing: -0.065em; }
+.intro-word > span { animation-delay: 0.22s; }
+.intro-word-accent { color: var(--lime); }
+.intro-word-accent > span { animation-delay: 0.34s; }
+.intro-meter { flex: 1; height: 1px; background: rgba(255,255,255,0.22); }
+.intro-meter i { display: block; height: 100%; background: var(--lime); transform: scaleX(0); transform-origin: left; animation: intro-fill 1.55s cubic-bezier(.4,0,.2,1) 0.2s forwards; }
+.intro-count { min-width: 46px; font: 600 12px Manrope, sans-serif; letter-spacing: 0.1em; text-align: right; font-variant-numeric: tabular-nums; }
+.intro.is-done { pointer-events: none; transform: translateY(-100%); transition: transform 0.85s cubic-bezier(.76,0,.24,1); }
+.intro.is-done .intro-inner, .intro.is-done .intro-foot { opacity: 0; transform: translateY(-26px); transition: opacity 0.4s ease, transform 0.7s cubic-bezier(.76,0,.24,1); }
+.intro.is-done .intro-head { transform: translateY(100vh); transition: transform 0.85s cubic-bezier(.76,0,.24,1); }
+
 .site-header {
   position: fixed; inset: 0 0 auto; z-index: 50; height: 92px; padding: 0 max(40px, calc((100vw - 1240px) / 2));
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 46px;
@@ -100,6 +135,37 @@ button { color: inherit; font: inherit; }
 .marquee:hover .marquee-track { animation-play-state: paused; }
 .marquee span { font: 700 12px Manrope, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; }
 .marquee i { width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; }
+
+.countdown { position: relative; overflow: hidden; padding-block: 110px; color: white; background: var(--forest); }
+.countdown::before { content: ""; position: absolute; inset: 0; opacity: 0.14; background-image: radial-gradient(circle at center, transparent 0, transparent 3px, white 4px, transparent 5px); background-size: 36px 36px; mask-image: linear-gradient(180deg, black, transparent 78%); }
+.countdown-inner { position: relative; z-index: 2; }
+.countdown-head { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 8vw; align-items: start; padding-bottom: 46px; border-bottom: 1px solid rgba(255,255,255,0.18); }
+.countdown .eyebrow { margin-bottom: 22px; color: var(--lime); }
+.countdown h2 { margin: 0; font: 600 clamp(38px, 4.6vw, 64px)/1.05 Manrope, sans-serif; letter-spacing: -0.055em; }
+.countdown-aside { display: flex; flex-direction: column; align-items: flex-start; gap: 32px; }
+/* Same label-over-value pattern as the hero event bar, one size up - these are
+   the two facts a visitor came for. */
+.countdown-facts { display: grid; gap: 24px; }
+.countdown-fact { display: flex; flex-direction: column; }
+.countdown-fact strong { font: 600 clamp(18px, 1.6vw, 22px)/1.35 Manrope, sans-serif; letter-spacing: -0.03em; }
+.countdown-actions { width: 100%; display: grid; gap: 20px; justify-items: start; }
+.calendar { position: relative; }
+.calendar-button { padding: 12px 0; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,0.45); font-size: 14px; cursor: pointer; transition: border-color 0.25s; }
+.calendar-button:hover { border-color: var(--lime); }
+.calendar-button > span { display: inline-block; margin-left: 12px; transition: transform 0.3s cubic-bezier(.2,.8,.2,1); }
+/* The plus turns into a close mark while the list is open. */
+.calendar-button[aria-expanded="true"] > span { transform: rotate(135deg); }
+.calendar-menu { position: absolute; z-index: 5; top: calc(100% + 14px); left: 0; min-width: 244px; display: grid; padding: 8px; color: var(--ink); background: var(--paper); box-shadow: 0 24px 60px rgba(2,14,11,0.45); }
+.calendar-menu[hidden] { display: none; }
+.calendar-menu a { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 14px; font-size: 13px; font-weight: 600; transition: background 0.2s; }
+.calendar-menu a:hover { background: var(--cream); }
+.calendar-menu a > span { color: var(--muted); font-size: 11px; font-weight: 500; }
+.countdown-clock { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); }
+.countdown-unit { padding: 44px 24px 0 0; }
+.countdown-unit + .countdown-unit { padding-left: 34px; border-left: 1px solid rgba(255,255,255,0.18); }
+.countdown-unit strong { display: block; font: 600 clamp(52px, 6.2vw, 88px)/1 Manrope, sans-serif; letter-spacing: -0.06em; font-variant-numeric: tabular-nums; }
+.countdown-unit span { display: block; margin-top: 14px; color: var(--lime); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.countdown-unit.is-tick strong { animation: tick-in 0.4s cubic-bezier(.2,.8,.2,1); }
 
 .section { padding-block: 130px; scroll-margin-top: 76px; }
 .section-kicker { display: grid; grid-template-columns: 48px auto; gap: 20px; align-items: center; margin-bottom: 65px; }
@@ -390,6 +456,9 @@ button { color: inherit; font: inherit; }
 .reveal.visible { opacity: 1; transform: none; }
 @keyframes settle { from { transform: scale(1.1); filter: brightness(0.65); } to { transform: scale(1.02); filter: brightness(1); } }
 @keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes intro-rise { to { transform: none; } }
+@keyframes intro-fill { to { transform: scaleX(1); } }
+@keyframes tick-in { from { opacity: 0.4; transform: translateY(-7px); } }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.7); } }
 @keyframes reg-panel-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes nudge { 0%, 72%, 100% { transform: translateY(0); } 82% { transform: translateY(4px); } }
@@ -433,6 +502,16 @@ button { color: inherit; font: inherit; }
   .event-detail + .event-detail { padding-left: 20px; }
   .event-edition, .scroll-cue { display: none; }
   .about-copy, .impact-heading, .section-heading, .highlights-heading, .experience-grid { grid-template-columns: 1fr; gap: 45px; }
+  .intro-head { height: 76px; padding-inline: 20px; }
+  .countdown { padding-block: 84px; }
+  .countdown-head { grid-template-columns: 1fr; gap: 34px; padding-bottom: 38px; }
+  .countdown-clock { grid-template-columns: 1fr 1fr; }
+  /* Row one carries the gutter as padding, not margin, so the column rules run
+     all the way into the row rule and the junctions close. */
+  .countdown-unit { padding: 32px 20px 32px 0; }
+  .countdown-unit:nth-child(2n) { padding-left: 30px; border-left: 1px solid rgba(255,255,255,0.18); }
+  .countdown-unit:nth-child(2n+1) { padding-left: 0; border-left: 0; }
+  .countdown-unit:nth-child(n+3) { padding-bottom: 0; border-top: 1px solid rgba(255,255,255,0.18); }
   .focus-list { grid-template-columns: 1fr; column-gap: 0; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .stats-grid article:nth-child(2) { border-right: 0; }
@@ -490,6 +569,16 @@ button { color: inherit; font: inherit; }
   .event-detail { min-height: 72px; padding: 14px 16px; border-right: 0; }
   .event-detail + .event-detail { padding-left: 16px; border-top: 1px solid rgba(255,255,255,0.15); }
   .section-kicker { margin-bottom: 42px; }
+  .intro-eyebrow > span > span { flex-basis: 100%; line-height: 1.9; }
+  .intro-eyebrow i { display: none; }
+  .intro-word { font-size: clamp(44px, 13vw, 64px); }
+  .intro-foot { padding-bottom: 34px; }
+  .countdown { padding-block: 68px; }
+  .countdown-unit span { margin-top: 12px; }
+  .countdown-actions { justify-items: stretch; }
+  .countdown-aside .button { width: 100%; }
+  .calendar-button { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+  .calendar-menu { right: 0; min-width: 0; }
   .about h2, .impact-heading h2, .section-heading h2, .experience h2 { font-size: 41px; }
   .stats-grid { margin-top: 65px; }
   .stats-grid article { padding: 28px 12px 28px 0; }
@@ -575,4 +664,6 @@ button { color: inherit; font: inherit; }
   .hero-media { transform: none; }
   .trend-bar { width: var(--bar); }
   .mobile-nav > a { opacity: 1; transform: none; }
+  .intro { display: none !important; }
+  .intro-line > span { transform: none; }
 }

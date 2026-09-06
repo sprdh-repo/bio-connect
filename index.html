@@ -17,9 +17,41 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <script>
+      /* Decided before first paint: the curtain is opt-in, so a repeat visit,
+         a deep link or a reduced-motion preference never sees it at all. */
+      (function () {
+        try {
+          if (location.hash || sessionStorage.getItem("bc-intro") === "seen") return;
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          sessionStorage.setItem("bc-intro", "seen");
+          document.documentElement.classList.add("intro-on");
+        } catch (error) {
+          /* Storage is blocked in private mode - just skip the intro. */
+        }
+      })();
+    </script>
     <script src="script.js" defer></script>
   </head>
   <body>
+    <div class="intro" data-intro aria-hidden="true">
+      <span class="intro-grid"></span>
+      <div class="intro-head">
+        <span class="brand"><img src="assets/bio-connect-logo.png" alt="" /></span>
+      </div>
+      <div class="intro-inner shell">
+        <p class="intro-line intro-eyebrow">
+          <span><span>08-09 October 2026</span><i aria-hidden="true">&middot;</i><span>Hyatt Regency Trivandrum</span></span>
+        </p>
+        <p class="intro-line intro-word"><span>Bio Connect</span></p>
+        <p class="intro-line intro-word intro-word-accent"><span>4.0</span></p>
+      </div>
+      <div class="intro-foot shell">
+        <span class="intro-meter"><i></i></span>
+        <span class="intro-count" data-intro-count>00</span>
+      </div>
+    </div>
+
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header" data-header>
@@ -115,6 +147,75 @@
             <span>B2B &amp; B2G meetups</span><i></i><span>Panel discussions</span><i></i><span>Investor connect</span><i></i>
             <span>Industry &amp; startup showcase</span><i></i><span>Networking</span><i></i>
           </div>
+        </div>
+      </section>
+
+      <section class="countdown" aria-labelledby="countdown-title" data-countdown>
+        <div class="shell countdown-inner">
+          <div class="countdown-head">
+            <div class="reveal">
+              <p class="eyebrow">Countdown</p>
+              <h2 id="countdown-title" data-countdown-title data-title-live="Bio Connect 4.0 is live.">
+                The fourth edition opens in
+              </h2>
+            </div>
+            <div class="countdown-aside reveal">
+              <div class="countdown-facts">
+                <div class="countdown-fact">
+                  <span class="detail-label">When</span>
+                  <strong>08-09 October 2026</strong>
+                </div>
+                <div class="countdown-fact">
+                  <span class="detail-label">Where</span>
+                  <strong>
+                    <a
+                      class="venue-inline-link"
+                      href="https://www.google.com/maps/search/?api=1&amp;query=Hyatt+Regency+Trivandrum"
+                      target="_blank"
+                      rel="noreferrer"
+                    >Hyatt Regency Trivandrum <span aria-hidden="true">&#8599;</span></a>
+                  </strong>
+                </div>
+              </div>
+              <div class="countdown-actions">
+                <a class="button button-primary" href="#registration">
+                  Register now<span class="button-arrow" aria-hidden="true">&#8594;</span>
+                </a>
+
+                <div class="calendar" data-calendar>
+                  <button
+                    class="calendar-button"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="calendar-menu"
+                    data-calendar-button
+                  >Add to calendar<span aria-hidden="true">+</span></button>
+
+                  <div class="calendar-menu" id="calendar-menu" hidden data-calendar-menu>
+                    <a
+                      href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Bio%20Connect%204.0&amp;dates=20261008/20261010&amp;location=Hyatt%20Regency%20Trivandrum%2C%20Kerala&amp;details=Kerala%27s%20international%20life%20sciences%20conclave%20and%20expo."
+                      target="_blank"
+                      rel="noreferrer"
+                    >Google Calendar<span aria-hidden="true">&#8599;</span></a>
+                    <a
+                      href="https://outlook.live.com/calendar/0/deeplink/compose?path=%2Fcalendar%2Faction%2Fcompose&amp;rru=addevent&amp;allday=true&amp;startdt=2026-10-08&amp;enddt=2026-10-10&amp;subject=Bio%20Connect%204.0&amp;location=Hyatt%20Regency%20Trivandrum%2C%20Kerala&amp;body=Kerala%27s%20international%20life%20sciences%20conclave%20and%20expo."
+                      target="_blank"
+                      rel="noreferrer"
+                    >Outlook<span aria-hidden="true">&#8599;</span></a>
+                    <a href="assets/bio-connect-4.ics" download>Apple Calendar<span>.ics</span></a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <ol class="countdown-clock reveal" aria-hidden="true">
+            <li class="countdown-unit"><strong data-unit="days">--</strong><span>Days</span></li>
+            <li class="countdown-unit"><strong data-unit="hours">--</strong><span>Hours</span></li>
+            <li class="countdown-unit"><strong data-unit="minutes">--</strong><span>Minutes</span></li>
+            <li class="countdown-unit"><strong data-unit="seconds">--</strong><span>Seconds</span></li>
+          </ol>
+          <p class="sr-only">Bio Connect 4.0 takes place on 8 and 9 October 2026 at Hyatt Regency Trivandrum.</p>
         </div>
       </section>
 

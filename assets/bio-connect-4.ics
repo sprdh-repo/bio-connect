@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Bio Connect//Bio Connect 4.0//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:bio-connect-4-0-2026@bioconnect.kerala.gov.in
+DTSTAMP:20260906T000000Z
+DTSTART;VALUE=DATE:20261008
+DTEND;VALUE=DATE:20261010
+SUMMARY:Bio Connect 4.0
+LOCATION:Hyatt Regency Trivandrum\, Kerala\, India
+DESCRIPTION:Kerala's international life sciences conclave and expo.
+END:VEVENT
+END:VCALENDAR

@@ -6,6 +6,85 @@ const heroMedia = document.querySelector("[data-parallax]");
 const hero = document.querySelector(".hero");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/* Intro curtain. The root class is set in the page head, before first paint -
+   here we only run the exit and tell the rest of the page when to start. */
+const intro = document.querySelector("[data-intro]");
+const introRunning = document.documentElement.classList.contains("intro-on") && intro;
+
+const introDone = new Promise((resolve) => {
+  if (!introRunning) {
+    resolve();
+    return;
+  }
+
+  const introCount = intro.querySelector("[data-intro-count]");
+  const countStartedAt = performance.now();
+
+  const countUp = (now) => {
+    const progress = Math.min((now - countStartedAt) / 1550, 1);
+    introCount.textContent = String(Math.round(progress * 100)).padStart(2, "0");
+    if (progress < 1) requestAnimationFrame(countUp);
+  };
+  requestAnimationFrame(countUp);
+
+  let settled = false;
+  const endIntro = () => {
+    if (settled) return;
+    settled = true;
+    intro.classList.add("is-done");
+    document.documentElement.classList.remove("intro-on");
+    /* Wait for the panel's own lift - the fades on its children bubble up here
+       too, and acting on those would cut the curtain off half raised. */
+    intro.addEventListener("transitionend", (event) => {
+      if (event.target === intro && event.propertyName === "transform") intro.remove();
+    });
+    setTimeout(resolve, 420);
+  };
+
+  /* Nobody should be held hostage by an animation - any input skips it. */
+  window.addEventListener("keydown", endIntro, { once: true });
+  intro.addEventListener("pointerdown", endIntro, { once: true });
+  window.addEventListener("wheel", endIntro, { once: true, passive: true });
+  setTimeout(endIntro, 2150);
+});
+
+/* The conclave opens on the morning of 8 October 2026, India time. */
+const EVENT_START = new Date("2026-10-08T09:00:00+05:30");
+const countdown = document.querySelector("[data-countdown]");
+
+if (countdown) {
+  const units = [
+    { node: countdown.querySelector('[data-unit="days"]'), per: 86400000 },
+    { node: countdown.querySelector('[data-unit="hours"]'), per: 3600000, of: 24 },
+    { node: countdown.querySelector('[data-unit="minutes"]'), per: 60000, of: 60 },
+    { node: countdown.querySelector('[data-unit="seconds"]'), per: 1000, of: 60 },
+  ];
+  const title = countdown.querySelector("[data-countdown-title]");
+
+  const render = () => {
+    const remaining = Math.max(EVENT_START - Date.now(), 0);
+
+    units.forEach(({ node, per, of }) => {
+      const value = of ? Math.floor(remaining / per) % of : Math.floor(remaining / per);
+      const next = String(value).padStart(2, "0");
+      if (node.textContent === next) return;
+      node.textContent = next;
+      if (reduceMotion) return;
+      const unit = node.parentElement;
+      unit.classList.add("is-tick");
+      unit.addEventListener("animationend", () => unit.classList.remove("is-tick"), { once: true });
+    });
+
+    if (remaining > 0) return true;
+    title.textContent = title.dataset.titleLive;
+    return false;
+  };
+
+  if (render()) {
+    const ticker = setInterval(() => render() || clearInterval(ticker), 1000);
+  }
+}
+
 /* Arriving from another page on a link like index.html#highlights, the browser
    would smooth-scroll the whole way down after load. Land there directly, then
    hand smooth scrolling back to in-page clicks. */
@@ -125,7 +204,8 @@ document.querySelectorAll(".reveal").forEach((element, index) => {
     element.style.transitionDelay =
       heroIndex >= 0 ? `${120 + heroIndex * 110}ms` : `${Math.min(index % 4, 2) * 70}ms`;
   }
-  revealObserver.observe(element);
+  /* Behind the curtain the hero would reveal to nobody - wait for the lift. */
+  introDone.then(() => revealObserver.observe(element));
 });
 
 const numberFormatter = new Intl.NumberFormat("en-IN");
@@ -152,6 +232,31 @@ const countObserver = new IntersectionObserver(
 );
 
 document.querySelectorAll("[data-count]").forEach((counter) => countObserver.observe(counter));
+
+/* Add-to-calendar disclosure. Plain links behind a toggle - the .ics download
+   covers every client the two deep links don't. */
+const calendar = document.querySelector("[data-calendar]");
+
+if (calendar) {
+  const calendarButton = calendar.querySelector("[data-calendar-button]");
+  const calendarMenu = calendar.querySelector("[data-calendar-menu]");
+
+  const setCalendar = (open) => {
+    calendarButton.setAttribute("aria-expanded", String(open));
+    calendarMenu.hidden = !open;
+  };
+
+  calendarButton.addEventListener("click", () =>
+    setCalendar(calendarButton.getAttribute("aria-expanded") !== "true"),
+  );
+  calendarMenu.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => setCalendar(false)));
+  document.addEventListener("click", (event) => calendar.contains(event.target) || setCalendar(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || calendarMenu.hidden) return;
+    setCalendar(false);
+    calendarButton.focus();
+  });
+}
 
 /* The highlights player only exists on the home page. */
 const videoDialog = document.querySelector("[data-video-dialog]");
