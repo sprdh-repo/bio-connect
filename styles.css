@@ -299,12 +299,90 @@ button { color: inherit; font: inherit; }
 .partner-logo-klip img { max-height: 69px; }
 .partner-logo-invest img { max-height: 76px; }
 
+/* Inline link for light surfaces - matches .reg-foot-link, usable inline in copy. */
+.inline-link { display: inline-block; padding-bottom: 4px; color: var(--forest); font-size: 13px; font-weight: 600; border-bottom: 1px solid rgba(11,51,41,0.3); transition: border-color 0.25s; }
+.inline-link:hover { border-color: var(--forest); }
+.inline-link span { display: inline-block; margin-left: 8px; transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
+.inline-link:hover span, .inline-link:focus-visible span { transform: translateX(4px); }
+
+/* Interior pages open on a flat dark band instead of the home hero artwork, so
+   the fixed header keeps the same white-on-dark treatment above the fold. */
+.page-hero { position: relative; overflow: hidden; padding-top: 178px; color: white; background: var(--forest-deep); }
+.page-hero::after { content: ""; position: absolute; inset: auto -10% -45% 26%; height: 540px; background: radial-gradient(ellipse at center, rgba(185,220,114,0.15), transparent 62%); pointer-events: none; }
+.page-hero-inner { position: relative; z-index: 2; padding-bottom: 78px; }
+.breadcrumb { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.breadcrumb a { border-bottom: 1px solid transparent; transition: color 0.2s, border-color 0.2s; }
+.breadcrumb a:hover { color: var(--lime); border-bottom-color: currentColor; }
+.breadcrumb [aria-current] { color: white; }
+.page-hero h1 { margin: 0; max-width: 15ch; font: 700 clamp(44px, 6.4vw, 92px)/0.98 Manrope, sans-serif; letter-spacing: -0.065em; }
+.page-hero h1 em { color: var(--lime); font-weight: 400; font-style: normal; }
+.page-hero-intro { max-width: 590px; margin: 32px 0 0; color: rgba(255,255,255,0.72); font-size: 17px; line-height: 1.7; }
+.hero-facts { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgba(255,255,255,0.2); }
+.hero-fact { padding: 26px 30px 32px 0; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.16); }
+.hero-fact + .hero-fact { padding-left: 30px; }
+.hero-fact:last-child { border-right: 0; }
+.hero-fact strong { font: 600 15px Manrope, sans-serif; letter-spacing: -0.01em; }
+
+.leadership .section-heading { margin-bottom: 56px; }
+.leadership-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.leader-card { min-height: 298px; display: grid; grid-template-columns: 238px minmax(0, 1fr); color: white; background: var(--forest); }
+.leader-card-tall { --portrait-ratio: 3 / 5; }
+.leader-portrait { position: relative; overflow: hidden; background: var(--forest-deep); }
+.leader-portrait::after { content: ""; position: absolute; inset: 0 0 0 auto; width: 1px; background: rgba(255,255,255,0.14); }
+.leader-portrait img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 0; transition: transform 0.7s cubic-bezier(.2,.8,.2,1); }
+.leader-card:hover .leader-portrait img { transform: scale(1.04); }
+/* margin-bottom:auto pins the role label to the top and the name block to the
+   bottom, so both cards line up however much text each one carries. */
+.leader-meta { padding: 34px 34px 32px; display: flex; flex-direction: column; justify-content: flex-start; }
+.leader-role { margin: 0 0 auto; color: var(--lime); font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.leader-card h3 { margin: 15px 0 0; font: 600 clamp(26px, 2.5vw, 34px)/1.1 Manrope, sans-serif; letter-spacing: -0.045em; }
+.leader-office { margin: 13px 0 0; color: rgba(255,255,255,0.68); font-size: 14px; line-height: 1.55; }
+.leader-tag { margin: 22px 0 0; padding: 8px 13px; align-self: flex-start; color: var(--forest-deep); background: var(--lime); font-size: 10px; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
+
+.committees { background: var(--cream); }
+.committees .section-heading { margin-bottom: 46px; }
+/* Sticky under the 76px scrolled header, so the roster you are reading always
+   says which committee it belongs to. */
+.committee-nav { position: sticky; top: 76px; z-index: 12; display: flex; overflow-x: auto; scrollbar-width: none; background: var(--cream); border-block: 1px solid var(--line); }
+.committee-nav::-webkit-scrollbar { display: none; }
+.committee-nav a { position: relative; flex-shrink: 0; padding: 17px 24px; color: var(--muted); font: 600 12px Manrope, sans-serif; letter-spacing: 0.05em; white-space: nowrap; transition: color 0.25s; }
+.committee-nav a + a { border-left: 1px solid var(--line); }
+.committee-nav a::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--forest); transform: scaleX(0); transform-origin: right; transition: transform 0.3s cubic-bezier(.2,.8,.2,1); }
+.committee-nav a:hover, .committee-nav a[aria-current] { color: var(--ink); }
+.committee-nav a[aria-current]::after { transform: scaleX(1); transform-origin: left; }
+
+.committee-block { padding-top: 78px; scroll-margin-top: 132px; }
+.committee-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding-bottom: 28px; }
+.committee-index { display: block; margin-bottom: 13px; color: var(--muted); font: 600 11px Manrope, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
+.committee-head h3 { margin: 0; font: 600 clamp(28px, 3.2vw, 46px)/1.06 Manrope, sans-serif; letter-spacing: -0.05em; }
+.committee-mandate { max-width: 58ch; margin: 16px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+.committee-count { margin: 0; padding-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+/* 1px gaps plus a 1px outset ring per cell: the grid rules stay hairline-thin and
+   a half-empty last row leaves no stray block of border colour. */
+.roster { margin: 1px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; list-style: none; }
+.roster-item { padding: 24px 26px; display: flex; flex-direction: column; gap: 7px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.roster-role { color: var(--muted); font: 700 10px Manrope, sans-serif; letter-spacing: 0.14em; text-transform: uppercase; }
+.roster-name { font: 600 17px Manrope, sans-serif; letter-spacing: -0.02em; }
+.roster-org { color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.roster-item.is-lead { background: #edf2e0; }
+.roster-item.is-lead .roster-role { color: #4a7736; font-weight: 800; }
+/* Citations for the page - the G.O. the committees come from, and the portrait
+   credits the CC BY-SA licence requires. */
+.page-notes { max-width: 860px; margin: 62px 0 0; padding-top: 20px; border-top: 1px solid var(--line); }
+.page-notes p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; letter-spacing: 0.04em; }
+.page-notes p + p { margin-top: 8px; }
+.page-notes a { border-bottom: 1px solid var(--line); transition: color 0.2s, border-color 0.2s; }
+.page-notes a:hover { color: var(--forest); border-bottom-color: var(--forest); }
+
 .site-footer { padding: 90px 0 25px; color: rgba(255,255,255,0.78); background: var(--forest-deep); }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 80px; }
+.footer-grid { display: grid; grid-template-columns: 1.25fr 0.7fr 0.85fr 0.95fr; gap: 60px; }
 .footer-brand .brand { width: 220px; }
 .footer-brand > p { max-width: 310px; margin: 26px 0 0; color: rgba(255,255,255,0.62); line-height: 1.6; }
 .footer-label { margin: 0 0 25px; color: var(--lime); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
-.footer-contact, .footer-location { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.footer-nav, .footer-contact, .footer-location { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.footer-nav a { transition: color 0.2s, transform 0.25s; }
+.footer-nav a:hover, .footer-nav a[aria-current] { color: var(--lime); }
+.footer-nav a:hover { transform: translateX(3px); }
 .footer-contact a, .footer-map-link, .social-links a { transition: color 0.2s, transform 0.25s; }
 .footer-contact a:hover, .footer-map-link:hover, .social-links a:hover { color: var(--lime); transform: translateX(3px); }
 .footer-location address { font-style: normal; line-height: 1.65; }
@@ -320,6 +398,13 @@ button { color: inherit; font: inherit; }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.7); } }
 @keyframes reg-panel-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes nudge { 0%, 72%, 100% { transform: translateY(0); } 82% { transform: translateY(4px); } }
+
+@media (max-width: 1150px) {
+  .site-header { gap: 26px; }
+  .brand { width: 152px; }
+  .desktop-nav { gap: 22px; }
+  .header-cta { padding: 11px 14px; }
+}
 
 @media (max-width: 900px) {
   :root { --shell: min(100% - 40px, 680px); }
@@ -340,6 +425,7 @@ button { color: inherit; font: inherit; }
   .mobile-nav.open > a:nth-child(4) { transition-delay: 0.23s; }
   .mobile-nav.open > a:nth-child(5) { transition-delay: 0.29s; }
   .mobile-nav.open > a:nth-child(6) { transition-delay: 0.34s; }
+  .mobile-nav.open > a:nth-child(7) { transition-delay: 0.39s; }
   .mobile-nav > a[aria-current] { color: #4f7f3b; }
   .mobile-nav > a:not(.button) { padding: 18px 0; font: 600 30px Manrope, sans-serif; border-bottom: 1px solid var(--line); }
   .mobile-nav .button { margin-top: 32px; align-self: stretch; }
@@ -376,6 +462,21 @@ button { color: inherit; font: inherit; }
   .matrix-table thead th:first-child, .matrix-table tbody th { width: 200px; }
   .matrix-table thead th:not(:first-child), .matrix-table tbody td { width: 110px; }
   .reg-foot { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .page-hero { padding-top: 134px; }
+  .page-hero-inner { padding-bottom: 58px; }
+  .breadcrumb { margin-bottom: 26px; }
+  .hero-facts { grid-template-columns: 1fr 1fr; }
+  .hero-fact { padding: 20px 20px 24px 0; }
+  .hero-fact + .hero-fact { padding-left: 0; }
+  .hero-fact:nth-child(2n) { padding-left: 22px; border-right: 0; }
+  .hero-fact:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,0.16); }
+  .leadership-grid { grid-template-columns: 1fr; }
+  .leader-card { min-height: 268px; }
+  .leader-portrait { aspect-ratio: 4 / 5; align-self: start; }
+  .committee-head { grid-template-columns: 1fr; align-items: start; gap: 16px; }
+  .committee-count { padding-bottom: 0; }
+  .roster { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 46px 40px; }
 }
 
 @media (max-width: 600px) {
@@ -446,6 +547,31 @@ button { color: inherit; font: inherit; }
   .matrix-table thead th:first-child, .matrix-table tbody th { width: 168px; }
   .matrix-table thead th:not(:first-child), .matrix-table tbody td { width: 88px; }
   .reg-foot { margin-top: 40px; }
+  .page-hero { padding-top: 122px; }
+  .page-hero-inner { padding-bottom: 46px; }
+  .page-hero h1 { font-size: clamp(38px, 11.5vw, 58px); }
+  .page-hero-intro { margin-top: 24px; font-size: 16px; }
+  .hero-facts { grid-template-columns: 1fr; }
+  .hero-fact, .hero-fact:nth-child(2n) { padding: 15px 0 17px; border-right: 0; }
+  .hero-fact + .hero-fact { padding-left: 0; border-top: 1px solid rgba(255,255,255,0.16); }
+  .leader-card { min-height: 0; grid-template-columns: 132px minmax(0, 1fr); }
+  .leader-portrait { aspect-ratio: var(--portrait-ratio, 4 / 5); }
+  .leader-meta { padding: 22px 20px; }
+  .leader-card h3 { font-size: 23px; }
+  .leader-office { font-size: 13px; }
+  .leader-tag { margin-top: 16px; padding: 7px 11px; font-size: 9px; letter-spacing: 0.08em; }
+  .committee-nav a { padding: 15px 16px; font-size: 11px; }
+  .committee-block { padding-top: 54px; }
+  .roster-item { padding: 20px; }
+  .page-notes { margin-top: 46px; }
+}
+
+@media (max-width: 360px) {
+  .leader-card { grid-template-columns: 108px minmax(0, 1fr); }
+  .leader-meta { padding: 18px 16px; }
+  .leader-card h3 { font-size: 20px; }
+  .leader-office { font-size: 12.5px; }
+  .leader-tag { padding: 6px 9px; font-size: 8.5px; letter-spacing: 0.06em; }
 }
 
 @media (prefers-reduced-motion: reduce) {

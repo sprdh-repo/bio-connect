@@ -6,14 +6,31 @@ const heroMedia = document.querySelector("[data-parallax]");
 const hero = document.querySelector(".hero");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* Nav links paired with their section, so the header can show where you are. */
-const navLinks = [...document.querySelectorAll("[data-nav-link]")];
-const navTargets = [...new Set(navLinks.map((link) => link.hash))]
-  .map((hash) => ({ hash, section: document.querySelector(hash) }))
-  .filter((target) => target.section);
+/* Arriving from another page on a link like index.html#highlights, the browser
+   would smooth-scroll the whole way down after load. Land there directly, then
+   hand smooth scrolling back to in-page clicks. */
+if (location.hash) {
+  const root = document.documentElement;
+  root.style.scrollBehavior = "auto";
+  window.addEventListener("load", () => {
+    document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    requestAnimationFrame(() => root.style.removeProperty("scroll-behavior"));
+  });
+}
+
+/* Nav links paired with their section, so the header can show where you are.
+   Only links into this page take part - links to another page carry a static
+   aria-current="page" in the markup, which scroll-spy must leave alone. */
+const spyLinks = [...document.querySelectorAll("[data-nav-link]")].filter(
+  (link) => link.hash && link.pathname === location.pathname && document.querySelector(link.hash),
+);
+const navTargets = [...new Set(spyLinks.map((link) => link.hash))].map((hash) => ({
+  hash,
+  section: document.querySelector(hash),
+}));
 
 const setActiveSection = (hash) => {
-  navLinks.forEach((link) => {
+  spyLinks.forEach((link) => {
     if (link.hash === hash) link.setAttribute("aria-current", "true");
     else link.removeAttribute("aria-current");
   });
@@ -30,6 +47,8 @@ const onScroll = () => {
     const offset = Math.min(scrolled, hero.offsetHeight) * 0.12;
     heroMedia.style.setProperty("--parallax", `${offset}px`);
   }
+
+  if (!navTargets.length) return;
 
   /* Active nav = last section whose top has passed under the header. The final
      target (the footer) sits below the deepest scroll position, so the bottom of
@@ -134,37 +153,41 @@ const countObserver = new IntersectionObserver(
 
 document.querySelectorAll("[data-count]").forEach((counter) => countObserver.observe(counter));
 
+/* The highlights player only exists on the home page. */
 const videoDialog = document.querySelector("[data-video-dialog]");
-const dialogFrame = document.querySelector("[data-dialog-frame]");
 
-const closeVideo = () => {
-  videoDialog.close();
-  dialogFrame.replaceChildren();
-};
+if (videoDialog) {
+  const dialogFrame = document.querySelector("[data-dialog-frame]");
 
-document.querySelectorAll("[data-video-url]").forEach((trigger) => {
-  trigger.addEventListener("click", () => {
-    const isNativeVideo = trigger.dataset.videoType === "video";
-    const player = document.createElement(isNativeVideo ? "video" : "iframe");
-    player.src = trigger.dataset.videoUrl;
-    player.title = trigger.dataset.videoTitle;
+  const closeVideo = () => {
+    videoDialog.close();
+    dialogFrame.replaceChildren();
+  };
 
-    if (isNativeVideo) {
-      player.controls = true;
-      player.autoplay = true;
-    } else {
-      player.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-      player.allowFullscreen = true;
-    }
+  document.querySelectorAll("[data-video-url]").forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      const isNativeVideo = trigger.dataset.videoType === "video";
+      const player = document.createElement(isNativeVideo ? "video" : "iframe");
+      player.src = trigger.dataset.videoUrl;
+      player.title = trigger.dataset.videoTitle;
 
-    dialogFrame.replaceChildren(player);
-    videoDialog.showModal();
+      if (isNativeVideo) {
+        player.controls = true;
+        player.autoplay = true;
+      } else {
+        player.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        player.allowFullscreen = true;
+      }
+
+      dialogFrame.replaceChildren(player);
+      videoDialog.showModal();
+    });
   });
-});
 
-document.querySelector("[data-dialog-close]").addEventListener("click", closeVideo);
-videoDialog.addEventListener("click", (event) => event.target === videoDialog && closeVideo());
-videoDialog.addEventListener("cancel", () => dialogFrame.replaceChildren());
+  document.querySelector("[data-dialog-close]").addEventListener("click", closeVideo);
+  videoDialog.addEventListener("click", (event) => event.target === videoDialog && closeVideo());
+  videoDialog.addEventListener("cancel", () => dialogFrame.replaceChildren());
+}
 
 /* Registration tabs: one panel at a time, with roving focus across the tablist. */
 const regTabs = [...document.querySelectorAll("[data-reg-tab]")];

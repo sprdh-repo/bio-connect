@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html styles.css script.js; do
+for file in index.html committee.html styles.css script.js; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -34,6 +34,11 @@ aws sts get-caller-identity --query 'Account' --output text >/dev/null
 
 echo "Deploying site to s3://$BUCKET..."
 aws s3 cp index.html "s3://$BUCKET/index.html" \
+  --content-type "text/html; charset=utf-8" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --only-show-errors
+
+aws s3 cp committee.html "s3://$BUCKET/committee.html" \
   --content-type "text/html; charset=utf-8" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --only-show-errors
@@ -56,7 +61,7 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/styles.css" "/script.js" "/assets/*" \
+    --paths "/" "/index.html" "/committee.html" "/styles.css" "/script.js" "/assets/*" \
     --query 'Invalidation.Id' \
     --output text
 )"
@@ -75,6 +80,17 @@ curl --fail --silent --show-error --location \
 
 if ! cmp -s index.html "$REMOTE_INDEX"; then
   echo "Error: production HTML does not match the deployed index.html." >&2
+  exit 1
+fi
+
+REMOTE_COMMITTEE="$(mktemp)"
+trap 'rm -f "$REMOTE_INDEX" "$REMOTE_COMMITTEE"' EXIT
+curl --fail --silent --show-error --location \
+  --retry 3 --retry-delay 2 \
+  "$SITE_URL/committee.html" > "$REMOTE_COMMITTEE"
+
+if ! cmp -s committee.html "$REMOTE_COMMITTEE"; then
+  echo "Error: production HTML does not match the deployed committee.html." >&2
   exit 1
 fi
 
