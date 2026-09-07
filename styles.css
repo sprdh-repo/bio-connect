@@ -100,7 +100,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .hero-content { position: relative; z-index: 2; padding-top: clamp(160px, 22vh, 220px); }
 .eyebrow { margin: 0 0 28px; display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .eyebrow::before { content: ""; width: 34px; height: 1px; background: var(--lime); }
-.hero h1 { margin: 0; max-width: 900px; font: 700 clamp(54px, 7.2vw, 106px)/0.94 Manrope, sans-serif; letter-spacing: -0.065em; }
+.hero h1 { margin: 0; max-width: 1120px; font: 700 clamp(54px, 7.2vw, 106px)/0.94 Manrope, sans-serif; letter-spacing: -0.065em; }
 .hero h1 em { color: var(--lime); font-weight: 400; font-style: normal; }
 .hero-intro { max-width: 570px; margin: 30px 0 0; color: rgba(255,255,255,0.75); font-size: 18px; line-height: 1.65; }
 .hero-actions { display: flex; align-items: center; gap: 32px; margin-top: 38px; }
@@ -232,6 +232,24 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .focus-number { color: var(--muted); font-size: 11px; }
 .focus-item h3 { margin: 0; font: 600 clamp(21px, 2vw, 30px) Manrope, sans-serif; letter-spacing: -0.04em; }
 
+/* Conference themes. Each card is an image tile: the photograph sits under a
+   forest scrim that deepens toward the base, so the title stays legible no
+   matter what the picture is doing behind it. */
+.themes { background: var(--paper); }
+.theme-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
+.theme-card { position: relative; min-width: 0; min-height: 390px; padding: 28px 26px 30px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; overflow: hidden; color: white; background: var(--forest-deep); }
+.theme-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 32%; transition: transform 0.75s cubic-bezier(.2,.8,.2,1); }
+/* Paints over the art and under the content, which carries its own z-index. */
+.theme-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,28,23,0.05) 0%, rgba(5,28,23,0.34) 46%, rgba(5,28,23,0.93) 100%); }
+.theme-card:hover .theme-art { transform: scale(1.06); }
+.theme-icon, .theme-text { position: relative; z-index: 1; }
+.theme-icon { color: var(--lime); }
+.theme-icon svg { width: 28px; height: 28px; display: block; filter: drop-shadow(0 1px 7px rgba(5,28,23,0.85)); }
+.theme-text::after { content: ""; position: absolute; inset: auto 0 -30px; height: 2px; background: var(--lime); transform: scaleX(0); transform-origin: right; transition: transform 0.35s cubic-bezier(.2,.8,.2,1); }
+.theme-card:hover .theme-text::after { transform: scaleX(1); transform-origin: left; }
+.theme-card h3 { margin: 0; font: 600 clamp(21px, 1.9vw, 26px)/1.15 Manrope, sans-serif; letter-spacing: -0.04em; }
+.theme-card p { margin: 12px 0 0; color: rgba(255,255,255,0.72); font-size: 14px; line-height: 1.6; }
+
 .highlights { color: white; background: var(--forest-deep); }
 .highlights .section-kicker span { color: rgba(255,255,255,0.55); }
 .highlights-heading { margin-bottom: 70px; display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 12vw; align-items: end; }
@@ -265,6 +283,28 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .experience-card > span { color: #4a7736; font: 600 11px Manrope, sans-serif; }
 .experience-card h3 { margin: 20px 0 14px; font: 600 34px Manrope, sans-serif; letter-spacing: -0.04em; }
 .experience-card p { margin: 0; max-width: 500px; color: var(--muted); line-height: 1.7; }
+
+/* Who should attend. Eight cards over four columns fill both rows exactly, so
+   the 1px gaps read as a continuous rule set rather than an open edge. */
+.audience { color: white; background: var(--forest); }
+.audience .section-kicker span { color: rgba(255,255,255,0.55); }
+.audience-heading { display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 12vw; align-items: end; margin-bottom: 70px; }
+.audience-heading h2 { margin: 0; font: 600 clamp(42px, 5.2vw, 72px)/1.05 Manrope, sans-serif; letter-spacing: -0.055em; }
+.audience-heading p { margin: 0; color: rgba(255,255,255,0.66); font-size: 16px; line-height: 1.75; }
+.audience-grid { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: rgba(255,255,255,0.18); }
+/* The art here is texture, not picture: it sits low in the mix so the section
+   still reads as one green band rather than eight photographs. */
+.audience-card { position: relative; min-width: 0; min-height: 182px; padding: 26px 24px 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; overflow: hidden; background: #17483c; }
+.audience-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.34; transition: opacity 0.4s ease, transform 0.75s cubic-bezier(.2,.8,.2,1); }
+/* Only the lower half is scrimmed - that is where the title sits. */
+.audience-card::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5,28,23,0) 28%, rgba(5,28,23,0.72) 100%); }
+.audience-card:hover .audience-art { opacity: 0.52; transform: scale(1.06); }
+.audience-icon, .audience-card h3 { position: relative; z-index: 1; }
+.audience-icon { color: var(--lime); }
+.audience-icon svg { width: 28px; height: 28px; display: block; filter: drop-shadow(0 1px 7px rgba(5,28,23,0.85)); }
+.audience-card h3 { margin: 0; font: 600 19px/1.25 Manrope, sans-serif; letter-spacing: -0.03em; }
+.audience-foot { margin-top: 44px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
+.audience-foot p { margin: 0; max-width: 520px; color: rgba(255,255,255,0.66); font-size: 15px; line-height: 1.7; }
 
 .registration { background: var(--cream); }
 .registration .section-heading { margin-bottom: 60px; }
@@ -464,6 +504,9 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 @keyframes nudge { 0%, 72%, 100% { transform: translateY(0); } 82% { transform: translateY(4px); } }
 
 @media (max-width: 1150px) {
+  .theme-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .theme-card { grid-column: span 2; }
+  .theme-card:nth-child(n+4) { grid-column: span 3; }
   .site-header { gap: 26px; }
   .brand { width: 152px; }
   .desktop-nav { gap: 22px; }
@@ -490,6 +533,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .mobile-nav.open > a:nth-child(5) { transition-delay: 0.29s; }
   .mobile-nav.open > a:nth-child(6) { transition-delay: 0.34s; }
   .mobile-nav.open > a:nth-child(7) { transition-delay: 0.39s; }
+  .mobile-nav.open > a:nth-child(8) { transition-delay: 0.44s; }
   .mobile-nav > a[aria-current] { color: #4f7f3b; }
   .mobile-nav > a:not(.button) { padding: 18px 0; font: 600 30px Manrope, sans-serif; border-bottom: 1px solid var(--line); }
   .mobile-nav .button { margin-top: 32px; align-self: stretch; }
@@ -501,7 +545,12 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .event-detail { padding: 20px; border-right: 1px solid rgba(255,255,255,0.18); }
   .event-detail + .event-detail { padding-left: 20px; }
   .event-edition, .scroll-cue { display: none; }
-  .about-copy, .impact-heading, .section-heading, .highlights-heading, .experience-grid { grid-template-columns: 1fr; gap: 45px; }
+  .about-copy, .impact-heading, .section-heading, .highlights-heading, .experience-grid,
+  .audience-heading { grid-template-columns: 1fr; gap: 45px; }
+  .theme-card, .theme-card:nth-child(n+4) { grid-column: span 3; }
+  /* Two per row leaves the fifth card alone - it takes the full row. */
+  .theme-card:last-child { grid-column: span 6; }
+  .audience-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .intro-head { height: 76px; padding-inline: 20px; }
   .countdown { padding-block: 84px; }
   .countdown-head { grid-template-columns: 1fr; gap: 34px; padding-bottom: 38px; }
@@ -562,7 +611,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .hero-media { background-image: linear-gradient(180deg, rgba(2,20,15,0.65) 0%, rgba(2,20,15,0.82) 55%, rgba(2,20,15,0.96) 100%), url("assets/hero-biotech.webp"); }
   .hero-content { padding-top: 145px; }
   .eyebrow { margin-bottom: 22px; font-size: 10px; }
-  .hero h1 { font-size: clamp(46px, 14vw, 65px); line-height: 0.98; }
+  .hero h1 { font-size: clamp(44px, 12.6vw, 62px); line-height: 0.98; }
   .hero-intro { margin-top: 24px; font-size: 16px; line-height: 1.55; }
   .hero-actions { align-items: flex-start; flex-direction: column; gap: 14px; margin-top: 28px; }
   .event-bar-inner { grid-template-columns: 1fr; }
@@ -579,7 +628,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .countdown-aside .button { width: 100%; }
   .calendar-button { width: 100%; display: flex; align-items: center; justify-content: space-between; }
   .calendar-menu { right: 0; min-width: 0; }
-  .about h2, .impact-heading h2, .section-heading h2, .experience h2 { font-size: 41px; }
+  .about h2, .impact-heading h2, .section-heading h2, .experience h2, .audience-heading h2 { font-size: 41px; }
   .stats-grid { margin-top: 65px; }
   .stats-grid article { padding: 28px 12px 28px 0; }
   .stats-grid article + article { padding-left: 16px; }
@@ -596,6 +645,14 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .outcome-grid .outcome-feature { min-height: 180px; }
   .outcome-grid strong { font-size: 42px; }
   .focus-item { min-height: 0; padding: 26px 0; grid-template-columns: 32px 1fr; gap: 14px; }
+  .theme-grid { grid-template-columns: minmax(0, 1fr); }
+  .theme-card, .theme-card:nth-child(n+4), .theme-card:last-child { grid-column: auto; }
+  .theme-card { min-height: 320px; padding: 24px 22px 26px; }
+  .audience-heading { margin-bottom: 48px; }
+  .audience-card { min-height: 152px; padding: 20px 17px 22px; gap: 18px; }
+  .audience-icon svg { width: 24px; height: 24px; }
+  .audience-card h3 { font-size: 16px; }
+  .audience-foot { margin-top: 34px; align-items: flex-start; flex-direction: column; gap: 18px; }
   .highlights-heading { margin-bottom: 48px; }
   .video-grid { grid-template-columns: 1fr; }
   .video-card-featured { grid-column: auto; }
