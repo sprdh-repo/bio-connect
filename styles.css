@@ -418,11 +418,14 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .page-hero h1 { margin: 0; max-width: 15ch; font: 700 clamp(44px, 6.4vw, 92px)/0.98 Manrope, sans-serif; letter-spacing: -0.065em; }
 .page-hero h1 em { color: var(--lime); font-weight: 400; font-style: normal; }
 .page-hero-intro { max-width: 590px; margin: 32px 0 0; color: rgba(255,255,255,0.72); font-size: 17px; line-height: 1.7; }
-.hero-facts { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgba(255,255,255,0.2); }
+/* Uneven tracks on purpose: the convener column carries a full attribution line,
+   so it gets roughly twice the width of the two short facts beside it. */
+.hero-facts { position: relative; z-index: 2; display: grid; grid-template-columns: 0.72fr 0.86fr 1.42fr; border-top: 1px solid rgba(255,255,255,0.2); }
 .hero-fact { padding: 26px 30px 32px 0; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,0.16); }
 .hero-fact + .hero-fact { padding-left: 30px; }
 .hero-fact:last-child { border-right: 0; }
 .hero-fact strong { font: 600 15px Manrope, sans-serif; letter-spacing: -0.01em; }
+.hero-fact-note { max-width: 54ch; margin-top: 9px; color: rgba(255,255,255,0.58); font-size: 12.5px; line-height: 1.55; }
 
 .leadership .section-heading { margin-bottom: 56px; }
 .leadership-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -442,22 +445,11 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 
 .committees { background: var(--cream); }
 .committees .section-heading { margin-bottom: 46px; }
-/* Sticky under the 76px scrolled header, so the roster you are reading always
-   says which committee it belongs to. */
-.committee-nav { position: sticky; top: 76px; z-index: 12; display: flex; overflow-x: auto; scrollbar-width: none; background: var(--cream); border-block: 1px solid var(--line); }
-.committee-nav::-webkit-scrollbar { display: none; }
-.committee-nav a { position: relative; flex-shrink: 0; padding: 17px 24px; color: var(--muted); font: 600 12px Manrope, sans-serif; letter-spacing: 0.05em; white-space: nowrap; transition: color 0.25s; }
-.committee-nav a + a { border-left: 1px solid var(--line); }
-.committee-nav a::after { content: ""; position: absolute; inset: auto 0 -1px; height: 2px; background: var(--forest); transform: scaleX(0); transform-origin: right; transition: transform 0.3s cubic-bezier(.2,.8,.2,1); }
-.committee-nav a:hover, .committee-nav a[aria-current] { color: var(--ink); }
-.committee-nav a[aria-current]::after { transform: scaleX(1); transform-origin: left; }
-
-.committee-block { padding-top: 78px; scroll-margin-top: 132px; }
-.committee-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding-bottom: 28px; }
-.committee-index { display: block; margin-bottom: 13px; color: var(--muted); font: 600 11px Manrope, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; }
-.committee-head h3 { margin: 0; font: 600 clamp(28px, 3.2vw, 46px)/1.06 Manrope, sans-serif; letter-spacing: -0.05em; }
-.committee-mandate { max-width: 58ch; margin: 16px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
-.committee-count { margin: 0; padding-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
+/* Caption row for the roster: what the list is on the left, how many sit on it on
+   the right, sharing the hairline the first row of cells draws against. */
+.roster-meta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.roster-title { margin: 0; font: 600 clamp(24px, 2.6vw, 34px)/1.08 Manrope, sans-serif; letter-spacing: -0.045em; }
+.roster-count { margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; }
 /* 1px gaps plus a 1px outset ring per cell: the grid rules stay hairline-thin and
    a half-empty last row leaves no stray block of border colour. */
 .roster { margin: 1px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; list-style: none; }
@@ -467,7 +459,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .roster-org { color: var(--muted); font-size: 13.5px; line-height: 1.55; }
 .roster-item.is-lead { background: #edf2e0; }
 .roster-item.is-lead .roster-role { color: #4a7736; font-weight: 800; }
-/* Citations for the page - the G.O. the committees come from, and the portrait
+/* Citations for the page - the G.O. the committee comes from, and the portrait
    credits the CC BY-SA licence requires. */
 .page-notes { max-width: 860px; margin: 62px 0 0; padding-top: 20px; border-top: 1px solid var(--line); }
 .page-notes p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; letter-spacing: 0.04em; }
@@ -594,11 +586,10 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .hero-fact + .hero-fact { padding-left: 0; }
   .hero-fact:nth-child(2n) { padding-left: 22px; border-right: 0; }
   .hero-fact:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,0.16); }
+  .hero-fact-wide { grid-column: 1 / -1; }
   .leadership-grid { grid-template-columns: 1fr; }
   .leader-card { min-height: 268px; }
   .leader-portrait { aspect-ratio: 4 / 5; align-self: start; }
-  .committee-head { grid-template-columns: 1fr; align-items: start; gap: 16px; }
-  .committee-count { padding-bottom: 0; }
   .roster { grid-template-columns: 1fr; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 46px 40px; }
 }
@@ -700,8 +691,6 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .leader-card h3 { font-size: 23px; }
   .leader-office { font-size: 13px; }
   .leader-tag { margin-top: 16px; padding: 7px 11px; font-size: 9px; letter-spacing: 0.08em; }
-  .committee-nav a { padding: 15px 16px; font-size: 11px; }
-  .committee-block { padding-top: 54px; }
   .roster-item { padding: 20px; }
   .page-notes { margin-top: 46px; }
 }

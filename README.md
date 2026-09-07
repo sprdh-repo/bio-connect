@@ -15,8 +15,10 @@ Then open <http://localhost:4173>.
 ## Pages
 
 - `index.html` - the landing page.
-- `committee.html` - the Advisory, Organising and Monitoring, and Programme Committees
-  constituted by G.O.(Rt) No. 879/2026/ID.
+- `committee.html` - the State leadership and the Advisory Committee constituted by
+  G.O.(Rt) No. 879/2026/ID.
+  It is titled *Leadership* everywhere in the UI; the filename is deliberately unchanged,
+  because `/committee.html` is the URL already in the sitemap and in the index.
 - `404.html` - served by CloudFront for any unknown path.
   The domain previously hosted Bio Connect 3.0, so search engines still request old
   URLs like `/about/` and `/agenda/`; without this they get an S3 `AccessDenied` 403,
@@ -83,7 +85,7 @@ show one. They are a 148px square crop of the sphere and molecule connector take
 drawn at 16px. Regenerate them from the logo if the brand asset changes; do not upscale the
 small ones.
 
-The two leadership portraits on the committee page:
+The two portraits on `committee.html`:
 
 - `assets/leader-chief-minister.webp` - official portrait published by KSIDC,
   `https://www.ksidc.org/media/ministers/sre_VD-Satheesan_CywOjsa.avif`.
@@ -95,7 +97,7 @@ The two leadership portraits on the committee page:
 **The second one is licensed, not public-domain.** BY-SA requires the page to name the
 photographer, link the licence, say the image was modified, and state that the adaptation
 is shared under the same licence. That is the second line in the `.page-notes` block at
-the foot of the committee page - if the photo stays, the line has to stay with it.
+the foot of `committee.html` - if the photo stays, the line has to stay with it.
 An official Government of Kerala portrait would remove the obligation; Kerala IT Mission
 publishes one at
 `https://itmission.kerala.gov.in/sites/default/files/inline-images/P K Kunhalikutty.jpg`.
