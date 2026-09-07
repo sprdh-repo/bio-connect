@@ -34,9 +34,16 @@ answers on. Every page also carries a `rel=canonical` pointing at it.
 
 `infra/legacy-redirects.js` is a CloudFront viewer-request function on the default cache
 behaviour. The domain hosted Bio Connect 3.0 until September 2026, so press coverage still
-links to pages like `/about` and `/speakers`; the function 301s them to the home page so
-those referrals are not lost. Anything else that is missing still returns a 404, which is
-what lets search engines drop the old pages from their index.
+links to pages like `/about` and `/speakers`. The function 301s each of them to the section
+of the single-page 4.0 site that covers the same ground, so an old "Delegate Registration"
+link lands on the registration block rather than the top of the page. Google drops the
+fragment when it consolidates the redirect, so this changes nothing for the index - it is
+for the person clicking. Anything else that is missing still returns a 404, which is what
+lets search engines drop the old pages from their index.
+
+Adding a section to the page is a chance to give one of the unmapped 3.0 URLs a real
+target: `/speakers` and `/venue` currently go to the top of the page for want of anywhere
+better.
 
 The function is deployed by hand, not by `scripts/deploy.sh`:
 
