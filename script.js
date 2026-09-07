@@ -320,3 +320,14 @@ regTabs.forEach((tab, index) => {
     selectRegTab(regTabs[(index + step + regTabs.length) % regTabs.length], { focus: true });
   });
 });
+
+/* Keep the payment link usable when shared or opened in a fresh visit. */
+const revealSponsorshipPayment = () => {
+  if (location.hash !== "#sponsorship-payment") return;
+  const sponsorTab = regTabs.find((tab) => tab.id === "reg-tab-sponsors");
+  if (!sponsorTab) return;
+  selectRegTab(sponsorTab);
+  document.getElementById("sponsorship-payment").scrollIntoView();
+};
+window.addEventListener("hashchange", revealSponsorshipPayment);
+revealSponsorshipPayment();
