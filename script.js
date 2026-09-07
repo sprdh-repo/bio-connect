@@ -60,6 +60,7 @@ if (countdown) {
     { node: countdown.querySelector('[data-unit="seconds"]'), per: 1000, of: 60 },
   ];
   const title = countdown.querySelector("[data-countdown-title]");
+  const lede = countdown.querySelector("[data-countdown-lede]");
 
   const render = () => {
     const remaining = Math.max(EVENT_START - Date.now(), 0);
@@ -76,7 +77,10 @@ if (countdown) {
     });
 
     if (remaining > 0) return true;
+    /* The heading carries the date, so "opens on" has to go with it - what is
+       left reads "Bio Connect 4.0 is live." over the venue. */
     title.textContent = title.dataset.titleLive;
+    lede?.remove();
     return false;
   };
 

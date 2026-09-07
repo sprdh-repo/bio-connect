@@ -73,6 +73,9 @@ When the sitemap changes, submit it again in Google Search Console for the
 
 ## Assets
 
+The transparent Government of Kerala emblem in `assets/government-of-kerala-logo.png` is by Sanu N, via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Government_of_Kerala_Logo.png), licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+The image is unmodified; the logo links to its source and attribution.
+
 The hero artwork in `assets/hero-biotech.webp` was generated specifically for this project with OpenAI image generation.
 
 The Bio Connect logo and favicon are the official, unmodified brand assets from <https://bioconnect.kerala.gov.in/>.
