@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html committee.html 404.html styles.css script.js robots.txt sitemap.xml; do
+for file in index.html committee.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -59,6 +59,12 @@ aws s3 cp sitemap.xml "s3://$BUCKET/sitemap.xml" \
   --cache-control "public, max-age=300" \
   --only-show-errors
 
+# Browsers and Google's favicon crawler both probe the site root first.
+aws s3 cp favicon.ico "s3://$BUCKET/favicon.ico" \
+  --content-type "image/x-icon" \
+  --cache-control "public, max-age=86400" \
+  --only-show-errors
+
 aws s3 cp styles.css "s3://$BUCKET/styles.css" \
   --content-type "text/css; charset=utf-8" \
   --cache-control "public, max-age=300" \
@@ -77,7 +83,7 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" \
+    --paths "/" "/index.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
             "/styles.css" "/script.js" "/assets/*" \
     --query 'Invalidation.Id' \
     --output text

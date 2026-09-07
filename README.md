@@ -48,8 +48,11 @@ aws cloudfront create-function --name bioconnect4-legacy-redirects \
 # distribution still associates it with the default cache behaviour.
 ```
 
-`index.html` carries an `Event` JSON-LD block. Keep its dates and venue in step with the
-event bar in the hero; a mismatch between the two is what search engines flag.
+`index.html` carries two JSON-LD blocks. The `Event` one must keep its dates and venue in
+step with the event bar in the hero; a mismatch between the two is what search engines
+flag. The `WebSite` one exists only to set the site name shown above the search result -
+without it Google falls back to the registrable domain and labels the site "Kerala-gov".
+`og:site_name` and `application-name` back it up.
 
 When the sitemap changes, submit it again in Google Search Console for the
 `bioconnect.kerala.gov.in` property.
@@ -59,6 +62,14 @@ When the sitemap changes, submit it again in Google Search Console for the
 The hero artwork in `assets/hero-biotech.webp` was generated specifically for this project with OpenAI image generation.
 
 The Bio Connect logo and favicon are the official, unmodified brand assets from <https://bioconnect.kerala.gov.in/>.
+
+`assets/icon-144.png`, `assets/icon-192.png` and `favicon.ico` are derived from the logo
+rather than from `assets/favicon.png`: the shipped favicon is 110x114 and clipped on three
+sides, and Google requires a square icon, ideally a multiple of 48px, or it declines to
+show one. They are a 148px square crop of the sphere and molecule connector taken from
+`assets/bio-connect-logo.png` at (158, 8) - the only part of the lockup that survives being
+drawn at 16px. Regenerate them from the logo if the brand asset changes; do not upscale the
+small ones.
 
 The two leadership portraits on the committee page:
 
