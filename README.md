@@ -41,9 +41,14 @@ fragment when it consolidates the redirect, so this changes nothing for the inde
 for the person clicking. Anything else that is missing still returns a 404, which is what
 lets search engines drop the old pages from their index.
 
-Adding a section to the page is a chance to give one of the unmapped 3.0 URLs a real
-target: `/speakers` and `/venue` currently go to the top of the page for want of anywhere
-better.
+The map covers every 3.0 page that Search Console still listed as indexed on 2026-09-07.
+Adding a section to the page is a chance to give one of the unmapped URLs a real target:
+`/speakers` and `/venue` currently go to the top of the page for want of anywhere better.
+
+The 3.0 PDFs under `/assets/files/` - the old brochure, the stall layout and the
+sponsorship details - are deliberately left to 404. The files no longer exist and there is
+no 4.0 equivalent, so an honest "not found" beats redirecting a document request to a
+marketing section. Revisit that when 4.0 collateral is published.
 
 The function is deployed by hand, not by `scripts/deploy.sh`:
 
