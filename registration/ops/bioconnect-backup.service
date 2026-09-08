@@ -1,0 +1,7 @@
+[Unit]
+Description=Bio Connect encrypted PostgreSQL backup
+OnFailure=bioconnect-alert.service
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/opt/bioconnect/ops/backup.sh

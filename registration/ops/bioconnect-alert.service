@@ -1,0 +1,5 @@
+[Unit]
+Description=Bio Connect operations alert
+[Service]
+Type=oneshot
+ExecStart=/opt/bioconnect/ops/alert.sh

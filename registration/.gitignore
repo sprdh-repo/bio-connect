@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+var/
+bioconnect
+coverage.out
+ops/secrets/

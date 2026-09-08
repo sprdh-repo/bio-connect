@@ -1,0 +1,63 @@
+name: bioconnect-registration
+services:
+  app:
+    image: ${APP_IMAGE:?Set an immutable app image tag or digest}
+    restart: unless-stopped
+    env_file: /etc/bioconnect/app.env
+    environment:
+      APP_ENV: production
+      LISTEN_ADDR: ":8080"
+      GOMEMLIMIT: 768MiB
+      TRUSTED_PROXY_CIDR: 172.30.44.0/24
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [backend, edge]
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: /etc/bioconnect/postgres.env
+    volumes: ["db:/var/lib/postgresql/data"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bioconnect -d bioconnect"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file: /etc/bioconnect/caddy.env
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge]
+    depends_on: [app]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+volumes:
+  db:
+  caddy_data:
+  caddy_config:
+networks:
+  backend:
+    internal: true
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.44.0/24
+          ip_range: 172.30.44.128/25

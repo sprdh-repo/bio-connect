@@ -1,0 +1,6 @@
+[Unit]
+Description=Bio Connect application and delivery queue check
+OnFailure=bioconnect-alert.service
+[Service]
+Type=oneshot
+ExecStart=/opt/bioconnect/ops/monitor.sh

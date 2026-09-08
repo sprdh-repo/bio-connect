@@ -1,0 +1,28 @@
+# Origin for the reg.bioconnect.kerala.gov.in CloudFront distribution.
+# Viewers never hit this hostname directly; CloudFront terminates the public
+# certificate and forwards here over HTTPS with a shared secret header.
+{
+	email {$ACME_EMAIL}
+}
+
+{$ORIGIN_HOSTNAME} {
+	encode zstd gzip
+
+	# Reject anything that did not come through our CloudFront distribution.
+	@direct not header X-Origin-Verify {$EDGE_AUTH_SECRET}
+	respond @direct "forbidden" 403 {
+		close
+	}
+
+	# Do not log request paths: /passes/<token> and recovery links carry secrets.
+	log {
+		output discard
+	}
+
+	reverse_proxy app:8080 {
+		header_up X-BioConnect-Client-IP {http.request.header.X-Forwarded-For}
+		header_up -X-Origin-Verify
+	}
+}
+
+# Plain HTTP is only for the ACME HTTP-01 challenge; everything else is redirected.
