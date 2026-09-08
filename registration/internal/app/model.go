@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -138,13 +139,48 @@ func (a *App) Migrate(ctx context.Context) error {
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(420062026)"); e != nil {
 		return e
 	}
-	var exists bool
-	if e = tx.QueryRow(ctx, "SELECT to_regclass('public.schema_migrations') IS NOT NULL").Scan(&exists); e != nil {
+	var haveTable bool
+	if e = tx.QueryRow(ctx, "SELECT to_regclass('public.schema_migrations') IS NOT NULL").Scan(&haveTable); e != nil {
 		return e
 	}
-	if !exists {
+	// 001_initial.sql creates schema_migrations itself; later files are plain
+	// incremental steps, applied in filename order and recorded by their NNN prefix.
+	if !haveTable {
 		b, _ := resources.ReadFile("migrations/001_initial.sql")
 		if _, e = tx.Exec(ctx, string(b)); e != nil {
+			return e
+		}
+	}
+	// The table existing means the initial schema is in place, whether or not an
+	// earlier build recorded it. Backfill so fresh and existing databases agree.
+	if _, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES(1) ON CONFLICT DO NOTHING"); e != nil {
+		return e
+	}
+	entries, e := resources.ReadDir("migrations")
+	if e != nil {
+		return e
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".sql") || len(name) < 4 {
+			continue
+		}
+		v, ce := strconv.Atoi(name[:3])
+		if ce != nil || v <= 1 {
+			continue
+		}
+		var applied bool
+		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", v).Scan(&applied); e != nil {
+			return e
+		}
+		if applied {
+			continue
+		}
+		b, _ := resources.ReadFile("migrations/" + name)
+		if _, e = tx.Exec(ctx, string(b)); e != nil {
+			return e
+		}
+		if _, e = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES($1)", v); e != nil {
 			return e
 		}
 	}

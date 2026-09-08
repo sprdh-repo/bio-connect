@@ -114,18 +114,24 @@ func (a *App) SubmitPayment(ctx context.Context, rid string, p PaymentInput) err
 	if status != "awaiting_payment" && status != "correction_requested" {
 		return ErrConflict
 	}
-	var ok bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE id=$1 AND registration_id=$2 AND kind='receipt')", p.ReceiptID, rid).Scan(&ok); e != nil {
-		return e
-	}
-	if !ok {
-		return errors.New("upload a receipt for this registration first")
+	// A receipt file is optional now; link it only when the client uploaded one
+	// that belongs to this registration.
+	var receipt any
+	if p.ReceiptID != "" {
+		var ok bool
+		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE id=$1 AND registration_id=$2 AND kind='receipt')", p.ReceiptID, rid).Scan(&ok); e != nil {
+			return e
+		}
+		if ok {
+			receipt = p.ReceiptID
+		}
 	}
 	c, e := category(ctx, tx, cat)
 	if e != nil {
 		return e
 	}
 	if c.Kind == "exhibitor" {
+		var ok bool
 		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE registration_id=$1 AND kind='logo')", rid).Scan(&ok); e != nil {
 			return e
 		}
@@ -134,7 +140,7 @@ func (a *App) SubmitPayment(ctx context.Context, rid string, p PaymentInput) err
 		}
 	}
 	// Evidence can report an incorrect amount. It is retained for staff correction, never auto-approved.
-	_, e = tx.Exec(ctx, "INSERT INTO payment_submissions(id,registration_id,bank_reference,payment_date,amount_paise,receipt_id) VALUES($1,$2,$3,$4,$5,$6)", id(), rid, p.Reference, date, p.AmountPaise, p.ReceiptID)
+	_, e = tx.Exec(ctx, "INSERT INTO payment_submissions(id,registration_id,bank_reference,payment_date,amount_paise,receipt_id) VALUES($1,$2,$3,$4,$5,$6)", id(), rid, p.Reference, date, p.AmountPaise, receipt)
 	if e != nil {
 		return e
 	}

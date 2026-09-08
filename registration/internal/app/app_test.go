@@ -115,9 +115,9 @@ func addFile(t *testing.T, a *App, rid, kind string, body []byte) string {
 
 func payDelegate(t *testing.T, a *App, rid string, amountPaise int64) {
 	t.Helper()
-	rcpt := addFile(t, a, rid, "receipt", tinyPNG(t))
+	// A receipt upload is optional; the reference and date are the evidence.
 	if err := a.SubmitPayment(context.Background(), rid, PaymentInput{
-		Reference: "UTR" + rid[:8], Date: today(a), AmountPaise: amountPaise, ReceiptID: rcpt,
+		Reference: "UTR" + rid[:8], Date: today(a), AmountPaise: amountPaise,
 	}); err != nil {
 		t.Fatalf("submit payment: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestPaymentBeforeSbiIsAllowedButNotAutoApproved(t *testing.T) {
 		t.Fatal(err)
 	}
 	payDelegate(t, a, rid, earlyPaise(t, a, rid))
-	// A receipt upload must never move the registration past review on its own.
+	// Submitting reference + date moves the registration to review, never to approved.
 	if status(t, a, rid) != "awaiting_review" {
 		t.Fatalf("status %s, want awaiting_review", status(t, a, rid))
 	}
@@ -1001,5 +1001,78 @@ func TestStaffCanSearchByPassNumber(t *testing.T) {
 		if len(records) != 1 {
 			t.Fatalf("search %q matched %d rows, want none", q, len(records)-1)
 		}
+	}
+}
+
+// --- migrations -------------------------------------------------------
+
+func TestMigrationsApplyIncrementallyAndAreIdempotent(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	var versions []int
+	rows, err := a.DB.Query(ctx, "SELECT version FROM schema_migrations ORDER BY version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var v int
+		if err := rows.Scan(&v); err != nil {
+			t.Fatal(err)
+		}
+		versions = append(versions, v)
+	}
+	if len(versions) < 2 || versions[0] != 1 || versions[1] != 2 {
+		t.Fatalf("schema_migrations = %v, want 1 and 2 recorded", versions)
+	}
+	var nullable string
+	if err := a.DB.QueryRow(ctx, "SELECT is_nullable FROM information_schema.columns WHERE table_name='payment_submissions' AND column_name='receipt_id'").Scan(&nullable); err != nil {
+		t.Fatal(err)
+	}
+	if nullable != "YES" {
+		t.Fatalf("payment_submissions.receipt_id is_nullable=%s, want YES after 002", nullable)
+	}
+	before := count(t, a, "SELECT count(*) FROM schema_migrations")
+	if err := a.Migrate(ctx); err != nil {
+		t.Fatalf("re-migrate: %v", err)
+	}
+	if after := count(t, a, "SELECT count(*) FROM schema_migrations"); after != before {
+		t.Fatalf("re-migrate changed schema_migrations from %d to %d", before, after)
+	}
+}
+
+func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	rid, _, err := a.Create(ctx, delegateInput("student"), key(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	payDelegate(t, a, rid, earlyPaise(t, a, rid))
+	var receipt *string
+	if err := a.DB.QueryRow(ctx, "SELECT receipt_id FROM payment_submissions WHERE registration_id=$1", rid).Scan(&receipt); err != nil {
+		t.Fatal(err)
+	}
+	if receipt != nil {
+		t.Fatalf("receipt_id = %q, want NULL when none uploaded", *receipt)
+	}
+	if status(t, a, rid) != "awaiting_review" {
+		t.Fatalf("status %s, want awaiting_review", status(t, a, rid))
+	}
+
+	rid2, _, err := a.Create(ctx, delegateInput("student"), key(2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fid := addFile(t, a, rid2, "receipt", tinyPNG(t))
+	if err := a.SubmitPayment(ctx, rid2, PaymentInput{
+		Reference: "UTR2", Date: today(a), AmountPaise: earlyPaise(t, a, rid2), ReceiptID: fid,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.DB.QueryRow(ctx, "SELECT receipt_id FROM payment_submissions WHERE registration_id=$1", rid2).Scan(&receipt); err != nil {
+		t.Fatal(err)
+	}
+	if receipt == nil || *receipt != fid {
+		t.Fatalf("receipt_id = %v, want %s when uploaded", receipt, fid)
 	}
 }

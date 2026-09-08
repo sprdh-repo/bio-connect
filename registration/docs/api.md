@@ -82,12 +82,14 @@ Uploads are only accepted while the registration is `awaiting_payment` or `corre
 `POST /registrations/{id}/payments`:
 
 ```json
-{"reference":"SBICR000123","date":"2026-09-20","amount_paise":600000,"receipt_id":"<fid>"}
+{"reference":"SBICR000123","date":"2026-09-20","amount_paise":600000}
 ```
 
-Requires a `receipt` file (and a `logo` for exhibitors).
+Requires `reference` and `date` (and a `logo` upload for exhibitors).
+`amount_paise` is required; the form prefills it with the current fee.
+`receipt_id` is optional: pass one from a prior `kind=receipt` upload to attach the SBI receipt, or omit it.
 Moves the registration to `awaiting_review` and appends to the payment history.
-A receipt upload or a browser redirect never approves payment on its own.
+Submitting evidence, uploading a receipt, or a browser redirect never approves payment on its own.
 
 ### Recovery (no account)
 
