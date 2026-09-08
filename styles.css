@@ -342,6 +342,22 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .status-pill { flex-shrink: 0; margin: 6px 0 0; padding: 9px 15px; display: inline-flex; align-items: center; gap: 9px; color: var(--forest); background: rgba(185,220,114,0.32); font-size: 10px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; white-space: nowrap; }
 .status-pill i { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2.6s ease-in-out infinite; }
 
+/* Registration CTAs. A .status-pill says what the desk is doing; a .button is
+   the thing you click. They are never the same element, so nothing that looks
+   like a label is secretly a link, and nothing that looks like a button is
+   secretly a label.
+
+   Everything the page says about registration is written in both states and
+   switched from data-registration on <body>: "soon" while submissions are
+   closed, "open" once they are. Flipping that one attribute flips the header,
+   the hero, all three panels and the section foot together, so the page can
+   never contradict the registration app. */
+[data-registration="soon"] .when-open,
+[data-registration="open"] .when-soon { display: none; }
+.reg-actions { flex-shrink: 0; margin-top: 6px; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.reg-actions .status-pill { margin: 0; }
+.reg-actions-note { max-width: 240px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; text-align: right; }
+
 .reg-card { background: var(--paper); border: 1px solid var(--line); }
 /* position: relative keeps the absolutely positioned .sr-only cell text inside the
    scroll container, so it cannot stretch the page width. */
@@ -639,6 +655,13 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .reg-panel { padding-top: 40px; }
   .reg-panel-header { align-items: flex-start; flex-direction: column; gap: 20px; }
   .status-pill { margin-top: 0; }
+  /* Stacked, the action is full width and reads as the next step rather than a
+     detail parked in the corner. */
+  .reg-actions { width: 100%; margin-top: 0; align-items: stretch; }
+  /* The button takes the full width; the text link keeps its own, so its
+     underline never runs the width of the column. */
+  .reg-actions .inline-link { align-self: flex-start; }
+  .reg-actions-note { max-width: none; text-align: left; }
   .stall-grid { grid-template-columns: 1fr; }
   .stall-card { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 6px 24px; padding: 26px 24px; }
   .stall-card h4, .stall-size { grid-column: 1; }
