@@ -106,7 +106,7 @@ Passes are regenerated on demand from the database, so pass PDFs do not need sep
 
 Before setting `REGISTRATION_ENABLED=true` and `LIVE_DELIVERY=true`:
 
-- [ ] `ops/deploy.sh` and `ops/cloudfront-origin.sh` have run; `https://reg.bioconnect.kerala.gov.in/healthz` returns 200 through CloudFront (not the placeholder JSON).
+- [x] `ops/deploy.sh` and `ops/cloudfront-origin.sh` have run; `https://reg.bioconnect.kerala.gov.in/healthz` returns 200 through CloudFront (not the placeholder JSON). `/delegates` and `/exhibitors` render the disabled-submissions preview.
 - [ ] The real SBI Collect link (or merchant setup) is confirmed and set as `SBI_COLLECT_URL`; staff have access to the SBI reconciliation report.
 - [x] Zinvos Postmark: verified sender `bioconnect@zinvos.com` / "Bio Connect 4.0", server token set. `POSTMARK_WEBHOOK_USER`/`PASSWORD` configured on the Postmark webhook, pointed at `/api/v1/webhooks/postmark`. Live send to a real inbox delivered and the webhook flipped the job to `delivered`.
 - [x] Zinvos Meta: access token, phone number id, app secret, API version set. `META_VERIFY_TOKEN` entered in the Meta webhook config against `/api/v1/webhooks/meta`; the approved pass template with a DOCUMENT header is live (`META_TEMPLATE=bioconnect_pass_delivery_doc`). The worker uploads the pass PDF to the WhatsApp media store and sends it as the header, keeping the pass link in the body as a fallback; the older text-only `bioconnect_pass_delivery` stays approved as a backup. Live template send (PDF + link) to a real handset was accepted by Meta.
@@ -114,7 +114,7 @@ Before setting `REGISTRATION_ENABLED=true` and `LIVE_DELIVERY=true`:
 - [ ] Initial staff identities created (`ssh` to the box, `sudo docker compose -f /opt/bioconnect/compose.production.yaml exec app bioconnect staff-create` with `{"Email":...,"Password":...,"Role":"manager"|"reviewer"}` on stdin), each enrolled in an authenticator, at least one `manager` and one `reviewer`.
 - [ ] Hourly backup timer green; one restore rehearsal completed; Lightsail automatic snapshots enabled in the console.
 - [ ] Published fees confirmed against SBI as the payable amounts.
-- [ ] The two registration links in the marketing site's `index.html` are deployed.
-- [ ] A single end-to-end live message test (one delegate and one exhibitor) authorised and passed.
+- [x] The delegate and exhibitor links in the marketing site are deployed (the `data-registration="soon"` panels link to preview the forms; flip to `open` at launch).
+- [ ] A single end-to-end live message test (one delegate and one exhibitor) authorised and passed. (Provider-level sends are already proven: branded email delivered to a real inbox with the pass PDF attached, and the WhatsApp template accepted to a real handset with the PDF as its document header. The full create -> approve -> deliver path still needs one run with registration enabled.)
 
 Out of scope: tax invoices, automated refunds, bank-report imports, attendance scanning, automated stall allocation, sponsorship registration.
