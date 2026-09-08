@@ -481,7 +481,8 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .partner-logo { min-width: 0; min-height: 145px; padding: 28px 32px; display: grid; place-items: center; }
 .partner-logo + .partner-logo { border-left: 1px solid var(--line); }
 .partner-logo img { width: auto; max-width: 100%; height: auto; display: block; object-fit: contain; }
-.partner-logo-ksidc img { max-height: 74px; }
+.partner-logo-ksidc { padding-inline: 24px; }
+.partner-logo-ksidc img { max-height: 66px; }
 .partner-logo-bio360 img { max-height: 78px; }
 .partner-logo-klip img { max-height: 69px; }
 .partner-logo-government img { max-height: 76px; filter: brightness(0); }
@@ -772,7 +773,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .partner-logos { grid-template-columns: 1fr; }
   .partner-logo { min-height: 116px; padding: 20px 28px; }
   .partner-logo + .partner-logo { border-left: 0; border-top: 1px solid var(--line); }
-  .partner-logo-ksidc img { max-height: 74px; }
+  .partner-logo-ksidc img { max-height: 58px; }
   .partner-logo-bio360 img { max-height: 74px; }
   .partner-logo-klip img { max-height: 68px; }
   .partner-logo-government img { max-height: 75px; }
