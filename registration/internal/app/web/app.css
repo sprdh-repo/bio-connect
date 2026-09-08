@@ -70,6 +70,7 @@ main { flex: 1; width: var(--shell); margin: 0 auto; padding: 46px 0 72px; }
 /* ---- layout ---- */
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 30px; align-items: start; margin-top: 30px; }
 .layout > section { min-width: 0; }
+.single { max-width: 880px; }
 
 .card, fieldset {
   background: white; border: 1px solid var(--line); border-radius: 14px;
@@ -135,12 +136,6 @@ button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .pay-amount span { font-family: var(--sans); font-size: 15px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .pay-cta { min-height: 58px; padding: 0 32px; font-size: 14px; }
 .pay-card .help { margin-top: 14px; }
-
-/* buttons inside the dark instructions panel */
-.aside-action { display: flex; width: 100%; margin: 16px 0; }
-a.aside-action { color: var(--forest-deep); text-decoration: none; }
-.aside-quiet { margin-bottom: 0; color: white; background: transparent; border-color: rgba(255, 255, 255, 0.45); }
-.aside-quiet:hover { color: var(--forest-deep); background: white; border-color: white; }
 
 /* ---- steps ---- */
 .steps { list-style: none; display: flex; gap: 10px; margin: 26px 0 0; padding: 0; }
