@@ -127,6 +127,10 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .button-primary { color: var(--forest-deep); background: var(--lime); }
 .button-primary:hover { background: #cce98f; }
 .button-light { background: var(--paper); color: var(--forest); }
+/* Same size and weight as .button-primary, quieter fill: for an action that is
+   real but is not the one we want you to take. */
+.button-outline { color: var(--forest); background: transparent; border-color: rgba(11, 51, 41, 0.4); }
+.button-outline:hover { color: var(--paper); background: var(--forest); border-color: var(--forest); }
 .text-link { padding-block: 12px; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.45); transition: border-color 0.25s; }
 .text-link:hover { border-color: var(--lime); }
 .text-link span { display: inline-block; margin-left: 14px; transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
@@ -339,8 +343,6 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .reg-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 30px; margin-bottom: 34px; }
 .reg-panel-header h3 { margin: 0; font: 600 clamp(26px, 2.8vw, 38px)/1.15 Manrope, sans-serif; letter-spacing: -0.045em; }
 .reg-lede { max-width: 540px; margin: 14px 0 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
-.status-pill { flex-shrink: 0; margin: 6px 0 0; padding: 9px 15px; display: inline-flex; align-items: center; gap: 9px; color: var(--forest); background: rgba(185,220,114,0.32); font-size: 10px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; white-space: nowrap; }
-.status-pill i { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2.6s ease-in-out infinite; }
 
 /* Registration CTAs. A .status-pill says what the desk is doing; a .button is
    the thing you click. They are never the same element, so nothing that looks
@@ -357,6 +359,10 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .reg-actions { flex-shrink: 0; margin-top: 6px; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
 .reg-actions .status-pill { margin: 0; }
 .reg-actions-note { max-width: 240px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; text-align: right; }
+/* The state reads as a caption under the action, never as the loudest thing in
+   the panel: what you can do should always outweigh what you must wait for. */
+.reg-actions-status { margin: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 9px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.reg-actions-status i { flex-shrink: 0; width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2.6s ease-in-out infinite; }
 
 .reg-card { background: var(--paper); border: 1px solid var(--line); }
 /* position: relative keeps the absolutely positioned .sr-only cell text inside the
@@ -654,13 +660,13 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .reg-tab-name { font-size: clamp(16px, 4.2vw, 24px); }
   .reg-panel { padding-top: 40px; }
   .reg-panel-header { align-items: flex-start; flex-direction: column; gap: 20px; }
-  .status-pill { margin-top: 0; }
   /* Stacked, the action is full width and reads as the next step rather than a
      detail parked in the corner. */
   .reg-actions { width: 100%; margin-top: 0; align-items: stretch; }
   /* The button takes the full width; the text link keeps its own, so its
      underline never runs the width of the column. */
   .reg-actions .inline-link { align-self: flex-start; }
+  .reg-actions-status { justify-content: flex-start; }
   .reg-actions-note { max-width: none; text-align: left; }
   .stall-grid { grid-template-columns: 1fr; }
   .stall-card { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 6px 24px; padding: 26px 24px; }
