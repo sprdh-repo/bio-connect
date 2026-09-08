@@ -350,6 +350,23 @@ func TestFeeCutoffBoundary(t *testing.T) {
 	}
 }
 
+func TestExhibitorCategoriesAreHighestFirst(t *testing.T) {
+	a := mustApp(t)
+	cats, err := a.categories(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, c := range cats {
+		if c.Kind == "exhibitor" {
+			got = append(got, c.ID)
+		}
+	}
+	if strings.Join(got, ",") != "premium,standard,table" {
+		t.Fatalf("exhibitor category order = %v, want premium, standard, table", got)
+	}
+}
+
 func TestQuoteAndDisplayedFeeFollowServerClock(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
