@@ -44,7 +44,7 @@ func (a *App) Handler() http.Handler {
 	fileSrv := http.StripPrefix("/static/", http.FileServer(http.FS(static)))
 	m.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// CloudFront does not cache (dynamic app), so let the browser hold static assets.
-		if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") {
+		if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") || strings.HasSuffix(r.URL.Path, ".svg") {
 			w.Header().Set("Cache-Control", "public, max-age=2592000")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=300")
