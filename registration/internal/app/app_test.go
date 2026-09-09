@@ -367,6 +367,23 @@ func TestExhibitorCategoriesAreHighestFirst(t *testing.T) {
 	}
 }
 
+func TestDelegateCategoriesAreIndustryFirst(t *testing.T) {
+	a := mustApp(t)
+	cats, err := a.categories(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, c := range cats {
+		if c.Kind == "delegate" {
+			got = append(got, c.ID)
+		}
+	}
+	if strings.Join(got, ",") != "industry,faculty,startup,student" {
+		t.Fatalf("delegate category order = %v, want industry, faculty, startup, student", got)
+	}
+}
+
 func TestQuoteAndDisplayedFeeFollowServerClock(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()

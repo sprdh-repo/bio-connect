@@ -187,7 +187,7 @@ func (a *App) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) categories(ctx context.Context) ([]Category, error) {
-	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open FROM categories ORDER BY kind,CASE WHEN kind='exhibitor' THEN early_paise END DESC,early_paise")
+	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 ELSE 5 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
 	if e != nil {
 		return nil, e
 	}
