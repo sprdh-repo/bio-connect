@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"flag"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +17,20 @@ import (
 
 	"github.com/xuri/excelize/v2"
 )
+
+// stubResolvableDomains makes every domain resolve successfully, so tests
+// that don't exercise domain validation never depend on real DNS.
+func stubResolvableDomains(t *testing.T) {
+	t.Helper()
+	originalMX, originalHost := lookupMX, lookupHost
+	lookupMX = func(context.Context, string) ([]*net.MX, error) {
+		return []*net.MX{{Host: "mail.example.invalid", Pref: 10}}, nil
+	}
+	lookupHost = func(context.Context, string) ([]string, error) {
+		return []string{"127.0.0.1"}, nil
+	}
+	t.Cleanup(func() { lookupMX, lookupHost = originalMX, originalHost })
+}
 
 func TestContactImports(t *testing.T) {
 	dir := t.TempDir()
@@ -82,6 +98,68 @@ func TestRenderingAndReport(t *testing.T) {
 	}
 }
 
+func TestDomainValidation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "contacts.csv")
+	if err := os.WriteFile(path, []byte("Email\ngood@ok.example\nbad@broken.example\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	originalMX, originalHost := lookupMX, lookupHost
+	defer func() { lookupMX, lookupHost = originalMX, originalHost }()
+	lookupMX = func(_ context.Context, name string) ([]*net.MX, error) {
+		if name == "ok.example" {
+			return []*net.MX{{Host: "mail.ok.example", Pref: 10}}, nil
+		}
+		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+	}
+	lookupHost = func(_ context.Context, name string) ([]string, error) {
+		return nil, &net.DNSError{Err: "no such host", Name: name, IsNotFound: true}
+	}
+	origArgs, origFlags := os.Args, flag.CommandLine
+	defer func() { os.Args, flag.CommandLine = origArgs, origFlags }()
+
+	// Dry run: reports the bad domain but does not fail or block the preview.
+	os.Args = []string{"marketing", "--contacts", path, "--state", dir}
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	if err := run(); err != nil {
+		t.Fatalf("dry run should not fail on bad domains: %v", err)
+	}
+	reports, _ := filepath.Glob(filepath.Join(dir, "invalid-domains-*.csv"))
+	if len(reports) != 1 {
+		t.Fatalf("expected one domain report, got %v", reports)
+	}
+	data, err := os.ReadFile(reports[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "bad@broken.example") || strings.Contains(string(data), "good@ok.example") {
+		t.Fatalf("unexpected report contents: %s", data)
+	}
+
+	// --send: refuses to send while an unresolvable domain remains.
+	t.Setenv("POSTMARK_SERVER_TOKEN", "fake-token")
+	t.Setenv("POSTMARK_FROM_ADDRESS", "sender@example.com")
+	os.Args = []string{"marketing", "--contacts", path, "--state", dir, "--send", "--campaign", "domain-test"}
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	if err := run(); err == nil || !strings.Contains(err.Error(), "unresolvable domains") {
+		t.Fatalf("expected refusal to send with bad domains: %v", err)
+	}
+
+	// --skip-mx-check bypasses the check entirely.
+	os.Args = []string{"marketing", "--contacts", path, "--state", dir, "--skip-mx-check"}
+	flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+	reports, _ = filepath.Glob(filepath.Join(dir, "invalid-domains-*.csv"))
+	for _, r := range reports {
+		os.Remove(r)
+	}
+	if err := run(); err != nil {
+		t.Fatalf("skip-mx-check dry run failed: %v", err)
+	}
+	if reports, _ := filepath.Glob(filepath.Join(dir, "invalid-domains-*.csv")); len(reports) != 0 {
+		t.Fatalf("expected no domain report with --skip-mx-check, got %v", reports)
+	}
+}
+
 type roundTrip func(*http.Request) (*http.Response, error)
 
 func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
@@ -124,6 +202,7 @@ func TestCampaignStopsReportsAndResumesWithoutDuplicates(t *testing.T) {
 	if err := os.WriteFile(path, []byte("Email\na@example.com\nb@example.com\nc@example.com\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	stubResolvableDomains(t)
 	t.Setenv("POSTMARK_SERVER_TOKEN", "fake-token")
 	t.Setenv("POSTMARK_FROM_ADDRESS", "sender@example.com")
 	originalTransport, originalArgs, originalFlags := http.DefaultTransport, os.Args, flag.CommandLine

@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/csv"
@@ -12,16 +13,24 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/xuri/excelize/v2"
+)
+
+// Overridable in tests so domain validation never depends on real DNS.
+var (
+	lookupMX   = net.DefaultResolver.LookupMX
+	lookupHost = net.DefaultResolver.LookupHost
 )
 
 //go:embed invitation.html
@@ -88,6 +97,76 @@ func address(s string) (string, error) {
 		return "", fmt.Errorf("invalid email address %q", s)
 	}
 	return strings.ToLower(s), nil
+}
+
+func domainOf(email string) string {
+	return email[strings.LastIndex(email, "@")+1:]
+}
+
+// checkDomain reports whether a domain can plausibly receive mail: an MX
+// record, or (per RFC 5321 §5.1) an A/AAAA record as implicit fallback.
+func checkDomain(ctx context.Context, domain string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if mxs, err := lookupMX(ctx, domain); err == nil && len(mxs) > 0 {
+		return nil
+	}
+	if _, err := lookupHost(ctx, domain); err != nil {
+		return fmt.Errorf("no mail server found for %s", domain)
+	}
+	return nil
+}
+
+// checkDomains validates every unique domain in list concurrently and
+// returns the ones that failed, plus the total number of unique domains checked.
+func checkDomains(ctx context.Context, list []contact) (map[string]error, int) {
+	domains := map[string]bool{}
+	for _, c := range list {
+		domains[domainOf(c.Email)] = true
+	}
+	type result struct {
+		domain string
+		err    error
+	}
+	results := make(chan result, len(domains))
+	sem := make(chan struct{}, 20)
+	var wg sync.WaitGroup
+	for d := range domains {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(domain string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			results <- result{domain, checkDomain(ctx, domain)}
+		}(d)
+	}
+	wg.Wait()
+	close(results)
+	bad := map[string]error{}
+	for r := range results {
+		if r.err != nil {
+			bad[r.domain] = r.err
+		}
+	}
+	return bad, len(domains)
+}
+
+func writeDomainReport(path string, list []contact, bad map[string]error) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	w := csv.NewWriter(f)
+	w.Write([]string{"email", "name", "domain", "error"})
+	for _, c := range list {
+		d := domainOf(c.Email)
+		if derr, ok := bad[d]; ok {
+			w.Write([]string{csvCell(c.Email), csvCell(c.Name), csvCell(d), csvCell(derr.Error())})
+		}
+	}
+	w.Flush()
+	return w.Error()
 }
 
 func contacts(path, sheet, emailColumn, nameColumn string) ([]contact, error) {
@@ -234,6 +313,7 @@ func run() error {
 	campaign := flag.String("campaign", "registration-september-2026", "stable campaign ID for duplicate prevention")
 	state := flag.String("state", "var/marketing", "private send-log and preview directory")
 	stream := flag.String("stream", "broadcast", "Postmark broadcast stream with Postmark-managed unsubscribes")
+	skipMX := flag.Bool("skip-mx-check", false, "skip DNS MX/A record validation of recipient domains")
 	flag.Parse()
 	if flag.NArg() > 0 {
 		return errors.New("unexpected positional arguments")
@@ -272,6 +352,27 @@ func run() error {
 		}
 	}
 	fmt.Printf("Preview: %s/preview.html\n", *state)
+	if *file != "" && !*skipMX {
+		bad, total := checkDomains(context.Background(), list)
+		if len(bad) > 0 {
+			affected := 0
+			for _, c := range list {
+				if _, ok := bad[domainOf(c.Email)]; ok {
+					affected++
+				}
+			}
+			reportPath := filepath.Join(*state, "invalid-domains-"+time.Now().UTC().Format("20060102T150405.000000000")+".csv")
+			if err := writeDomainReport(reportPath, list, bad); err != nil {
+				return err
+			}
+			fmt.Printf("Domain check: %d of %d domains have no mail server, affecting %d contacts. See %s\n", len(bad), total, affected, reportPath)
+			if *send {
+				return fmt.Errorf("refusing to send: %d contacts have unresolvable domains; remove them from the contacts file (see %s) and rerun, or pass --skip-mx-check to override", affected, reportPath)
+			}
+		} else {
+			fmt.Printf("Domain check: all %d recipient domains resolve.\n", total)
+		}
+	}
 	if !*send && *test == "" {
 		fmt.Printf("Dry run: %d unique contacts; no emails sent.\n", len(list))
 		return nil

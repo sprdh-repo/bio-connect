@@ -21,6 +21,14 @@ Omit `--name-column` for an unpersonalised greeting.
 Legacy `.xls` files must first be saved as `.xlsx`.
 Use contacts who have agreed to receive event invitations.
 
+### Domain validation
+
+Whenever `--contacts` is used, every unique recipient domain is checked concurrently for an MX record (falling back to an A/AAAA record, per RFC 5321) before anything is sent.
+A dry run reports unreachable domains and writes `invalid-domains-<UTC timestamp>.csv` (email, name, domain, error) but still completes.
+`--send` refuses to proceed at all while any unresolvable domain remains: clean the offending rows out of the contacts file using the report, then rerun.
+This catches non-existent/mistyped domains before they count against your Postmark bounce rate.
+Pass `--skip-mx-check` to bypass this (e.g. no outbound DNS from your network, or a list already verified elsewhere).
+
 ## Send a test
 
 Load the existing trusted environment file without printing credentials:
