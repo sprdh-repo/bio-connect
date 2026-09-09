@@ -181,11 +181,16 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		return errors.New("note is too long")
 	}
 	switch in.Action {
-	case "approve_send", "approve_only":
+	case "approve_send", "approve_only", "record_approve_send", "record_approve_only":
 		if status == "approved" {
 			return tx.Commit(ctx)
 		}
-		if status != "awaiting_review" {
+		recordPayment := strings.HasPrefix(in.Action, "record_")
+		expectedStatus := "awaiting_review"
+		if recordPayment {
+			expectedStatus = "awaiting_payment"
+		}
+		if status != expectedStatus {
 			return ErrConflict
 		}
 		if !in.Successful || !in.BeneficiaryConfirmed {
@@ -206,14 +211,30 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if !validText(ref, 100) {
 			return errors.New("verified bank reference is required")
 		}
-		var latest string
-		if e = tx.QueryRow(ctx, "SELECT id FROM payment_submissions WHERE registration_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1", rid).Scan(&latest); e != nil {
-			return e
+		if recordPayment {
+			if c.Kind == "exhibitor" {
+				var hasLogo bool
+				if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE registration_id=$1 AND kind='logo')", rid).Scan(&hasLogo); e != nil {
+					return e
+				}
+				if !hasLogo {
+					return errors.New("the exhibitor must upload the institution logo before approval")
+				}
+			}
+			_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
+				id,registration_id,bank_reference,payment_date,amount_paise,
+				verified_at,verified_by,verified_reference,verified_date,verified_amount_paise,beneficiary_confirmed
+			) VALUES($1,$2,$3,$4,$5,now(),$6,$3,$4,$5,true)`, id(), rid, ref, date, in.VerifiedAmountPaise, staff)
+		} else {
+			var latest string
+			if e = tx.QueryRow(ctx, "SELECT id FROM payment_submissions WHERE registration_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1", rid).Scan(&latest); e != nil {
+				return e
+			}
+			if latest != in.PaymentID {
+				return errors.New("review the latest payment submission")
+			}
+			_, e = tx.Exec(ctx, `UPDATE payment_submissions SET verified_at=now(),verified_by=$2,verified_reference=$3,verified_date=$4,verified_amount_paise=$5,beneficiary_confirmed=true WHERE id=$1`, latest, staff, ref, date, in.VerifiedAmountPaise)
 		}
-		if latest != in.PaymentID {
-			return errors.New("review the latest payment submission")
-		}
-		_, e = tx.Exec(ctx, `UPDATE payment_submissions SET verified_at=now(),verified_by=$2,verified_reference=$3,verified_date=$4,verified_amount_paise=$5,beneficiary_confirmed=true WHERE id=$1`, latest, staff, ref, date, in.VerifiedAmountPaise)
 		if e != nil {
 			return fmt.Errorf("bank reference is already approved or payment could not be verified: %w", e)
 		}
@@ -250,7 +271,7 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if _, e = tx.Exec(ctx, "UPDATE registrations SET contact_pack_hash=$2,contact_pack_cipher=$3 WHERE id=$1", rid, hash(pack), a.seal(pack)); e != nil {
 			return e
 		}
-		if in.Action == "approve_send" {
+		if in.Action == "approve_send" || in.Action == "record_approve_send" {
 			if e = a.queuePasses(ctx, tx, rid, "", "initial"); e != nil {
 				return e
 			}

@@ -15,6 +15,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 - Registration saved before payment; SBI Collect paid out of band; payment reference, date, amount, and receipt collected for manual staff review.
 - Registration states: `awaiting_payment`, `awaiting_review`, `correction_requested`, `approved`, `rejected`, `cancelled`.
 - Staff console at `/admin` with individual accounts, mandatory TOTP, server sessions, CSRF protection, and login throttling. Account-management and registration-review permissions are separate roles (`manager`, `reviewer`).
+- Reviewers can record and approve a payment found directly in SBI when the registrant did not submit payment evidence; the verified payment and staff action are retained in the payment history and audit trail.
 - Approval atomically creates one pass per attendee plus the delivery jobs. Concurrent approvals and repeated clicks never create extra passes.
 - Branded A5 PDF passes with an opaque QR (no contact information). Attendance scanning is deferred.
 - Short human identifiers in one series per category: a registration is `BC4-EX-0007` (the 7th exhibitor), and each of its passes is that reference plus the holder's place in it, `BC4-EX-0007-3`, printed large on the pass and repeated in the pass email.

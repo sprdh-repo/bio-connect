@@ -146,6 +146,8 @@ Roles are disjoint:
 |---|---|
 | `approve_send` | verifies the payment, approves, atomically creates one pass per attendee and the pack (exhibitors), then queues delivery. Requires `successful` and `beneficiary_confirmed`. `verified_amount_paise` must equal the category fee for `verified_date`. `verified_reference` must not already belong to an approved payment. Idempotent once approved. |
 | `approve_only` | as above without queueing delivery |
+| `record_approve_send` | from `awaiting_payment`, records a payment found directly in SBI as both reported and verified, then approves and queues delivery. Takes the same verified payment fields and confirmation flags as `approve_send`; no `payment_id` is required. Exhibitors must already have an institution logo. The payment and reviewer action are recorded atomically in the payment history and audit trail. |
+| `record_approve_only` | as above without queueing delivery |
 | `send` | queues the initial delivery for an approved registration; repeats are no-ops |
 | `resend` | needs a unique `request_id`; queues a fresh delivery of the existing passes |
 | `reissue` | `{pass_id, note}`; revokes that pass, its QR and its pass number, issues the next version at the next free place in the registration (`...-7` after a roster of 6), queues delivery |

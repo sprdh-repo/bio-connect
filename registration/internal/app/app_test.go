@@ -426,6 +426,81 @@ func TestQuoteAndDisplayedFeeFollowServerClock(t *testing.T) {
 
 // --- payment review -----------------------------------------------------
 
+func TestReviewerCanRecordAndApproveUnsubmittedPayment(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1))
+
+	err := a.Review(ctx, rid, sid, ReviewInput{
+		Action: "record_approve_only", VerifiedReference: "  sbi manual 123  ",
+		VerifiedDate: today(a), VerifiedAmountPaise: 400000,
+		Successful: true, BeneficiaryConfirmed: true, Note: "found in SBI Collect",
+	})
+	if err != nil {
+		t.Fatalf("record and approve: %v", err)
+	}
+	if status(t, a, rid) != "approved" {
+		t.Fatalf("status = %s, want approved", status(t, a, rid))
+	}
+	var reportedRef, verifiedRef, verifiedBy string
+	var reportedAmount, verifiedAmount int64
+	if err := a.DB.QueryRow(ctx, `SELECT bank_reference,amount_paise,verified_reference,verified_amount_paise,verified_by
+		FROM payment_submissions WHERE registration_id=$1`, rid).Scan(
+		&reportedRef, &reportedAmount, &verifiedRef, &verifiedAmount, &verifiedBy); err != nil {
+		t.Fatal(err)
+	}
+	if reportedRef != "SBIMANUAL123" || verifiedRef != reportedRef {
+		t.Fatalf("reported/verified references = %q/%q", reportedRef, verifiedRef)
+	}
+	if reportedAmount != 400000 || verifiedAmount != reportedAmount || verifiedBy != sid {
+		t.Fatalf("payment record = reported %d, verified %d by %q", reportedAmount, verifiedAmount, verifiedBy)
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND staff_id=$2 AND action='record_approve_only'", rid, sid); n != 1 {
+		t.Fatalf("recorded payment audit rows = %d, want 1", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass'", rid); n != 0 {
+		t.Fatalf("record_approve_only queued %d pass jobs", n)
+	}
+}
+
+func TestReviewerRecordedExhibitorPaymentRequiresLogo(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, _ := a.Create(ctx, exhibitorInput("table", 2), key(1))
+
+	in := ReviewInput{
+		Action: "record_approve_send", VerifiedReference: "SBIEXHIBITOR",
+		VerifiedDate: today(a), VerifiedAmountPaise: earlyPaise(t, a, rid),
+		Successful: true, BeneficiaryConfirmed: true,
+	}
+	err := a.Review(ctx, rid, sid, in)
+	if err == nil || !strings.Contains(err.Error(), "logo") {
+		t.Fatalf("record payment without exhibitor logo error = %v", err)
+	}
+	if status(t, a, rid) != "awaiting_payment" {
+		t.Fatalf("status changed after missing-logo rejection: %s", status(t, a, rid))
+	}
+	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE registration_id=$1", rid); n != 0 {
+		t.Fatalf("created %d payment submissions after missing-logo rejection", n)
+	}
+
+	addFile(t, a, rid, "logo", tinyPNG(t))
+	if err := a.Review(ctx, rid, sid, in); err != nil {
+		t.Fatalf("record exhibitor payment after logo upload: %v", err)
+	}
+	if status(t, a, rid) != "approved" {
+		t.Fatalf("status after recording exhibitor payment = %s", status(t, a, rid))
+	}
+	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 2 {
+		t.Fatalf("record_approve_send created %d exhibitor passes, want 2", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose IN ('pass','pack')", rid); n != 3 {
+		t.Fatalf("record_approve_send queued %d pass/pack jobs, want 3", n)
+	}
+}
+
 func TestApprovalRejectsMismatchedAmount(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
