@@ -66,7 +66,7 @@ TEST_DATABASE_URL='postgres://bioconnect:local-development-only@localhost:55432/
   go test ./...
 ```
 
-They cover both registration journeys and every category, the exact exhibitor roster counts (6 / 4 / 2), fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
+They cover both registration journeys and every category, the exact exhibitor roster counts (3 / 2 / 2) with registrations made before a roster change keeping their original roster, fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
 
 To eyeball a rendered pass:
 

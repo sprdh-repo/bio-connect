@@ -150,7 +150,7 @@ Roles are disjoint:
 | `record_approve_only` | as above without queueing delivery |
 | `send` | queues the initial delivery for an approved registration; repeats are no-ops |
 | `resend` | needs a unique `request_id`; queues a fresh delivery of the existing passes |
-| `reissue` | `{pass_id, note}`; revokes that pass, its QR and its pass number, issues the next version at the next free place in the registration (`...-7` after a roster of 6), queues delivery |
+| `reissue` | `{pass_id, note}`; revokes that pass, its QR and its pass number, issues the next version at the next free place in the registration (`...-4` after a roster of 3), queues delivery |
 | `correction_requested` / `rejected` | `{note}` required; only from `awaiting_review` |
 | `cancelled` | `{note}` required; revokes all passes and cancels queued pass/pack jobs |
 

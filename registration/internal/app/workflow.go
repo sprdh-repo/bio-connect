@@ -57,7 +57,7 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string) (str
 	if e != nil {
 		return "", "", e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, fee(c, a.Now()), hash(token), a.Now().Add(30*24*time.Hour))
+	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires,roster_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, fee(c, a.Now()), hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount)
 	if e != nil {
 		return "", "", e
 	}
@@ -174,7 +174,8 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 	}
 	defer tx.Rollback(ctx)
 	var status, cat, email string
-	if e = tx.QueryRow(ctx, "SELECT status,category_id,email FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email); e != nil {
+	var roster int
+	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster); e != nil {
 		return e
 	}
 	if len(in.Note) > 2000 {
@@ -259,7 +260,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if e != nil {
 			return e
 		}
-		if len(people) != c.RosterCount {
+		// Against the roster recorded at registration, not the category's current
+		// allowance, so a later allowance change cannot strand an existing registration.
+		if len(people) != roster {
 			return errors.New("roster is incomplete")
 		}
 		for _, aid := range people {

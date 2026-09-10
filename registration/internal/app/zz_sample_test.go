@@ -24,7 +24,7 @@ func TestDumpSamplePasses(t *testing.T) {
 			"Principal Scientist, Molecular Diagnostics", "faculty", "Faculty / Scientists"},
 		{"pass-industry.pdf", "Ananya Krishnan", "Biocon Biologics", "Head of Business Development", "industry", "Industry"},
 		{"pass-exhibitor.pdf", "Ravi Chandran",
-			"Rajiv Gandhi Centre for Biotechnology", "Booth in-charge", "premium", "Premium stall (6m x 3m)"},
+			"Rajiv Gandhi Centre for Biotechnology", "Booth in-charge", "premium", "Premium stall"},
 	}
 	for i, s := range samples {
 		number := fmt.Sprintf("BC4-%s-%04d-%d", categoryCode(s.catID), i+1, i+1)
