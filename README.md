@@ -48,9 +48,11 @@ Adding a section to the page is a chance to give one of the unmapped URLs a real
 `/speakers` and `/venue` currently go to the top of the page for want of anywhere better.
 
 The 3.0 PDFs under `/assets/files/` - the old brochure, the stall layout and the
-sponsorship details - are deliberately left to 404. The files no longer exist and there is
-no 4.0 equivalent, so an honest "not found" beats redirecting a document request to a
-marketing section. Revisit that when 4.0 collateral is published.
+sponsorship details - are deliberately left to 404. Those exact files no longer exist, and
+the 3.0 URLs are not worth reviving, so an honest "not found" beats redirecting a document
+request to a marketing section. The 4.0 brochure is published at its own path,
+`/assets/bio-connect-4-brochure.pdf`, and is linked from the Brochure section on the home
+page rather than from any of the old URLs.
 
 The function is deployed by hand, not by `scripts/deploy.sh`:
 
@@ -77,6 +79,14 @@ The transparent Government of Kerala emblem in `assets/government-of-kerala-logo
 The image is unmodified; the logo links to its source and attribution.
 
 The hero artwork in `assets/hero-biotech.webp` was generated specifically for this project with OpenAI image generation.
+
+`assets/bio-connect-4-brochure.pdf` is the official 4-page A4 event brochure, downscaled
+from the 10.5 MB press original to 2.4 MB (image resolution reduced to ~200 DPI, then
+linearised for progressive loading). It is visually identical on screen and still prints
+cleanly at A4. `assets/brochure-cover.webp` is a 900px render of its first page, used as
+the preview on the home page. Regenerate both from a new press original rather than
+editing them; the render pipeline is Ghostscript `-dPDFSETTINGS` downsampling plus
+`qpdf --linearize`, and `pdftoppm -r 200` for the cover.
 
 The Bio Connect logo and favicon are the official, unmodified brand assets from <https://bioconnect.kerala.gov.in/>.
 

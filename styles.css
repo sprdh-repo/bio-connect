@@ -327,6 +327,28 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .audience-foot { margin-top: 44px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .audience-foot p { margin: 0; max-width: 520px; color: rgba(255,255,255,0.66); font-size: 15px; line-height: 1.7; }
 
+/* Event brochure. The cover sits on a stacked-paper shadow so it reads as a
+   physical document you can pick up, next to the copy and the two actions:
+   .button-primary downloads the file, .inline-link opens it in a tab. */
+.brochure { background: var(--paper); }
+.brochure-inner { display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr); gap: clamp(44px, 7vw, 104px); align-items: center; }
+.brochure-preview { position: relative; max-width: 420px; justify-self: center; }
+.brochure-preview::before { content: ""; position: absolute; z-index: 0; inset: 20px -20px -20px 20px; background: var(--cream); border: 1px solid var(--line); }
+.brochure-doc { position: relative; z-index: 1; display: block; background: var(--cream); box-shadow: 0 30px 66px rgba(5,28,23,0.22); transition: transform 0.4s cubic-bezier(.2,.8,.2,1), box-shadow 0.4s ease; }
+.brochure-doc::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--line); pointer-events: none; }
+.brochure-doc img { display: block; width: 100%; height: auto; }
+.brochure-doc:hover { transform: translateY(-5px); box-shadow: 0 42px 88px rgba(5,28,23,0.28); }
+.brochure-copy .eyebrow { margin-bottom: 22px; color: var(--forest); }
+.brochure-copy h2 { margin: 0; font: 600 clamp(38px, 4.6vw, 60px)/1.06 Manrope, sans-serif; letter-spacing: -0.05em; }
+.brochure-lede { max-width: 540px; margin: 24px 0 0; color: var(--muted); font-size: 16px; line-height: 1.75; }
+.brochure-specs { display: flex; flex-wrap: wrap; gap: 14px 44px; margin: 32px 0 0; padding-top: 26px; border-top: 1px solid var(--line); }
+.brochure-specs div { display: flex; flex-direction: column; gap: 7px; }
+.brochure-specs dt { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.brochure-specs dd { margin: 0; font: 600 15px Manrope, sans-serif; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.brochure-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 30px; margin-top: 36px; }
+.brochure-actions .button-arrow { transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
+.brochure-actions .button:hover .button-arrow, .brochure-actions .button:focus-visible .button-arrow { transform: translateY(3px); }
+
 .registration { background: var(--cream); }
 .registration .section-heading { margin-bottom: 60px; }
 .reg-tablist { display: grid; grid-template-columns: repeat(3, 1fr); border-block: 1px solid var(--line); }
@@ -625,6 +647,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .mobile-nav.open > a:nth-of-type(6) { transition-delay: 0.34s; }
   .mobile-nav.open > a:nth-of-type(7) { transition-delay: 0.39s; }
   .mobile-nav.open > a:nth-of-type(8) { transition-delay: 0.44s; }
+  .mobile-nav.open > a:nth-of-type(9) { transition-delay: 0.49s; }
   .mobile-nav > a[aria-current] { color: #4f7f3b; }
   .mobile-nav > a:not(.button) { padding: 18px 0; font: 600 30px Manrope, sans-serif; border-bottom: 1px solid var(--line); }
   .mobile-nav .button { margin-top: 32px; align-self: stretch; }
@@ -638,6 +661,9 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .event-edition, .scroll-cue { display: none; }
   .about-copy, .impact-heading, .section-heading, .highlights-heading, .experience-grid,
   .audience-heading { grid-template-columns: 1fr; gap: 45px; }
+  .brochure-inner { grid-template-columns: 1fr; gap: 46px; justify-items: start; }
+  .brochure-preview { justify-self: start; max-width: 300px; }
+  .brochure-preview::before { inset: 14px -14px -14px 14px; }
   .theme-card, .theme-card:nth-child(n+4) { grid-column: span 3; }
   /* Two per row leaves the fifth card alone - it takes the full row. */
   .theme-card:last-child { grid-column: span 6; }
@@ -734,6 +760,11 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .calendar-button { width: 100%; display: flex; align-items: center; justify-content: space-between; }
   .calendar-menu { right: 0; min-width: 0; }
   .about h2, .impact-heading h2, .section-heading h2, .experience h2, .audience-heading h2 { font-size: 41px; }
+  .brochure-copy h2 { font-size: 36px; }
+  .brochure-preview { max-width: 260px; }
+  .brochure-actions { align-items: stretch; flex-direction: column; gap: 16px; }
+  .brochure-actions .button { width: 100%; }
+  .brochure-actions .inline-link { align-self: flex-start; }
   .stats-grid { margin-top: 65px; }
   .stats-grid article { padding: 28px 12px 28px 0; }
   .stats-grid article + article { padding-left: 16px; }
