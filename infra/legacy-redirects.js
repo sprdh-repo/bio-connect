@@ -24,9 +24,9 @@ var MOVED = {
      expo, and the past-edition highlights are the closest the 4.0 site has. */
   "/exhibitors": "/#programme",
   "/creatives": "/#highlights",
-  /* No speakers list or venue section on the 4.0 site yet - the event bar in the
-     hero carries the venue, so the top of the page is the honest answer. */
-  "/speakers": "/",
+  "/speakers": "/speakers.html",
+  /* No venue section on the 4.0 site yet - the event bar in the hero carries the
+     venue, so the top of the page is the honest answer. */
   "/venue": "/"
 };
 

@@ -298,6 +298,65 @@ if (videoDialog) {
   videoDialog.addEventListener("cancel", () => dialogFrame.replaceChildren());
 }
 
+/* Speaker search only exists on the speakers page. Without script every card
+   simply shows, so the field stays hidden until it can work. */
+const speakerGrid = document.querySelector("[data-speaker-grid]");
+
+if (speakerGrid) {
+  const search = document.querySelector("[data-speaker-search]");
+  const input = search.querySelector("[data-speaker-query]");
+  const count = document.querySelector("[data-speaker-count]");
+  const empty = document.querySelector("[data-speaker-empty]");
+  const emptyQuery = empty.querySelector("[data-speaker-empty-query]");
+
+  /* Letters and digits only, so "tp singh", "T.P. Singh" and "t p singh" all
+     find Prof. T. P. Singh. */
+  const compact = (text) =>
+    text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const speakers = [...speakerGrid.querySelectorAll(".speaker")].map((card) => ({
+    card,
+    text: compact(card.querySelector(".speaker-meta").textContent),
+  }));
+
+  const filterSpeakers = () => {
+    const query = input.value.trim();
+    const terms = query.split(/\s+/).map(compact).filter(Boolean);
+    let shown = 0;
+
+    speakers.forEach(({ card, text }) => {
+      const match = terms.every((term) => text.includes(term));
+      card.hidden = !match;
+      if (match) shown += 1;
+    });
+
+    count.textContent = terms.length
+      ? `${shown} of ${speakers.length} speakers`
+      : `${speakers.length} speakers`;
+    emptyQuery.textContent = `“${query}”`;
+    empty.hidden = shown > 0;
+  };
+
+  const clearSpeakers = () => {
+    input.value = "";
+    filterSpeakers();
+  };
+
+  input.addEventListener("input", filterSpeakers);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !input.value) return;
+    event.preventDefault();
+    clearSpeakers();
+  });
+  empty.querySelector("[data-speaker-clear]").addEventListener("click", () => {
+    clearSpeakers();
+    input.focus();
+  });
+
+  search.hidden = false;
+  /* A back/forward visit can restore a typed query - honour it. */
+  if (input.value) filterSpeakers();
+}
+
 /* Registration tabs: one panel at a time, with roving focus across the tablist. */
 const regTabs = [...document.querySelectorAll("[data-reg-tab]")];
 

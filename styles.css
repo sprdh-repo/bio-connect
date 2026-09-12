@@ -602,6 +602,59 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .page-notes a { border-bottom: 1px solid var(--line); transition: color 0.2s, border-color 0.2s; }
 .page-notes a:hover { color: var(--forest); border-bottom-color: var(--forest); }
 
+/* Speakers page. Portraits carry the same forest duotone as the leadership
+   pair, baked into the files, so photos from 40 different sources read as one set. */
+.speakers { background: var(--cream); }
+.speakers .section-heading { margin-bottom: 46px; }
+.speaker-toolbar { margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; }
+.speaker-search { position: relative; width: min(100%, 360px); display: flex; align-items: center; }
+.speaker-search[hidden] { display: none; }
+.speaker-search-icon { position: absolute; left: 16px; color: var(--muted); pointer-events: none; transition: color 0.2s; }
+.speaker-search:focus-within .speaker-search-icon { color: var(--forest); }
+.speaker-search input { width: 100%; min-height: 50px; padding: 0 14px 0 44px; color: var(--ink); font: 500 15px "DM Sans", sans-serif; background: var(--paper); border: 1px solid rgba(16, 32, 27, 0.22); border-radius: 0; transition: border-color 0.2s, box-shadow 0.2s; }
+.speaker-search input::placeholder { color: var(--muted); opacity: 1; }
+.speaker-search input:hover { border-color: rgba(16, 32, 27, 0.45); }
+.speaker-search input:focus { outline: none; border-color: #4f7f3b; box-shadow: 0 0 0 1px #4f7f3b; }
+/* The browser's own clear control is a blue cross - redrawn in ink. */
+.speaker-search input::-webkit-search-cancel-button { -webkit-appearance: none; width: 20px; height: 20px; margin-left: 10px; cursor: pointer; opacity: 0.55; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5.5 5.5 9 9m0-9-9 9' stroke='%2310201b' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / 20px no-repeat; transition: opacity 0.2s; }
+.speaker-search input::-webkit-search-cancel-button:hover { opacity: 1; }
+/* Hairline grid, drawn the same way as the committee roster. */
+.speaker-grid { margin: 1px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; list-style: none; }
+.speaker { min-width: 0; display: flex; flex-direction: column; background: var(--paper); box-shadow: 0 0 0 1px var(--line); }
+.speaker[hidden] { display: none; }
+.speaker-portrait { position: relative; aspect-ratio: 4 / 5; overflow: hidden; background: var(--forest-deep); }
+.speaker-portrait img { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform 0.7s cubic-bezier(.2,.8,.2,1); }
+.speaker-portrait::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; background: var(--lime); transform: scaleX(0); transform-origin: left; transition: transform 0.45s cubic-bezier(.2,.8,.2,1); }
+.speaker:hover .speaker-portrait img { transform: scale(1.04); }
+.speaker:hover .speaker-portrait::after { transform: scaleX(1); }
+/* Stand-in for a speaker whose photo has not come in yet. */
+.speaker-monogram { display: grid; place-items: center; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px; background-position: center; }
+.speaker-monogram span { color: var(--lime); font: 600 clamp(44px, 4.6vw, 68px)/1 Manrope, sans-serif; letter-spacing: -0.06em; }
+.speaker-meta { flex: 1; padding: 20px 22px 24px; display: flex; flex-direction: column; }
+.speaker-name { margin: 0; font: 600 18px/1.25 Manrope, sans-serif; letter-spacing: -0.025em; }
+.speaker-role { margin: 10px 0 0; font-size: 13.5px; line-height: 1.5; }
+.speaker-org { margin: 3px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.speaker-empty { padding: 54px 0 6px; }
+.speaker-empty[hidden] { display: none; }
+.speaker-empty p { margin: 0 0 16px; font: 600 clamp(22px, 2.4vw, 30px)/1.2 Manrope, sans-serif; letter-spacing: -0.04em; overflow-wrap: anywhere; }
+.speaker-empty strong { color: #4a7736; font-weight: 600; }
+.speaker-empty .inline-link { padding-inline: 0; background: none; border-width: 0 0 1px; cursor: pointer; }
+
+/* Home page pointer to the speakers page, set under the conclave strand. */
+.speakers-teaser { margin-top: 60px; padding: 26px 32px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px 34px; color: white; background: var(--forest); transition: background 0.25s; }
+.speakers-teaser:hover { background: #0e3d31; }
+.speakers-teaser-faces { display: flex; }
+.speakers-teaser-faces img { width: 58px; height: 58px; display: block; object-fit: cover; object-position: 50% 30%; border: 2px solid var(--forest); border-radius: 50%; transition: margin 0.35s cubic-bezier(.2,.8,.2,1), border-color 0.25s; }
+.speakers-teaser-faces img + img { margin-left: -16px; }
+.speakers-teaser:hover .speakers-teaser-faces img { border-color: #0e3d31; }
+.speakers-teaser:hover .speakers-teaser-faces img + img { margin-left: -8px; }
+.speakers-teaser-label { display: block; margin-bottom: 7px; color: var(--lime); font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.speakers-teaser-copy strong { display: block; font: 600 clamp(19px, 1.9vw, 24px)/1.25 Manrope, sans-serif; letter-spacing: -0.03em; }
+.speakers-teaser-cta { padding-bottom: 4px; color: var(--lime); font-size: 12px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; white-space: nowrap; border-bottom: 1px solid rgba(185,220,114,0.4); transition: border-color 0.25s; }
+.speakers-teaser-cta span { display: inline-block; margin-left: 8px; transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
+.speakers-teaser:hover .speakers-teaser-cta { border-color: var(--lime); }
+.speakers-teaser:hover .speakers-teaser-cta span, .speakers-teaser:focus-visible .speakers-teaser-cta span { transform: translateX(4px); }
+
 .site-footer { padding: 90px 0 25px; color: rgba(255,255,255,0.78); background: var(--forest-deep); }
 .footer-grid { display: grid; grid-template-columns: 1.25fr 0.7fr 0.85fr 0.95fr; gap: 60px; }
 .footer-brand .brand { width: 220px; }
@@ -673,6 +726,7 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .mobile-nav.open > a:nth-of-type(4) { transition-delay: 0.23s; }
   .mobile-nav.open > a:nth-of-type(5) { transition-delay: 0.29s; }
   .mobile-nav.open > a:nth-of-type(6) { transition-delay: 0.34s; }
+  .mobile-nav.open > a:nth-of-type(7) { transition-delay: 0.39s; }
   .mobile-nav > a[aria-current] { color: #4f7f3b; }
   .mobile-nav > a:not(.button) { padding: 18px 0; font: 600 30px Manrope, sans-serif; border-bottom: 1px solid var(--line); }
   .mobile-nav .button { margin-bottom: 30px; align-self: stretch; }
@@ -754,6 +808,11 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .leader-card { min-height: 268px; }
   .leader-portrait { aspect-ratio: 4 / 5; align-self: start; }
   .roster { grid-template-columns: 1fr; }
+  .speaker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .speaker-meta { padding: 18px 18px 22px; }
+  .speaker-name { font-size: 17px; }
+  .speakers-teaser { grid-template-columns: auto minmax(0, 1fr); }
+  .speakers-teaser-cta { grid-column: 1 / -1; justify-self: start; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 46px 40px; }
 }
 
@@ -875,6 +934,17 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .leader-tag { margin-top: 16px; padding: 7px 11px; font-size: 9px; letter-spacing: 0.08em; }
   .roster-item { padding: 20px; }
   .page-notes { margin-top: 46px; }
+  .speaker-toolbar { margin-bottom: 16px; flex-direction: column-reverse; align-items: stretch; gap: 14px; }
+  .speaker-search { width: 100%; }
+  .speaker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .speaker-meta { padding: 14px 14px 18px; }
+  .speaker-name { font-size: 15px; letter-spacing: -0.02em; }
+  .speaker-role { margin-top: 7px; font-size: 12.5px; line-height: 1.45; }
+  .speaker-org { font-size: 12px; line-height: 1.45; }
+  .speaker-monogram span { font-size: 40px; }
+  .speakers-teaser { margin-top: 44px; padding: 22px 20px 24px; grid-template-columns: 1fr; gap: 16px; }
+  .speakers-teaser-faces img { width: 50px; height: 50px; }
+  .speakers-teaser-cta { grid-column: auto; }
 }
 
 @media (max-width: 360px) {

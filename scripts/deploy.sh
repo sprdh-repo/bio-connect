@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html committee.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
+for file in index.html speakers.html committee.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -34,6 +34,11 @@ aws sts get-caller-identity --query 'Account' --output text >/dev/null
 
 echo "Deploying site to s3://$BUCKET..."
 aws s3 cp index.html "s3://$BUCKET/index.html" \
+  --content-type "text/html; charset=utf-8" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --only-show-errors
+
+aws s3 cp speakers.html "s3://$BUCKET/speakers.html" \
   --content-type "text/html; charset=utf-8" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --only-show-errors
@@ -83,7 +88,7 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
+    --paths "/" "/index.html" "/speakers.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
             "/styles.css" "/script.js" "/assets/*" \
     --query 'Invalidation.Id' \
     --output text
@@ -106,8 +111,19 @@ if ! cmp -s index.html "$REMOTE_INDEX"; then
   exit 1
 fi
 
+REMOTE_SPEAKERS="$(mktemp)"
+trap 'rm -f "$REMOTE_INDEX" "$REMOTE_SPEAKERS"' EXIT
+curl --fail --silent --show-error --location \
+  --retry 3 --retry-delay 2 \
+  "$SITE_URL/speakers.html" > "$REMOTE_SPEAKERS"
+
+if ! cmp -s speakers.html "$REMOTE_SPEAKERS"; then
+  echo "Error: production HTML does not match the deployed speakers.html." >&2
+  exit 1
+fi
+
 REMOTE_COMMITTEE="$(mktemp)"
-trap 'rm -f "$REMOTE_INDEX" "$REMOTE_COMMITTEE"' EXIT
+trap 'rm -f "$REMOTE_INDEX" "$REMOTE_SPEAKERS" "$REMOTE_COMMITTEE"' EXIT
 curl --fail --silent --show-error --location \
   --retry 3 --retry-delay 2 \
   "$SITE_URL/committee.html" > "$REMOTE_COMMITTEE"

@@ -15,6 +15,9 @@ Then open <http://localhost:4173>.
 ## Pages
 
 - `index.html` - the landing page.
+- `speakers.html` - the speakers expected at the conclave, with a client-side search.
+  The list is static markup; the count in the hero, the toolbar and the home page teaser is
+  typed out, so update all three when speakers are added or removed.
 - `committee.html` - the State leadership and the Advisory Committee constituted by
   G.O.(Rt) No. 879/2026/ID.
   It is titled *Leadership* everywhere in the UI; the filename is deliberately unchanged,
@@ -24,7 +27,7 @@ Then open <http://localhost:4173>.
   URLs like `/about/` and `/agenda/`; without this they get an S3 `AccessDenied` 403,
   which Google reads as "blocked" and keeps the stale entry alive instead of dropping it.
 
-Both pages share `styles.css` and `script.js`.
+All pages share `styles.css` and `script.js`.
 `script.js` is page-agnostic: the home-page-only widgets are feature-detected, and
 scroll-spy only tracks nav links that point into the page you are on.
 
@@ -45,7 +48,8 @@ lets search engines drop the old pages from their index.
 
 The map covers every 3.0 page that Search Console still listed as indexed on 2026-09-07.
 Adding a section to the page is a chance to give one of the unmapped URLs a real target:
-`/speakers` and `/venue` currently go to the top of the page for want of anywhere better.
+`/venue` currently goes to the top of the page for want of anywhere better.
+`/speakers` goes to `speakers.html`.
 
 The 3.0 PDFs under `/assets/files/` - the old brochure, the stall layout and the
 sponsorship details - are deliberately left to 404. Those exact files no longer exist, and
@@ -118,6 +122,13 @@ publishes one at
 Both are cropped to 4:5 at a matched head size and given the same forest-green duotone,
 so two portraits shot on different days read as one set. Regenerate them from the
 originals rather than editing the `.webp` files by hand.
+
+The speaker portraits in `assets/speakers/` come from the organisers' speaker spreadsheet.
+Each is cropped to 4:5 around the detected face and given the same forest-green duotone as
+the leadership portraits, at 480x600.
+Regenerate them from the originals rather than editing the `.webp` files by hand.
+A speaker without a usable photo gets a lettered placeholder (`.speaker-monogram`) until one
+arrives.
 
 ## Deploy
 
