@@ -6,6 +6,10 @@ const heroMedia = document.querySelector("[data-parallax]");
 const hero = document.querySelector(".hero");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const programme = document.querySelector("#programme");
+const registration = document.querySelector("#registration");
+if (programme && registration) programme.after(registration);
+
 /* Intro curtain. The root class is set in the page head, before first paint -
    here we only run the exit and tell the rest of the page when to start. */
 const intro = document.querySelector("[data-intro]");
