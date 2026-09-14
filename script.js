@@ -305,7 +305,6 @@ const speakerGrid = document.querySelector("[data-speaker-grid]");
 if (speakerGrid) {
   const search = document.querySelector("[data-speaker-search]");
   const input = search.querySelector("[data-speaker-query]");
-  const count = document.querySelector("[data-speaker-count]");
   const empty = document.querySelector("[data-speaker-empty]");
   const emptyQuery = empty.querySelector("[data-speaker-empty-query]");
 
@@ -329,9 +328,6 @@ if (speakerGrid) {
       if (match) shown += 1;
     });
 
-    count.textContent = terms.length
-      ? `${shown} of ${speakers.length} speakers`
-      : `${speakers.length} speakers`;
     emptyQuery.textContent = `“${query}”`;
     empty.hidden = shown > 0;
   };

@@ -85,7 +85,7 @@ The image is unmodified; the logo links to its source and attribution.
 The hero artwork in `assets/hero-biotech.webp` was generated specifically for this project with OpenAI image generation.
 
 `assets/bio-connect-4-brochure.pdf` is the official 4-page A4 event brochure, downscaled
-from the 10.5 MB press original to 2.4 MB (image resolution reduced to ~200 DPI, then
+from the 10.5 MB press original to 2.0 MB (image resolution reduced to ~200 DPI, then
 linearised for progressive loading). It is visually identical on screen and still prints
 cleanly at A4. `assets/brochure-cover.webp` is a 900px render of its first page, used as
 the preview on the home page. Regenerate both from a new press original rather than
