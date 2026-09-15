@@ -52,7 +52,7 @@ Reusing the key with a different body is rejected.
 ```
 
 - Delegates: `attendees` must hold exactly one person; contact fields are taken from that person.
-- Exhibitors: `attendees` must hold exactly 6 (premium), 4 (standard), or 2 (table space); `description` is required. The contact person receives a pass only if listed among the attendees.
+- Exhibitors: `attendees` must hold exactly 3 (premium), 2 (standard), or 2 (table space); `description` is required. The contact person receives a pass only if listed among the attendees.
 - `phone` must be `+` and 8 to 15 digits. `whatsapp_consent` records messaging permission; without it WhatsApp is skipped for that person.
 - Fails with 400 if registration is closed or the category is closed.
 
