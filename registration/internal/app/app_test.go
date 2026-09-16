@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -770,6 +771,88 @@ func TestBulkSendReportsPerRegistration(t *testing.T) {
 	}
 	if results[notApproved] == "queued" {
 		t.Fatal("bulk send queued a non-approved registration")
+	}
+}
+
+func TestPaymentReminderOnlyForAwaitingPaymentAndRateLimited(t *testing.T) {
+	a := mustApp(t)
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	ctx := context.Background()
+	remind := func(rid string) error { return a.Review(ctx, rid, sid, ReviewInput{Action: "payment_reminder"}) }
+	reminders := func(rid string) int {
+		return count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='payment_reminder'", rid)
+	}
+
+	rid, firstTok, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
+	if err := remind(rid); err != nil {
+		t.Fatalf("reminder for awaiting payment: %v", err)
+	}
+	if n := reminders(rid); n != 1 {
+		t.Fatalf("%d reminders queued, want 1", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM recovery_tokens WHERE registration_id=$1 AND expires_at>now()+interval '6 days'", rid); n != 1 {
+		t.Fatalf("%d week-long reminder links, want 1", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND action='payment_reminder' AND staff_id=$2", rid, sid); n != 1 {
+		t.Fatalf("%d reminder audit events, want 1", n)
+	}
+	// Issuing the link must not disturb the link the registrant already holds.
+	if !a.manage(bearerReq(rid, firstTok), rid) {
+		t.Fatal("sending a reminder invalidated the existing management link")
+	}
+
+	if err := remind(rid); err == nil || !strings.Contains(err.Error(), "24 hours") {
+		t.Fatalf("second reminder within 24 hours: %v", err)
+	}
+	if _, err := a.DB.Exec(ctx, "UPDATE delivery_jobs SET created_at=now()-interval '25 hours' WHERE registration_id=$1 AND purpose='payment_reminder'", rid); err != nil {
+		t.Fatal(err)
+	}
+	if err := remind(rid); err != nil {
+		t.Fatalf("reminder after cooldown: %v", err)
+	}
+	if n := reminders(rid); n != 2 {
+		t.Fatalf("%d reminders after cooldown, want 2", n)
+	}
+
+	paid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
+	payDelegate(t, a, paid, 400000)
+	if err := remind(paid); !errors.Is(err, ErrConflict) {
+		t.Fatalf("reminder for awaiting review: %v, want conflict", err)
+	}
+	if n := reminders(paid); n != 0 {
+		t.Fatalf("%d reminders queued for a paid registration", n)
+	}
+}
+
+func TestQueuedPaymentReminderIsDroppedOncePaid(t *testing.T) {
+	a := mustApp(t)
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	ctx := context.Background()
+	unpaid, _, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
+	paid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
+	for _, rid := range []string{unpaid, paid} {
+		if err := a.Review(ctx, rid, sid, ReviewInput{Action: "payment_reminder"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payDelegate(t, a, paid, 400000)
+	for count(t, a, "SELECT count(*) FROM delivery_jobs WHERE status='queued'") > 0 {
+		if err := a.WorkOnce(ctx); err != nil {
+			t.Fatalf("WorkOnce: %v", err)
+		}
+	}
+	jobs := func(rid string) string {
+		var st string
+		if err := a.DB.QueryRow(ctx, "SELECT status FROM delivery_jobs WHERE registration_id=$1 AND purpose='payment_reminder'", rid).Scan(&st); err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+	if st := jobs(unpaid); st != "delivered" {
+		t.Fatalf("unpaid reminder status = %s, want delivered", st)
+	}
+	if st := jobs(paid); st != "cancelled" {
+		t.Fatalf("paid reminder status = %s, want cancelled", st)
 	}
 }
 

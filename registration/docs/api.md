@@ -130,6 +130,7 @@ Roles are disjoint:
 | `GET /admin/export?format=csv\|xlsx&sheet=&<same filters>` | CSV is one `sheet` (`Registrations`, `Attendees`, `Payments`, `Deliveries`); XLSX has all four. Cells that begin with `= + - @` are prefixed with `'`. 50,000-row cap. |
 | `POST /admin/categories` | `{id, open}` opens or closes a category |
 | `POST /admin/bulk-send` | `{ids:[...], channel:""}` runs `send` for 1-100 approved registrations; returns per-id `queued` or the error |
+| `POST /admin/bulk-remind` | `{ids:[...]}` runs `payment_reminder` for 1-100 registrations; returns per-id `queued` or the error |
 | `POST /admin/retry` | `{id, confirm_uncertain, note}` requeues a `failed` or `uncertain` delivery. `uncertain` needs `confirm_uncertain:true` and a `note`. The prior job and its provider id are kept for late webhooks. |
 
 ### `POST /admin/registrations/{id}/review`
@@ -151,6 +152,7 @@ Roles are disjoint:
 | `send` | queues the initial delivery for an approved registration; repeats are no-ops |
 | `resend` | needs a unique `request_id`; queues a fresh delivery of the existing passes |
 | `reissue` | `{pass_id, note}`; revokes that pass, its QR and its pass number, issues the next version at the next free place in the registration (`...-4` after a roster of 3), queues delivery |
+| `payment_reminder` | from `awaiting_payment` only; emails the contact the reference, the fee payable today, and a single-use `/recover#<token>` link valid for 7 days. The existing management link keeps working until that link is used. At most one reminder per registration per 24 hours. A queued reminder is cancelled if the registration has left `awaiting_payment` by the time it is sent. |
 | `correction_requested` / `rejected` | `{note}` required; only from `awaiting_review` |
 | `cancelled` | `{note}` required; revokes all passes and cancels queued pass/pack jobs |
 

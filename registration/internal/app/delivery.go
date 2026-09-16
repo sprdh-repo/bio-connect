@@ -64,6 +64,13 @@ func (a *App) WorkOnce(ctx context.Context) error {
 	if e = tx.QueryRow(ctx, "SELECT status FROM registrations WHERE id=$1 FOR NO KEY UPDATE", j.RegistrationID).Scan(&status); e != nil {
 		return e
 	}
+	// A registrant who paid, or was cancelled, after the reminder was queued must not be told to pay.
+	if j.Purpose == "payment_reminder" && status != "awaiting_payment" {
+		if _, e = tx.Exec(ctx, "UPDATE delivery_jobs SET status='cancelled',updated_at=now() WHERE id=$1", j.ID); e != nil {
+			return e
+		}
+		return tx.Commit(ctx)
+	}
 	if j.Purpose == "pass" || j.Purpose == "pack" {
 		valid := status == "approved"
 		if valid && j.PassID != "" {
@@ -199,6 +206,19 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			heading = "Registration saved"
 			cta = "Open my registration"
 			intro = "Your registration is saved. Use this private link to see the payment instructions and submit your evidence.\n\nThis is not a payment approval or an admission pass - keep the link to yourself."
+		case "payment_reminder":
+			var reference, catID string
+			if e = a.DB.QueryRow(ctx, "SELECT reference,category_id FROM registrations WHERE id=$1", j.RegistrationID).Scan(&reference, &catID); e != nil {
+				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
+			}
+			var c Category
+			if e = a.DB.QueryRow(ctx, "SELECT early_paise,regular_paise FROM categories WHERE id=$1", catID).Scan(&c.EarlyPaise, &c.RegularPaise); e != nil {
+				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
+			}
+			subject = "Bio Connect 4.0 - payment pending for " + reference
+			heading = "Complete your payment"
+			cta = "Open my registration"
+			intro = "Your registration " + reference + " is saved, but we have not received your payment details yet. The fee payable today is " + money(fee(c, a.Now())) + ".\n\nOpen your registration for the SBI Collect payment link, then submit your bank reference so we can verify the payment and issue your passes. If you have already paid, submit those payment details.\n\nThis link works once and expires in 7 days. Keep it to yourself."
 		case "recovery":
 			subject = "Bio Connect 4.0 - recover your registration"
 			heading = "Recover your registration"

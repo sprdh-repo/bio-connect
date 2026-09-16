@@ -542,3 +542,72 @@ func TestAdminCanUploadExhibitorLogoOnRegistrantsBehalf(t *testing.T) {
 		t.Fatalf("staff logo upload audit rows = %d, want 1", n)
 	}
 }
+
+func TestPaymentReminderEmailCarriesReferenceFeeAndLink(t *testing.T) {
+	a := mustApp(t)
+	var sent map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&sent)
+		json.NewEncoder(w).Encode(map[string]any{"MessageID": "pm-reminder", "ErrorCode": 0})
+	}))
+	defer srv.Close()
+	a.Config.LiveDelivery = true
+	a.Config.PostmarkToken = "test-token"
+	a.Config.SenderAddress = "events@zinvos.example"
+	a.Config.SenderName = "Zinvos Events"
+	a.Config.PostmarkAPIBase = srv.URL
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, err := a.Create(ctx, delegateInput("student"), key(1), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DB.Exec(ctx, "UPDATE delivery_jobs SET status='delivered' WHERE registration_id=$1", rid); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "payment_reminder"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.WorkOnce(ctx); err != nil {
+		t.Fatalf("WorkOnce: %v", err)
+	}
+	var reference string
+	var early, regular int64
+	if err := a.DB.QueryRow(ctx, "SELECT r.reference,c.early_paise,c.regular_paise FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1", rid).Scan(&reference, &early, &regular); err != nil {
+		t.Fatal(err)
+	}
+	text, _ := sent["TextBody"].(string)
+	want := money(fee(Category{EarlyPaise: early, RegularPaise: regular}, a.Now()))
+	if sent["Subject"] != "Bio Connect 4.0 - payment pending for "+reference || !strings.Contains(text, want) || !strings.Contains(text, a.Config.BaseURL+"/recover#") {
+		t.Fatalf("reminder email = subject %q, body %q; want reference %s, fee %s and a recovery link", sent["Subject"], text, reference, want)
+	}
+}
+
+func TestBulkRemindReportsPerRegistration(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Now().UTC().Truncate(time.Minute)
+	a.Now = func() time.Time { return fixed }
+	h := a.Handler()
+	ctx := context.Background()
+	_, secret := addStaff(t, a, "rev@bioconnect.test", "reviewer")
+	session, csrf := staffLogin(t, h, "rev@bioconnect.test", secret, fixed)
+	unpaid, _, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
+	paid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
+	payDelegate(t, a, paid, 400000)
+
+	body, _ := json.Marshal(map[string][]string{"ids": {unpaid, paid}})
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v1/admin/bulk-remind", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrf)
+	req.AddCookie(&http.Cookie{Name: "bc_session", Value: session})
+	h.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("bulk remind returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var out map[string]string
+	json.Unmarshal(rr.Body.Bytes(), &out)
+	if out[unpaid] != "queued" || out[paid] != ErrConflict.Error() {
+		t.Fatalf("bulk remind results = %v", out)
+	}
+}

@@ -384,20 +384,15 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		if !decode(w, r, &in) {
 			return
 		}
-		if len(in.IDs) < 1 || len(in.IDs) > 100 {
-			fail(w, 400, "select 1-100 registrations")
+		a.bulkReview(w, r, p, in.IDs, ReviewInput{Action: "send", Channel: in.Channel})
+	case path == "bulk-remind" && r.Method == "POST":
+		var in struct {
+			IDs []string `json:"ids"`
+		}
+		if !decode(w, r, &in) {
 			return
 		}
-		result := map[string]string{}
-		for _, rid := range in.IDs {
-			e := a.Review(r.Context(), rid, p.ID, ReviewInput{Action: "send", Channel: in.Channel})
-			if e != nil {
-				result[rid] = publicError(e)
-			} else {
-				result[rid] = "queued"
-			}
-		}
-		respond(w, 200, result)
+		a.bulkReview(w, r, p, in.IDs, ReviewInput{Action: "payment_reminder"})
 	case path == "retry" && r.Method == "POST":
 		a.retryJob(w, r, p)
 	case strings.HasPrefix(path, "registrations/"):
@@ -435,6 +430,24 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	default:
 		fail(w, 404, "not found")
 	}
+}
+
+// bulkReview applies one review action to each registration independently and
+// reports per-id "queued" or the error, so one ineligible row never blocks the rest.
+func (a *App) bulkReview(w http.ResponseWriter, r *http.Request, p principal, ids []string, in ReviewInput) {
+	if len(ids) < 1 || len(ids) > 100 {
+		fail(w, 400, "select 1-100 registrations")
+		return
+	}
+	result := map[string]string{}
+	for _, rid := range ids {
+		if e := a.Review(r.Context(), rid, p.ID, in); e != nil {
+			result[rid] = publicError(e)
+		} else {
+			result[rid] = "queued"
+		}
+	}
+	respond(w, 200, result)
 }
 func (a *App) retryJob(w http.ResponseWriter, r *http.Request, p principal) {
 	var in struct {

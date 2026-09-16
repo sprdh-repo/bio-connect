@@ -12,6 +12,9 @@ import (
 
 var ErrConflict = errors.New("registration changed or action is not allowed in this state")
 
+// reminderLinkLifetime bounds the single-use link in a payment reminder email.
+const reminderLinkLifetime = 7 * 24 * time.Hour
+
 const consentText = "I have permission to send this attendee their Bio Connect 4.0 pass and delivery updates by WhatsApp."
 
 func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo []byte) (string, string, error) {
@@ -342,6 +345,27 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			key = "resend:" + hash(in.RequestID)
 		}
 		if e = a.queuePasses(ctx, tx, rid, in.Channel, key); e != nil {
+			return e
+		}
+	case "payment_reminder":
+		if status != "awaiting_payment" {
+			return ErrConflict
+		}
+		var recent bool
+		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_jobs WHERE registration_id=$1 AND purpose='payment_reminder' AND created_at>now()-interval '24 hours')", rid).Scan(&recent); e != nil {
+			return e
+		}
+		if recent {
+			return errors.New("a payment reminder was already sent in the last 24 hours")
+		}
+		// The management token is stored only as a hash, so the reminder carries a
+		// single-use recovery link instead. It replaces the registrant's current
+		// management link only when they use it.
+		token := randomToken()
+		if _, e = tx.Exec(ctx, "INSERT INTO recovery_tokens(token_hash,registration_id,expires_at) VALUES($1,$2,$3)", hash(token), rid, a.Now().Add(reminderLinkLifetime)); e != nil {
+			return e
+		}
+		if e = a.queue(ctx, tx, rid, "", "payment_reminder", "email", email, a.Config.BaseURL+"/recover#"+token, "payment_reminder:"+hash(token)); e != nil {
 			return e
 		}
 	case "reissue":
