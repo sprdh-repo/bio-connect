@@ -14,7 +14,7 @@ var ErrConflict = errors.New("registration changed or action is not allowed in t
 
 const consentText = "I have permission to send this attendee their Bio Connect 4.0 pass and delivery updates by WhatsApp."
 
-func (a *App) Create(ctx context.Context, in RegistrationInput, key string) (string, string, error) {
+func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo []byte) (string, string, error) {
 	if !a.Config.RegistrationEnabled {
 		return "", "", errors.New("registration is not open yet")
 	}
@@ -52,6 +52,19 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string) (str
 	if !c.Open {
 		return "", "", errors.New("this category is closed")
 	}
+	// Exhibitors must submit their logo in the same request that creates the
+	// registration, so a registration can never exist without one: the two used
+	// to be separate calls, and a dropped connection between them left the
+	// registration stuck at approval time with no logo to show for it.
+	var logoMime string
+	if c.Kind == "exhibitor" {
+		if len(logo) == 0 {
+			return "", "", errors.New("institution logo is required")
+		}
+		if logoMime, e = validateUpload(logo, "logo"); e != nil {
+			return "", "", e
+		}
+	}
 	rid, token := id(), randomToken()
 	reference, e := nextReference(ctx, tx, c.ID)
 	if e != nil {
@@ -60,6 +73,15 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string) (str
 	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires,roster_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, fee(c, a.Now()), hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount)
 	if e != nil {
 		return "", "", e
+	}
+	if c.Kind == "exhibitor" {
+		fid := id()
+		if e = a.Storage.Put(ctx, fid, logo, logoMime); e != nil {
+			return "", "", errors.New("upload failed; please retry")
+		}
+		if _, e = tx.Exec(ctx, "INSERT INTO files(id,registration_id,kind,object_key,mime,size) VALUES($1,$2,$3,$1,$4,$5)", fid, rid, "logo", logoMime, len(logo)); e != nil {
+			return "", "", e
+		}
 	}
 	for i, p := range in.Attendees {
 		var at *time.Time

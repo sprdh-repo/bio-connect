@@ -164,6 +164,64 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request, rid string) {
 	}
 	respond(w, 201, map[string]string{"id": fid})
 }
+
+// adminUpload lets staff attach a logo on an exhibitor's behalf, e.g. when
+// recording a bank-confirmed payment for someone who never completed their
+// own upload. Receipts stay exhibitor-only evidence, so only "logo" is
+// accepted here.
+func (a *App) adminUpload(w http.ResponseWriter, r *http.Request, rid string, p principal) {
+	if r.URL.Query().Get("kind") != "logo" {
+		fail(w, 400, "invalid file kind")
+		return
+	}
+	b, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 5<<20))
+	if e != nil {
+		fail(w, 413, "file exceeds 5 MB")
+		return
+	}
+	mime, e := validateUpload(b, "logo")
+	if e != nil {
+		fail(w, 400, e.Error())
+		return
+	}
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		fail(w, 503, "upload unavailable")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	var status string
+	if e = tx.QueryRow(r.Context(), "SELECT status FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status); e != nil {
+		fail(w, 404, "registration not found")
+		return
+	}
+	if status != "awaiting_payment" && status != "correction_requested" {
+		fail(w, 409, "uploads are closed while review is pending or complete")
+		return
+	}
+	var count int
+	if e = tx.QueryRow(r.Context(), "SELECT count(*) FROM files WHERE registration_id=$1 AND kind<>'pass'", rid).Scan(&count); e != nil || count >= 30 {
+		fail(w, 400, "upload limit reached; contact organisers")
+		return
+	}
+	fid := id()
+	if e = a.Storage.Put(r.Context(), fid, b, mime); e != nil {
+		fail(w, 503, "upload failed; please retry")
+		return
+	}
+	_, e = tx.Exec(r.Context(), "INSERT INTO files(id,registration_id,kind,object_key,mime,size) VALUES($1,$2,$3,$1,$4,$5)", fid, rid, "logo", mime, len(b))
+	if e == nil {
+		e = audit(r.Context(), tx, p.ID, rid, "logo_uploaded_by_staff", "")
+	}
+	if e == nil {
+		e = tx.Commit(r.Context())
+	}
+	if e != nil {
+		fail(w, 503, "upload could not be saved; retry")
+		return
+	}
+	respond(w, 201, map[string]string{"id": fid})
+}
 func (a *App) downloadFile(w http.ResponseWriter, r *http.Request, rid, fid string) {
 	var key, mime string
 	if e := a.DB.QueryRow(r.Context(), "SELECT object_key,mime FROM files WHERE id=$1 AND registration_id=$2 AND kind<>'pass'", fid, rid).Scan(&key, &mime); e != nil {

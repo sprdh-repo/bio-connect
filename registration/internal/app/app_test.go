@@ -125,7 +125,8 @@ func payDelegate(t *testing.T, a *App, rid string, amountPaise int64) {
 
 func payExhibitor(t *testing.T, a *App, rid string, amountPaise int64) {
 	t.Helper()
-	addFile(t, a, rid, "logo", tinyPNG(t))
+	// Create now attaches the logo itself, so this is just payDelegate under
+	// an exhibitor-flavoured name for readability at call sites.
 	payDelegate(t, a, rid, amountPaise)
 }
 
@@ -196,7 +197,7 @@ func TestDelegateJourneyEveryCategory(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	for i, cat := range []string{"student", "startup", "faculty", "industry"} {
-		rid, tok, err := a.Create(ctx, delegateInput(cat), key(i))
+		rid, tok, err := a.Create(ctx, delegateInput(cat), key(i), nil)
 		if err != nil {
 			t.Fatalf("%s create: %v", cat, err)
 		}
@@ -237,13 +238,13 @@ func TestExhibitorRosterCountsEnforced(t *testing.T) {
 		want int
 	}{{"premium", 3}, {"standard", 2}, {"table", 2}}
 	for i, c := range cases {
-		if _, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want-1), key(100+i)); err == nil {
+		if _, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want-1), key(100+i), tinyPNG(t)); err == nil {
 			t.Fatalf("%s: accepted %d attendees, want exactly %d", c.cat, c.want-1, c.want)
 		}
-		if _, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want+1), key(200+i)); err == nil {
+		if _, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want+1), key(200+i), tinyPNG(t)); err == nil {
 			t.Fatalf("%s: accepted %d attendees, want exactly %d", c.cat, c.want+1, c.want)
 		}
-		rid, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want), key(300+i))
+		rid, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want), key(300+i), tinyPNG(t))
 		if err != nil {
 			t.Fatalf("%s: exact roster rejected: %v", c.cat, err)
 		}
@@ -270,7 +271,7 @@ func TestRosterChangeLeavesExistingRegistrationsAlone(t *testing.T) {
 	if _, err := a.DB.Exec(ctx, "UPDATE categories SET roster_count=6 WHERE id='premium'"); err != nil {
 		t.Fatal(err)
 	}
-	rid, _, err := a.Create(ctx, exhibitorInput("premium", 6), key(1))
+	rid, _, err := a.Create(ctx, exhibitorInput("premium", 6), key(1), tinyPNG(t))
 	if err != nil {
 		t.Fatalf("register under the old allowance: %v", err)
 	}
@@ -284,7 +285,7 @@ func TestRosterChangeLeavesExistingRegistrationsAlone(t *testing.T) {
 	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 6 {
 		t.Fatalf("%d passes, want the 6 the registrant submitted", n)
 	}
-	if _, _, err := a.Create(ctx, exhibitorInput("premium", 6), key(2)); err == nil {
+	if _, _, err := a.Create(ctx, exhibitorInput("premium", 6), key(2), tinyPNG(t)); err == nil {
 		t.Fatal("new registration accepted 6 attendees after the allowance became 3")
 	}
 }
@@ -292,7 +293,7 @@ func TestRosterChangeLeavesExistingRegistrationsAlone(t *testing.T) {
 func TestPaymentBeforeSbiIsAllowedButNotAutoApproved(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	rid, _, err := a.Create(ctx, delegateInput("faculty"), key(1))
+	rid, _, err := a.Create(ctx, delegateInput("faculty"), key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +310,7 @@ func TestPaymentBeforeSbiIsAllowedButNotAutoApproved(t *testing.T) {
 func TestRegistrationDisabledByDefault(t *testing.T) {
 	a := mustApp(t)
 	a.Config.RegistrationEnabled = false
-	if _, _, err := a.Create(context.Background(), delegateInput("student"), key(1)); err == nil {
+	if _, _, err := a.Create(context.Background(), delegateInput("student"), key(1), nil); err == nil {
 		t.Fatal("Create succeeded while registration disabled")
 	}
 }
@@ -317,14 +318,14 @@ func TestRegistrationDisabledByDefault(t *testing.T) {
 func TestClosedCategoryBlocksNewButNotExisting(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	rid, _, err := a.Create(ctx, delegateInput("industry"), key(1))
+	rid, _, err := a.Create(ctx, delegateInput("industry"), key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.DB.Exec(ctx, "UPDATE categories SET open=false WHERE id='industry'"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := a.Create(ctx, delegateInput("industry"), key(2)); err == nil {
+	if _, _, err := a.Create(ctx, delegateInput("industry"), key(2), nil); err == nil {
 		t.Fatal("Create succeeded for closed category")
 	}
 	// The already-saved registration can still submit payment evidence.
@@ -337,11 +338,11 @@ func TestIdempotentCreate(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	in := delegateInput("student")
-	rid1, tok1, err := a.Create(ctx, in, key(1))
+	rid1, tok1, err := a.Create(ctx, in, key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rid2, tok2, err := a.Create(ctx, in, key(1))
+	rid2, tok2, err := a.Create(ctx, in, key(1), nil)
 	if err != nil {
 		t.Fatalf("replay errored: %v", err)
 	}
@@ -354,13 +355,13 @@ func TestIdempotentCreate(t *testing.T) {
 	_ = tok1
 	changed := in
 	changed.Institution = "Different Institution"
-	if _, _, err := a.Create(ctx, changed, key(1)); err == nil {
+	if _, _, err := a.Create(ctx, changed, key(1), nil); err == nil {
 		t.Fatal("reused key with different details was accepted")
 	}
 	if n := count(t, a, "SELECT count(*) FROM registrations"); n != 1 {
 		t.Fatalf("%d registrations, want 1", n)
 	}
-	if _, _, err := a.Create(ctx, in, "short"); err == nil {
+	if _, _, err := a.Create(ctx, in, "short", nil); err == nil {
 		t.Fatal("accepted a too-short idempotency key")
 	}
 }
@@ -437,7 +438,7 @@ func TestQuoteAndDisplayedFeeFollowServerClock(t *testing.T) {
 	// Late-submitted evidence of a timely payment still gets the early-bird fee:
 	// approval checks fee(verifiedDate), not "now".
 	a.Now = func() time.Time { return time.Date(2026, 10, 5, 9, 0, 0, 0, india) }
-	rid, _, err := a.Create(ctx, delegateInput("student"), key(1))
+	rid, _, err := a.Create(ctx, delegateInput("student"), key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +460,7 @@ func TestReviewerCanRecordAndApproveUnsubmittedPayment(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1))
+	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1), nil)
 
 	err := a.Review(ctx, rid, sid, ReviewInput{
 		Action: "record_approve_only", VerifiedReference: "  sbi manual 123  ",
@@ -497,7 +498,12 @@ func TestReviewerRecordedExhibitorPaymentRequiresLogo(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, exhibitorInput("table", 2), key(1))
+	rid, _, _ := a.Create(ctx, exhibitorInput("table", 2), key(1), tinyPNG(t))
+	// Create now requires a logo, so simulate a registration from before that
+	// (or one whose file was otherwise lost) to prove Review still catches it.
+	if _, err := a.DB.Exec(ctx, "DELETE FROM files WHERE registration_id=$1 AND kind='logo'", rid); err != nil {
+		t.Fatal(err)
+	}
 
 	in := ReviewInput{
 		Action: "record_approve_send", VerifiedReference: "SBIEXHIBITOR",
@@ -534,7 +540,7 @@ func TestApprovalRejectsMismatchedAmount(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1))
+	rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
 	payDelegate(t, a, rid, 600000)
 	if err := tryApprove(a, rid, sid, "approve_send", "SBIWRONG", 500000); err == nil {
 		t.Fatal("approval accepted an amount below the category fee")
@@ -551,7 +557,7 @@ func TestApprovalRequiresBankConfirmationFlags(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1))
+	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1), nil)
 	payDelegate(t, a, rid, 400000)
 	err := a.Review(ctx, rid, sid, ReviewInput{
 		Action: "approve_send", PaymentID: latestPayment(a, rid),
@@ -567,7 +573,7 @@ func TestCorrectionRequestedThenResubmit(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, delegateInput("startup"), key(1))
+	rid, _, _ := a.Create(ctx, delegateInput("startup"), key(1), nil)
 	payDelegate(t, a, rid, 350000)
 	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "correction_requested", Note: "reference does not match bank record"}); err != nil {
 		t.Fatal(err)
@@ -589,7 +595,7 @@ func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	ridA, _, _ := a.Create(ctx, delegateInput("industry"), key(1))
+	ridA, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
 	payDelegate(t, a, ridA, 600000)
 	if err := tryApprove(a, ridA, sid, "approve_send", "SBISHARED", 600000); err != nil {
 		t.Fatal(err)
@@ -597,7 +603,7 @@ func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
 	inB := delegateInput("industry")
 	inB.Attendees[0].Email = "second@example.com"
 	inB.Email = "second@example.com"
-	ridB, _, _ := a.Create(ctx, inB, key(2))
+	ridB, _, _ := a.Create(ctx, inB, key(2), nil)
 	payDelegate(t, a, ridB, 600000)
 	if err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", 600000); err == nil {
 		t.Fatal("reused an already-approved bank transaction reference")
@@ -613,7 +619,7 @@ func TestConcurrentApprovalCreatesNoExtraPasses(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 2), key(1))
+	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 2), key(1), tinyPNG(t))
 	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
 
 	var wg sync.WaitGroup
@@ -648,7 +654,7 @@ func approvedDelegate(t *testing.T, a *App, k int, action string) (rid, sid stri
 	t.Helper()
 	ctx := context.Background()
 	sid, _ = addStaff(t, a, fmt.Sprintf("rev%d@bioconnect.test", k), "reviewer")
-	rid, _, _ = a.Create(ctx, delegateInput("industry"), key(k))
+	rid, _, _ = a.Create(ctx, delegateInput("industry"), key(k), nil)
 	payDelegate(t, a, rid, 600000)
 	if err := tryApprove(a, rid, sid, action, fmt.Sprintf("SBI%d", k), 600000); err != nil {
 		t.Fatalf("approve: %v", err)
@@ -741,13 +747,13 @@ func TestBulkSendReportsPerRegistration(t *testing.T) {
 	ctx := context.Background()
 	var approved, notApproved string
 	{
-		rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1))
+		rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
 		payDelegate(t, a, rid, 600000)
 		tryApprove(a, rid, sid, "approve_only", "SBIBULK1", 600000)
 		approved = rid
 	}
 	{
-		rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2))
+		rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
 		payDelegate(t, a, rid, 400000)
 		notApproved = rid
 	}
@@ -772,7 +778,7 @@ func TestBulkSendReportsPerRegistration(t *testing.T) {
 func TestSecureRecoveryFlow(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	rid, firstTok, _ := a.Create(ctx, delegateInput("student"), key(1))
+	rid, firstTok, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
 
 	rr := httptest.NewRecorder()
 	body, _ := json.Marshal(map[string]string{"email": "asha@example.com"})
@@ -839,11 +845,11 @@ func bearerReq(rid, token string) *http.Request {
 func TestManagementTokenIsolation(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	ridA, tokA, _ := a.Create(ctx, delegateInput("student"), key(1))
+	ridA, tokA, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
 	inB := delegateInput("faculty")
 	inB.Email = "b@example.com"
 	inB.Attendees[0].Email = "b@example.com"
-	ridB, tokB, _ := a.Create(ctx, inB, key(2))
+	ridB, tokB, _ := a.Create(ctx, inB, key(2), nil)
 	if a.manage(bearerReq(ridB, tokA), ridB) {
 		t.Fatal("registration A token unlocked registration B")
 	}
@@ -894,7 +900,7 @@ func TestExportContentsAndFormulaInjection(t *testing.T) {
 	in := delegateInput("industry")
 	in.Institution = "=cmd|' /c calc'!A1" // spreadsheet formula injection attempt
 	in.ContactName = "Asha Nair"
-	rid, _, err := a.Create(ctx, in, key(1))
+	rid, _, err := a.Create(ctx, in, key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1010,7 +1016,7 @@ func TestPassNumbersFollowTheRegistrationReference(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, err := a.Create(ctx, exhibitorInput("premium", 3), key(1))
+	rid, _, err := a.Create(ctx, exhibitorInput("premium", 3), key(1), tinyPNG(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1055,10 +1061,12 @@ func TestReferenceSeriesIsPerCategory(t *testing.T) {
 	want := map[string]string{}
 	for i, cat := range []string{"industry", "industry", "student", "premium", "industry"} {
 		in := delegateInput(cat)
+		var logo []byte
 		if cat == "premium" {
 			in = exhibitorInput(cat, 3)
+			logo = tinyPNG(t)
 		}
-		rid, _, err := a.Create(ctx, in, key(i+1))
+		rid, _, err := a.Create(ctx, in, key(i+1), logo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1084,7 +1092,7 @@ func TestConcurrentRegistrationsGetConsecutiveReferences(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			rid, _, err := a.Create(ctx, delegateInput("faculty"), key(i+1))
+			rid, _, err := a.Create(ctx, delegateInput("faculty"), key(i+1), nil)
 			if err != nil {
 				t.Errorf("create %d: %v", i, err)
 				return
@@ -1181,7 +1189,7 @@ func TestMigrationsApplyIncrementallyAndAreIdempotent(t *testing.T) {
 func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	rid, _, err := a.Create(ctx, delegateInput("student"), key(1))
+	rid, _, err := a.Create(ctx, delegateInput("student"), key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1197,7 +1205,7 @@ func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
 		t.Fatalf("status %s, want awaiting_review", status(t, a, rid))
 	}
 
-	rid2, _, err := a.Create(ctx, delegateInput("student"), key(2))
+	rid2, _, err := a.Create(ctx, delegateInput("student"), key(2), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

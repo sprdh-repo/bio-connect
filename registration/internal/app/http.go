@@ -77,10 +77,34 @@ func (a *App) Handler() http.Handler {
 			return
 		}
 		var in RegistrationInput
-		if !decode(w, r, &in) {
+		var logo []byte
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			// Exhibitors submit their logo alongside the registration in one request
+			// (see Create) so the two can never be split by a dropped connection.
+			r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+			if e := r.ParseMultipartForm(6 << 20); e != nil {
+				fail(w, 400, "could not read submission")
+				return
+			}
+			if e := json.Unmarshal([]byte(r.FormValue("payload")), &in); e != nil {
+				fail(w, 400, "invalid request fields or JSON")
+				return
+			}
+			if f, hdr, e := r.FormFile("logo"); e == nil {
+				defer f.Close()
+				if hdr.Size > 5<<20 {
+					fail(w, 413, "file exceeds 5 MB")
+					return
+				}
+				if logo, e = io.ReadAll(f); e != nil {
+					fail(w, 400, "could not read submission")
+					return
+				}
+			}
+		} else if !decode(w, r, &in) {
 			return
 		}
-		rid, t, e := a.Create(r.Context(), in, r.Header.Get("Idempotency-Key"))
+		rid, t, e := a.Create(r.Context(), in, r.Header.Get("Idempotency-Key"), logo)
 		if e != nil {
 			fail(w, 400, publicError(e))
 			return
@@ -401,6 +425,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(parts) == 4 && parts[2] == "files" && r.Method == "GET" {
 			a.downloadFile(w, r, rid, parts[3])
+			return
+		}
+		if len(parts) == 3 && parts[2] == "files" && r.Method == "POST" {
+			a.adminUpload(w, r, rid, p)
 			return
 		}
 		fail(w, 404, "not found")

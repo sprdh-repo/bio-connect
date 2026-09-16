@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,7 +22,7 @@ import (
 func queuedEmail(t *testing.T, a *App) (rid, jobID string) {
 	t.Helper()
 	ctx := context.Background()
-	rid, _, err := a.Create(ctx, delegateInput("student"), key(1))
+	rid, _, err := a.Create(ctx, delegateInput("student"), key(1), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +157,7 @@ func TestStuckSendingJobBecomesUncertain(t *testing.T) {
 func seedAcceptedJob(t *testing.T, a *App, channel, providerID string) string {
 	t.Helper()
 	ctx := context.Background()
-	rid, _, _ := a.Create(ctx, delegateInput("student"), key(1))
+	rid, _, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
 	jid := id()
 	_, err := a.DB.Exec(ctx, `INSERT INTO delivery_jobs(id,registration_id,purpose,channel,recipient,payload_cipher,dedupe_key,status,provider_id,attempts)
 		VALUES($1,$2,'registration',$3,'x@example.com','','seed-'||$1,'accepted',$4,1)`, jid, rid, channel, providerID)
@@ -273,6 +274,31 @@ func TestHandlerSecurityHeadersAndCORS(t *testing.T) {
 	}
 }
 
+// staffLogin signs a staff account in through the real HTTP login flow and
+// returns the session and CSRF cookies issued, for tests that then need an
+// authenticated admin request.
+func staffLogin(t *testing.T, h http.Handler, email, secret string, at time.Time) (session, csrf string) {
+	t.Helper()
+	code, _ := totp.GenerateCode(secret, at)
+	body, _ := json.Marshal(map[string]string{"email": email, "password": "correct-horse-battery-staple", "code": code})
+	lr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(lr, req)
+	if lr.Code != 200 {
+		t.Fatalf("login for %s returned %d: %s", email, lr.Code, lr.Body.String())
+	}
+	for _, c := range lr.Result().Cookies() {
+		switch c.Name {
+		case "bc_session":
+			session = c.Value
+		case "bc_csrf":
+			csrf = c.Value
+		}
+	}
+	return
+}
+
 func TestAdminRequiresSessionAndRoleSeparation(t *testing.T) {
 	a := mustApp(t)
 	// Pinned for deterministic TOTP, but near real time so DB now()-based
@@ -292,28 +318,7 @@ func TestAdminRequiresSessionAndRoleSeparation(t *testing.T) {
 		t.Fatalf("unauthenticated admin call returned %d", rr.Code)
 	}
 
-	login := func(email, secret string) (session, csrf string) {
-		code, _ := totp.GenerateCode(secret, fixed)
-		body, _ := json.Marshal(map[string]string{"email": email, "password": "correct-horse-battery-staple", "code": code})
-		lr := httptest.NewRecorder()
-		req := httptest.NewRequest("POST", "/api/v1/auth/login", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		h.ServeHTTP(lr, req)
-		if lr.Code != 200 {
-			t.Fatalf("login for %s returned %d: %s", email, lr.Code, lr.Body.String())
-		}
-		for _, c := range lr.Result().Cookies() {
-			switch c.Name {
-			case "bc_session":
-				session = c.Value
-			case "bc_csrf":
-				csrf = c.Value
-			}
-		}
-		return
-	}
-
-	revSession, revCSRF := login("rev@bioconnect.test", revSecret)
+	revSession, revCSRF := staffLogin(t, h, "rev@bioconnect.test", revSecret, fixed)
 
 	// TOTP replay within the same step is refused.
 	code, _ := totp.GenerateCode(revSecret, fixed)
@@ -354,7 +359,7 @@ func TestAdminRequiresSessionAndRoleSeparation(t *testing.T) {
 		t.Fatalf("reviewer creating staff returned %d, want 403", rr.Code)
 	}
 
-	mgrSession, mgrCSRF := login("mgr@bioconnect.test", mgrSecret)
+	mgrSession, mgrCSRF := staffLogin(t, h, "mgr@bioconnect.test", mgrSecret, fixed)
 	// Manager can administer staff...
 	if rr := authed("POST", "/api/v1/admin/staff", mgrSession, mgrCSRF, newAcct); rr.Code != 201 {
 		t.Fatalf("manager creating staff returned %d: %s", rr.Code, rr.Body.String())
@@ -396,11 +401,11 @@ func TestClientPeerBehindProxyChain(t *testing.T) {
 func TestPrivateFileAccessIsScopedToRegistration(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
-	ridA, tokA, _ := a.Create(ctx, delegateInput("student"), key(1))
+	ridA, tokA, _ := a.Create(ctx, delegateInput("student"), key(1), nil)
 	fid := addFile(t, a, ridA, "receipt", tinyPNG(t))
 	inB := delegateInput("faculty")
 	inB.Email, inB.Attendees[0].Email = "b@example.com", "b@example.com"
-	ridB, tokB, _ := a.Create(ctx, inB, key(2))
+	ridB, tokB, _ := a.Create(ctx, inB, key(2), nil)
 
 	h := a.Handler()
 	// Owner can download.
@@ -418,5 +423,122 @@ func TestPrivateFileAccessIsScopedToRegistration(t *testing.T) {
 	h.ServeHTTP(no, req2)
 	if no.Code == 200 {
 		t.Fatal("cross-registration file access succeeded")
+	}
+}
+
+func multipartRegistration(t *testing.T, in RegistrationInput, logo []byte) *http.Request {
+	t.Helper()
+	payload, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	if err := w.WriteField("payload", string(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if logo != nil {
+		fw, err := w.CreateFormFile("logo", "logo.png")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fw.Write(logo); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", "/api/v1/registrations", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	return req
+}
+
+// The registration and its logo must land in the same request: this is the
+// fix for the bug where a dropped connection between two separate calls left
+// a registration approved-pending with no logo to show for it.
+func TestExhibitorRegistrationRequiresLogoInTheSameMultipartRequest(t *testing.T) {
+	a := mustApp(t)
+	h := a.Handler()
+
+	req := multipartRegistration(t, exhibitorInput("table", 2), tinyPNG(t))
+	req.Header.Set("Idempotency-Key", key(1))
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 201 {
+		t.Fatalf("multipart exhibitor registration returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		ID              string `json:"id"`
+		ManagementToken string `json:"management_token"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ID == "" || out.ManagementToken == "" {
+		t.Fatalf("missing id/token in response: %s", rr.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM files WHERE registration_id=$1 AND kind='logo'", out.ID); n != 1 {
+		t.Fatalf("logo files for registration = %d, want 1", n)
+	}
+
+	// The server enforces this itself; it is not just a client-side form check.
+	req2 := multipartRegistration(t, exhibitorInput("table", 2), nil)
+	req2.Header.Set("Idempotency-Key", key(2))
+	rr2 := httptest.NewRecorder()
+	h.ServeHTTP(rr2, req2)
+	if rr2.Code != 400 {
+		t.Fatalf("exhibitor registration without a logo returned %d, want 400: %s", rr2.Code, rr2.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM registrations"); n != 1 {
+		t.Fatalf("registrations after rejected submission = %d, want 1", n)
+	}
+}
+
+func TestAdminCanUploadExhibitorLogoOnRegistrantsBehalf(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Now().UTC().Truncate(time.Minute)
+	a.Now = func() time.Time { return fixed }
+	h := a.Handler()
+	ctx := context.Background()
+
+	sid, secret := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, err := a.Create(ctx, exhibitorInput("table", 2), key(1), tinyPNG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate the real case this exists for: the exhibitor's own upload never
+	// completed, and staff need to attach the logo to record their payment.
+	if _, err := a.DB.Exec(ctx, "DELETE FROM files WHERE registration_id=$1 AND kind='logo'", rid); err != nil {
+		t.Fatal(err)
+	}
+
+	session, csrfTok := staffLogin(t, h, "reviewer@bioconnect.test", secret, fixed)
+	uploadPath := "/api/v1/admin/registrations/" + rid + "/files?kind=logo"
+
+	// Missing CSRF token is refused, same as any other admin state change.
+	noCSRF := httptest.NewRecorder()
+	noCSRFReq := httptest.NewRequest("POST", uploadPath, bytes.NewReader(tinyPNG(t)))
+	noCSRFReq.Header.Set("Content-Type", "application/octet-stream")
+	noCSRFReq.AddCookie(&http.Cookie{Name: "bc_session", Value: session})
+	h.ServeHTTP(noCSRF, noCSRFReq)
+	if noCSRF.Code != 401 {
+		t.Fatalf("admin upload without CSRF token returned %d, want 401", noCSRF.Code)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", uploadPath, bytes.NewReader(tinyPNG(t)))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.AddCookie(&http.Cookie{Name: "bc_session", Value: session})
+	req.Header.Set("X-CSRF-Token", csrfTok)
+	h.ServeHTTP(rr, req)
+	if rr.Code != 201 {
+		t.Fatalf("admin logo upload returned %d: %s", rr.Code, rr.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM files WHERE registration_id=$1 AND kind='logo'", rid); n != 1 {
+		t.Fatalf("logo files after admin upload = %d, want 1", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND staff_id=$2 AND action='logo_uploaded_by_staff'", rid, sid); n != 1 {
+		t.Fatalf("staff logo upload audit rows = %d, want 1", n)
 	}
 }
