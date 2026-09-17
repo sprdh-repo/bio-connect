@@ -1,0 +1,132 @@
+/* Social poster studio. Extends the admin console's existing classes rather
+   than restyling them: .admin-page, .card, .fields, .actions and .help all come
+   from app.css and keep their behaviour here. */
+
+.poster-page .admin-intro { max-width: 62ch; }
+
+.poster-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 28px;
+  align-items: start;
+  margin-top: 26px;
+}
+.poster-stage {
+  position: sticky;
+  top: 20px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+}
+/* The canvas carries the true output resolution; CSS only scales it down, so
+   the preview and the exported PNG are the same pixels. */
+.poster-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 10px 30px rgba(16, 32, 27, 0.14);
+  touch-action: none;
+  cursor: grab;
+}
+.poster-stage canvas.grabbing { cursor: grabbing; }
+.poster-stage .help { margin-top: 12px; }
+
+.poster-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.poster-tab {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--forest);
+  border-color: var(--line);
+}
+.poster-tab.active { background: var(--forest); color: white; border-color: var(--forest); }
+
+/* Deliberately a div, not an <aside>: app.css styles bare `aside` as the dark
+   registration summary panel, which would paint this forest green and leave
+   every field label white on a white card. */
+.poster-fields { display: grid; gap: 18px; }
+.poster-fields .card { margin: 0; }
+.poster-fields label { margin-bottom: 14px; }
+.poster-fields .fields { grid-template-columns: 1fr 1fr; gap: 14px; }
+.poster-fields .fields.one-column { grid-template-columns: 1fr; }
+.poster-fields .fields.grid-4 { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.poster-fields .fields label { margin-bottom: 0; }
+.poster-fields textarea { min-height: 62px; }
+.poster-fields h2 { margin-top: 0; }
+.poster-fields input[type=color] { height: 44px; padding: 5px; cursor: pointer; }
+.help-inline {
+  font-size: 12px; font-weight: 400; color: var(--muted);
+  text-transform: none; letter-spacing: 0;
+}
+.poster-photo-tools { margin: -6px 0 16px; display: grid; gap: 10px; }
+.poster-photo-tools button { min-height: 34px; padding: 0 12px; font-size: 11px; justify-self: start; }
+
+.poster-families { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.poster-families li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--cream);
+  border-radius: 10px;
+}
+.poster-sizes { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); }
+.poster-family-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.poster-family-actions button { min-height: 34px; padding: 0 12px; font-size: 11px; }
+.poster-reopen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.poster-reopen button { min-height: 34px; padding: 0 12px; font-size: 11px; }
+
+.layer-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+.layer-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  background: var(--cream);
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.layer-list li.active { border-color: var(--forest); background: var(--paper); }
+.layer-pick {
+  flex: 1;
+  min-height: 32px;
+  padding: 0;
+  /* app.css centres button content; a layer name reads as a list row, not a
+     button label, so it starts at the left edge. */
+  justify-content: flex-start;
+  text-align: left;
+  /* Layer names are staff-typed labels, so keep their casing and letterforms
+     rather than inheriting the console's uppercase button treatment. */
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+}
+.layer-pick:hover { background: transparent; transform: none; }
+.layer-type { margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--muted); text-transform: uppercase; }
+.layer-order { display: flex; gap: 4px; }
+.layer-order button { min-height: 28px; min-width: 28px; padding: 0; font-size: 12px; letter-spacing: 0; }
+/* Removing a layer is destructive but it is a per-row control, so it stays
+   quiet until the pointer is on it rather than shouting from every row. */
+.layer-order .layer-remove { background: transparent; color: var(--muted); border-color: transparent; }
+.layer-order .layer-remove:hover:not(:disabled) { background: var(--danger); color: white; border-color: var(--danger); }
+
+@media (max-width: 1080px) {
+  .poster-studio { grid-template-columns: minmax(0, 1fr); }
+  .poster-stage { position: static; }
+  .poster-fields .fields.grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 620px) {
+  .poster-fields .fields { grid-template-columns: 1fr; }
+  .poster-families li { flex-direction: column; align-items: stretch; }
+}

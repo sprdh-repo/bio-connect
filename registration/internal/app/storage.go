@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -229,6 +230,22 @@ func (a *App) downloadFile(w http.ResponseWriter, r *http.Request, rid, fid stri
 		return
 	}
 	a.serveObject(w, r, key, mime)
+}
+
+// serveInline streams an object through the app instead of redirecting to a
+// presigned S3 URL. Poster artwork is drawn into a <canvas> that is then read
+// back with toDataURL, and a cross-origin image with no CORS headers taints the
+// canvas and makes that read throw. Same-origin bytes are the whole point, so
+// this must never become a redirect.
+func (a *App) serveInline(w http.ResponseWriter, r *http.Request, key, mime string) {
+	b, e := a.Storage.Get(r.Context(), key)
+	if e != nil {
+		fail(w, 503, "image unavailable")
+		return
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Length", strconv.Itoa(len(b)))
+	w.Write(b)
 }
 func (a *App) serveObject(w http.ResponseWriter, r *http.Request, key, mime string) {
 	u, e := a.Storage.URL(r.Context(), key)

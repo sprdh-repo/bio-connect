@@ -314,6 +314,14 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		a.staffAccounts(w, r, p)
 		return
 	}
+	// Posters sit above the role gate on purpose: they are neither registration
+	// data nor account data, and the comms person doing a speaker reveal is as
+	// likely to hold a manager account as a reviewer one. The staff id still
+	// lands in the audit trail for every save.
+	if path == "posters" || strings.HasPrefix(path, "posters/") {
+		a.posterAPI(w, r, p, strings.TrimPrefix(strings.TrimPrefix(path, "posters"), "/"))
+		return
+	}
 	if p.Role != "reviewer" {
 		fail(w, 403, "registration reviewer permission required")
 		return

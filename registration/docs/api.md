@@ -117,7 +117,8 @@ Login is throttled per IP and per email.
 Roles are disjoint:
 
 - `manager`: `GET/POST /admin/staff` only. Creating an account returns `201 {"totp_uri":"otpauth://..."}`. Editing (`{id, role, active}`) revokes that account's sessions.
-- `reviewer`: everything else below.
+- `reviewer`: everything else below, except the poster routes.
+- Both roles reach `/admin/posters/*`. A poster is neither registration data nor account data, and the person making a speaker reveal is as likely to hold either account. Saves are still attributed to the staff id in the audit trail.
 
 | Route | Purpose |
 |---|---|
@@ -133,6 +134,42 @@ Roles are disjoint:
 | `POST /admin/bulk-send` | `{ids:[...], channel:""}` runs `send` for 1-100 approved registrations; returns per-id `queued` or the error |
 | `POST /admin/bulk-remind` | `{ids:[...]}` runs `payment_reminder` for 1-100 registrations; returns per-id `queued` or the error |
 | `POST /admin/retry` | `{id, confirm_uncertain, note}` requeues a `failed` or `uncertain` delivery. `uncertain` needs `confirm_uncertain:true` and a `note`. The prior job and its provider id are kept for late webhooks. |
+
+### Social posters (`/admin/posters`)
+
+Open to both roles. Rendering happens in the browser on a canvas at true output
+resolution; these routes store the definitions and the artwork and never produce
+an image, which is why there is no image encoder in `go.mod`.
+
+| Route | Purpose |
+|---|---|
+| `GET /admin/posters/templates` | `{items, builtin_logos, sizes}`. Each item carries `spec` (see below); `sizes` maps `4x5`/`1x1`/`9x16` to pixel dimensions. |
+| `POST /admin/posters/templates` | `{id?, family, name, size, spec}`. Omitting `id` creates a template and retires the family's previous active template at that size, so relaying out a size is one step. `spec` is validated in full and rejected with the offending rule. |
+| `GET /admin/posters/assets?kind=art\|photo\|logo` | uploaded artwork, newest first, 200 max |
+| `POST /admin/posters/assets?kind=&label=` | raw-body PNG/JPEG upload, 8 MB, ≤6000x6000 and ≤20 MP. Returns `{id, width, height, mime}`. The larger cap applies here only; registration uploads stay at 5 MB. |
+| `GET /admin/posters/assets/{id}` | **the image bytes inline, never a redirect.** The editor draws these into a canvas and reads it back with `toDataURL`; a redirect to a presigned S3 URL would taint that canvas and break every export. |
+| `GET /admin/posters/qr?data=` | `image/png` QR, same encoder and error-correction level as the passes. `data` must be an `https://` URL of at most 512 characters. |
+| `GET /admin/posters` | saved posters, newest first, 100 max |
+| `GET /admin/posters/{id}` | `{id, family, title, content}` to reopen for editing |
+| `POST /admin/posters` | `{id?, family, title, content}`; `content` is `{values, transforms}` |
+
+A template `spec` is one ordered `layers` array plus optional `background`
+(`#rrggbb`) and `defaults`. **Array order is draw order**, which is how a
+decoration sits above the portrait and a caption above that; there is no separate
+background or overlay concept. At most 40 layers.
+
+| Layer `type` | Fields |
+|---|---|
+| `art` | exactly one of `asset_id` (uploaded) or `builtin` (an embedded brand logo: `bio-connect`, `bio-connect-mark`, `bio360`, `ksidc`, `klip`, `invest-kerala`). The Government of Kerala emblem is not embedded: the site's copy is CC BY-SA 4.0 and a poster cannot carry the attribution. Upload the official emblem as artwork instead. |
+| `photo` | `key`, `fit` (`cover`/`contain`), `radius`, `duotone`. `contain` is also the partner-logo slot, so there is no separate type. |
+| `text` | `key`, `font` (`display`=Manrope / `body`=DM Sans), `weight` (400/500/600/700), `size`, `color`, `align`, `transform` (`none`/`upper`), `tracking`, `line_height`, `autofit` |
+| `qr` | `key`; must be square |
+
+Every layer has `id`, `x`, `y`, `w`, `h` and an optional `label`. Keyed layers name
+a field the poster fills; a `family` groups the sizes that share field names, so a
+poster is filled once and exported at each size. `content.transforms` holds the
+photo framing per key per size, because the same portrait needs a different crop at
+4:5 and at 9:16.
 
 ### `POST /admin/registrations/{id}/review`
 

@@ -26,6 +26,7 @@ A sequential series does publish how many registrations a category has, and a pr
 - PostgreSQL-backed delivery queue with ret/uncertain handling, channel-specific resend, reissue (revokes the previous pass), and failed-delivery retry.
 - Postmark and Meta status webhooks, authenticated and correlated to delivery records.
 - Filtered CSV and XLSX exports with separate sheets and spreadsheet-formula-injection protection.
+- A social poster studio in the console, open to both staff roles: staff lay out a template once on uploaded artwork, then fill it per post and download a PNG at every size in the family.
 
 API contract: [`docs/api.md`](docs/api.md).
 Deployment, backups, restore, and rollback: [`docs/operations.md`](docs/operations.md).
@@ -67,6 +68,7 @@ TEST_DATABASE_URL='postgres://bioconnect:local-development-only@localhost:55432/
 ```
 
 They cover both registration journeys and every category, the exact exhibitor roster counts (3 / 2 / 2) with registrations made before a roster change keeping their original roster, fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
+For posters they cover template-spec validation rule by rule, the 8 MB image checks, poster QR payload rejection, inline asset serving (a redirect here would taint the export canvas), a template save retiring the family's previous active size, field and per-size framing round-tripping, both staff roles reaching the poster routes while registrations stay separated, and every offered builtin logo actually being embedded.
 
 To eyeball a rendered pass:
 
@@ -86,6 +88,55 @@ Check PDF wording, field overflow, category alignment, and QR scanning without a
 go test -run 'TestRenderedPassVariants|TestPassFitsMaximumLengthFields' ./internal/app/
 ```
 
+## Social posters
+
+The console at `/admin` carries a poster studio for speaker reveals, session
+announces, countdowns and partner welcomes.
+A template is an **ordered layer stack** laid out on the canvas by staff, not a flat
+background image: array order is draw order, which is what lets a decoration sit
+above the portrait and a caption above that.
+Layer types are `art` (uploaded artwork or one of the embedded brand logos),
+`photo`, `text` and `qr`.
+A `family` groups the sizes that share field names - 4:5 (1080x1350), 1:1 and 9:16 -
+so a poster is filled once and exported at each of them, with the photo framing kept
+per size because one portrait needs a different crop at 4:5 and at 9:16.
+
+**Rendering happens in the browser**, on a canvas at true output resolution, so the
+preview a staff member drags a portrait around in is the file they download. There
+is no second renderer to drift from it and no image encoder in `go.mod`. Three
+consequences are load-bearing and easy to undo by accident:
+
+- Poster assets are served **inline** by `serveInline`, never redirected to a
+  presigned S3 URL. A cross-origin image with no CORS headers taints the canvas and
+  makes `toDataURL` throw, which breaks every export. `TestPosterAssetIsServedInlineNotRedirected` guards this.
+- The CSP allows `img-src 'self' data:` and not `blob:`, so uploads are read with
+  `FileReader.readAsDataURL` and downloads go through a `data:` URL.
+- Canvas does not trigger webfont loading. `poster.js` awaits `document.fonts.load`
+  for every size a template uses before the first draw; without that, Manrope
+  silently falls back to a system font in the exported PNG.
+
+Portraits can carry the same forest-green duotone as `speakers.html`, applied in the
+renderer from the three stops in `scripts/portrait.py` rather than by shelling out.
+
+`web/logos/` holds the marks a template can place without an upload. **The Government
+of Kerala emblem is deliberately not among them.** The copy in the site's `assets/` is
+Wikimedia's, CC BY-SA 4.0, and the marketing site discharges that by naming the
+photographer and linking the licence in `committee.html`; a social image has nowhere to
+carry an attribution, and ShareAlike would reach the poster itself. An official
+Government of Kerala emblem, which carries no such obligation, can be uploaded as
+artwork - and doing that is the right fix if posters need the emblem.
+
+A template needs no artwork to be useful: a solid background with text, an embedded
+logo and a QR works on day one.
+
+The speaker-reveal template at 4:5 does have artwork, and its source is in
+[`artwork/`](artwork/README.md) - two layers plus the script that builds them, so
+it can be regenerated rather than only re-uploaded. Artwork is template content,
+so it lives in the database and object storage, not in the binary; `artwork/README.md`
+has the two calls that install it on a fresh environment. The other sizes and the
+other three families have no artwork yet, and the studio is what lets a designer
+drop it in without a code change.
+
 ## Layout
 
 ```
@@ -93,6 +144,8 @@ cmd/bioconnect/         entry point; `migrate` and `staff-create` subcommands
 internal/app/           the application (one package)
   migrations/           embedded SQL, applied once under an advisory lock
   web/                  embedded server-rendered page, CSS, and progressive-enhancement JS
+    poster.js           the poster studio: one renderer, the editor and the template builder
+    logos/              brand marks a poster template can place without an upload
   fonts/                embedded pass font (Noto Sans, OFL)
 ops/                    production compose file, Caddyfile, backup/monitor scripts, systemd units
 compose.yaml            local development
