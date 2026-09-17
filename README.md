@@ -130,6 +130,18 @@ Regenerate them from the originals rather than editing the `.webp` files by hand
 A speaker without a usable photo gets a lettered placeholder (`.speaker-monogram`) until one
 arrives.
 
+Both the leadership and speaker portraits are produced with `scripts/portrait.py`:
+
+```sh
+python3 scripts/portrait.py path/to/original.jpg assets/speakers/name.webp
+```
+
+It face-detects the subject (OpenCV Haar cascade; pass `--face X,Y,W,H` to override when
+detection picks the wrong face), crops to 4:5 with the face at a matched size and vertical
+position, then applies the shared forest-green duotone: a three-stop gradient
+(`#051c16` shadows, `#76967a` mid, `#e8eed8` highlights) over a 1st/99th-percentile
+contrast stretch. Requires `opencv-python`, `numpy` and `Pillow`.
+
 ## Deploy
 
 Deploy the current working tree to the production S3 bucket and invalidate CloudFront:
