@@ -345,6 +345,8 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respond(w, 200, map[string]any{"items": items, "page": page, "total": count, "page_size": 25})
+	case path == "summary" && r.Method == "GET":
+		a.summary(w, r)
 	case path == "export" && r.Method == "GET":
 		a.export(w, r, p)
 	case path == "categories" && r.Method == "POST":
@@ -430,6 +432,51 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	default:
 		fail(w, 404, "not found")
 	}
+}
+
+// CategorySummary counts one category's registrations event-wide, ignoring the
+// listing filters. Registered excludes rejected and cancelled registrations;
+// confirmed is the approved subset.
+type CategorySummary struct {
+	ID         string `json:"id"`
+	Kind       string `json:"kind"`
+	Label      string `json:"label"`
+	Registered int    `json:"registered"`
+	Confirmed  int    `json:"confirmed"`
+}
+
+func (a *App) summary(w http.ResponseWriter, r *http.Request) {
+	cats, e := a.categories(r.Context())
+	if e != nil {
+		fail(w, 503, "summary unavailable")
+		return
+	}
+	rows, e := a.DB.Query(r.Context(), "SELECT category_id,count(*) FILTER (WHERE status NOT IN ('rejected','cancelled')),count(*) FILTER (WHERE status='approved') FROM registrations GROUP BY category_id")
+	if e != nil {
+		fail(w, 503, "summary unavailable")
+		return
+	}
+	defer rows.Close()
+	counts := map[string][2]int{}
+	for rows.Next() {
+		var id string
+		var registered, confirmed int
+		if e = rows.Scan(&id, &registered, &confirmed); e != nil {
+			fail(w, 503, "summary unavailable")
+			return
+		}
+		counts[id] = [2]int{registered, confirmed}
+	}
+	if rows.Err() != nil {
+		fail(w, 503, "summary unavailable")
+		return
+	}
+	out := make([]CategorySummary, 0, len(cats))
+	for _, c := range cats {
+		n := counts[c.ID]
+		out = append(out, CategorySummary{ID: c.ID, Kind: c.Kind, Label: c.Label, Registered: n[0], Confirmed: n[1]})
+	}
+	respond(w, 200, map[string]any{"categories": out})
 }
 
 // bulkReview applies one review action to each registration independently and

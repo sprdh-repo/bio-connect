@@ -742,6 +742,45 @@ func TestCancellationRevokesPassesAndPendingJobs(t *testing.T) {
 	}
 }
 
+func TestSummaryCountsRegisteredAndConfirmedPerCategory(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	approvedDelegate(t, a, 1, "approve_only")
+	cancelled, sid := approvedDelegate(t, a, 2, "approve_only")
+	if err := a.Review(ctx, cancelled, sid, ReviewInput{Action: "cancelled", Note: "duplicate registration"}); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	if _, _, err := a.Create(ctx, delegateInput("industry"), key(3), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.Create(ctx, exhibitorInput("premium", 3), key(4), tinyPNG(t)); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	a.summary(rr, httptest.NewRequest("GET", "/api/v1/admin/summary", nil))
+	if rr.Code != 200 {
+		t.Fatalf("summary returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var out struct{ Categories []CategorySummary }
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	cats, _ := a.categories(ctx)
+	if len(out.Categories) != len(cats) {
+		t.Fatalf("summary has %d categories, want every one of %d", len(out.Categories), len(cats))
+	}
+	want := map[string][2]int{"industry": {2, 1}, "premium": {1, 0}}
+	for i, c := range out.Categories {
+		if c.ID != cats[i].ID {
+			t.Fatalf("summary order %d is %q, want category order %q", i, c.ID, cats[i].ID)
+		}
+		if got := [2]int{c.Registered, c.Confirmed}; got != want[c.ID] {
+			t.Fatalf("%s registered/confirmed = %v, want %v", c.ID, got, want[c.ID])
+		}
+	}
+}
+
 func TestBulkSendReportsPerRegistration(t *testing.T) {
 	a := mustApp(t)
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")

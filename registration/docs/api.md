@@ -124,6 +124,7 @@ Roles are disjoint:
 | `GET /admin/me` | `{id, role}` |
 | `POST /admin/logout` | clears the session |
 | `GET /admin/registrations?q=&category=&status=&from=&to=&page=` | paginated list (25/page); `from`/`to` are `YYYY-MM-DD`. `q` matches reference, institution, contact, attendee name/email, and pass number; references and pass numbers match case-insensitively with the hyphens optional |
+| `GET /admin/summary` | `{categories:[{id, kind, label, registered, confirmed}]}` in category order, event-wide (ignores list filters). `registered` excludes `rejected` and `cancelled`; `confirmed` counts `approved` |
 | `GET /admin/registrations/{id}` | full record: registration, category, payments, files, passes, deliveries, audit trail |
 | `POST /admin/registrations/{id}/review` | state transitions, see below |
 | `GET /admin/registrations/{id}/files/{file}` | private receipt/logo download |
