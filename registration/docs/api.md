@@ -143,8 +143,10 @@ an image, which is why there is no image encoder in `go.mod`.
 
 | Route | Purpose |
 |---|---|
-| `GET /admin/posters/templates` | `{items, builtin_logos, sizes}`. Each item carries `spec` (see below); `sizes` maps `4x5`/`1x1`/`9x16` to pixel dimensions. |
-| `POST /admin/posters/templates` | `{id?, family, name, size, spec}`. Omitting `id` creates a template and retires the family's previous active template at that size, so relaying out a size is one step. `spec` is validated in full and rejected with the offending rule. |
+| `GET /admin/posters/templates` | `{items, builtin_logos, sizes}`. Each item carries `spec` (see below) and `origin` (`seed` or `staff`); `sizes` maps `4x5`/`1x1`/`9x16` to pixel dimensions. |
+| `POST /admin/posters/templates` | `{id?, family, name, size, spec}`. Omitting `id` creates a template and retires the family's previous active template at that size, so relaying out a size is one step. `spec` is validated in full and rejected with the offending rule. **Saving with an `id` sets `origin='staff'`**, which is what stops a later `poster-seed --replace` reverting the edit. |
+| `POST /admin/posters/templates/duplicate` | `{family, name}` copies every active size of `family` into a new one whose slug comes from `name`. The copy is `origin='staff'` and points at the same artwork rows - nothing mutates an asset, so sharing them avoids duplicating megabytes. 409 if the name is taken, 404 if the source has no active sizes. |
+| `POST /admin/posters/templates/retire` | `{family, size?}` sets `active=false` for that family, or for one size of it. The rows stay: posters made from the template keep their values, and the audit trail keeps its history. |
 | `GET /admin/posters/assets?kind=art\|photo\|logo` | uploaded artwork, newest first, 200 max |
 | `POST /admin/posters/assets?kind=&label=` | raw-body PNG/JPEG upload, 8 MB, ≤6000x6000 and ≤20 MP. Returns `{id, width, height, mime}`. The larger cap applies here only; registration uploads stay at 5 MB. |
 | `GET /admin/posters/assets/{id}` | **the image bytes inline, never a redirect.** The editor draws these into a canvas and reads it back with `toDataURL`; a redirect to a presigned S3 URL would taint that canvas and break every export. |
@@ -225,3 +227,9 @@ as separate families. Without `--replace` the seeder leaves any existing
 template alone, so a deploy never reverts a layout staff changed in the builder.
 Seeded assets carry a `seed:<label>:<sha256 prefix>` label, which is how
 unchanged artwork is reused rather than uploaded again.
+
+`poster_templates.origin` records who owns a layout. The seeder inserts `seed`;
+saving any edit in the console, and every duplicate, sets `staff`. `--replace`
+skips `staff` rows and reports them as `kept (edited)`, so rolling out new
+artwork can never revert a template staff have customised. Duplicate is the
+intended way to start from a shipped template and keep the original updating.

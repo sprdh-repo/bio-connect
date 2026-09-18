@@ -387,44 +387,187 @@ function familyFields(templates) {
 
 /* ------------------------------------------------------------------- home */
 
+// A post type is one or more families that differ only by look, so the gallery
+// can group "speaker-reveal-light" and "-dark" under one card with a toggle.
+// Families that do not end in a known look stand on their own.
+const LOOKS = ['light', 'dark'];
+
+function postTypes() {
+  const groups = new Map();
+  for (const [family, list] of studio.families) {
+    const look = LOOKS.find(l => family.endsWith('-' + l));
+    const key = look ? family.slice(0, -look.length - 1) : family;
+    if (!groups.has(key)) groups.set(key, { key, looks: [] });
+    groups.get(key).looks.push({ family, look: look || '', list });
+  }
+  for (const g of groups.values()) {
+    g.looks.sort((a, b) => LOOKS.indexOf(a.look) - LOOKS.indexOf(b.look));
+    // The card's title drops the look suffix the template name carries.
+    g.title = g.looks[0].list[0].name.replace(/\s*[-–]\s*(light|dark)\s*$/i, '');
+    g.shipped = g.looks.every(l => l.list.every(t => t.origin === 'seed'));
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+// The thumbnail is the template's own artwork layers stacked, not a canvas
+// render: it is the picture staff recognise, costs two cached <img> per card,
+// and needs none of the font loading a real render would.
+//
+// The first image sits in normal flow and gives the box its height; the rest are
+// absolutely positioned over it. Sizing off the image rather than an
+// aspect-ratio on the wrapper keeps it correct inside a <button>, whose flex
+// formatting context swallowed the ratio.
+function thumbnail(list, eager) {
+  const t = list.find(x => x.size === '4x5') || list[0];
+  const art = t.spec.layers.filter(l => l.type === 'art');
+  const src = l => l.asset_id ? '/api/v1/admin/posters/assets/' + l.asset_id
+    : '/static/logos/' + l.builtin + '.png';
+  if (!art.length) {
+    // A template can legitimately have no artwork - text, a logo and a QR on a
+    // plain background. Show its background colour rather than an empty box.
+    return `<span class="poster-thumb poster-thumb-plain"
+      data-bg="${esc(t.spec.background || PS.cream)}"></span>`;
+  }
+  return `<span class="poster-thumb" data-bg="${esc(t.spec.background || PS.cream)}">${
+    // The shown look loads eagerly; the other waits until someone toggles to
+    // it, which keeps the gallery to two images per card on first paint.
+    art.map(l => `<img src="${esc(src(l))}" alt="" decoding="async"
+      loading="${eager ? 'eager' : 'lazy'}">`).join('')
+  }</span>`;
+}
+
 async function posterHome() {
   await loadTemplates();
   const posters = await api('/admin/posters');
-  const families = [...studio.families.entries()];
+  const types = postTypes();
   app.innerHTML = `<div class="admin-page poster-page">
     <header class="admin-heading">
       <div><p class="admin-kicker">Staff console</p><h1>Social posters</h1>
-      <p class="admin-intro">Pick a template family, drop in a portrait and the wording, and download a ready-to-post image at every size.</p></div>
+      <p class="admin-intro">Pick a template, drop in a portrait and the wording, and download a ready-to-post image at every size.</p></div>
       <div class="admin-header-actions">
         <button id="new-template" class="secondary">New template</button>
         <button id="poster-back" class="quiet">Back to console</button>
       </div>
     </header>
-    <section class="card">
-      <h2>Template families</h2>
-      ${families.length ? `<ul class="poster-families">${families.map(([family, list]) => `
-        <li><div><strong>${esc(list[0].name)}</strong><span class="poster-sizes">${list.map(t => esc(PS.sizeLabels[t.size] || t.size)).join(' · ')}</span></div>
-        <div class="poster-family-actions">
-          <button class="make-poster" data-family="${esc(family)}">Make a poster</button>
-          ${list.map(t => `<button class="edit-template secondary" data-id="${esc(t.id)}">Edit ${esc(t.size)}</button>`).join('')}
-          <button class="add-size secondary" data-family="${esc(family)}">Add size</button>
-        </div></li>`).join('')}</ul>`
-      : '<p class="muted">No templates yet. Create one to get started - a template works with nothing but text and a logo, so you do not have to wait for artwork.</p>'}
-    </section>
+    ${types.length ? `<ul class="poster-gallery">${types.map(g => {
+      const active = g.looks[0];
+      return `<li class="poster-card" data-type="${esc(g.key)}">
+        ${g.looks.map((l, i) => `<button class="poster-pick${i ? '' : ' active'}" data-family="${esc(l.family)}"
+            aria-label="Make a ${esc(g.title)} poster">${thumbnail(l.list, !i)}</button>`).join('')}
+        <div class="poster-card-body">
+          <strong>${esc(g.title)}</strong>
+          ${g.looks.length > 1 ? `<span class="poster-looks">${g.looks.map((l, i) =>
+            `<button class="poster-look${i ? '' : ' active'}" data-family="${esc(l.family)}">${esc(l.look)}</button>`).join('')}</span>` : ''}
+          <span class="poster-sizes">${active.list.map(t => esc(PS.sizeLabels[t.size] || t.size)).join(' · ')}</span>
+        </div>
+        <div class="poster-card-actions">
+          <button class="make-poster" data-family="${esc(active.family)}">Make a poster</button>
+          <details class="poster-menu">
+            <summary aria-label="More actions for ${esc(g.title)}">&hellip;</summary>
+            <div class="poster-menu-items">
+              ${active.list.map(t => `<button class="edit-template" data-id="${esc(t.id)}">Edit ${esc(PS.sizeLabels[t.size] || t.size)}</button>`).join('')}
+              ${Object.keys(PS.sizes).filter(sz => !active.list.some(t => t.size === sz))
+                .map(sz => `<button class="add-size" data-family="${esc(active.family)}" data-size="${esc(sz)}">Add ${esc(PS.sizeLabels[sz])}</button>`).join('')}
+              <button class="dup-template" data-family="${esc(active.family)}" data-name="${esc(g.title)}">Duplicate&hellip;</button>
+              <button class="retire-template danger" data-family="${esc(active.family)}" data-title="${esc(g.title)}">Retire</button>
+            </div>
+          </details>
+        </div>
+        <form class="poster-dup-form" hidden>
+          <label>Name for the copy
+            <input name="name" maxlength="120" placeholder="${esc(g.title)} (our version)" required></label>
+          <p class="help">A copy is yours: rolling out new artwork never changes it.</p>
+          <div class="actions"><button>Create copy</button>
+            <button type="button" class="dup-cancel secondary">Cancel</button></div>
+        </form>
+        ${g.shipped ? '' : '<span class="poster-badge">edited</span>'}
+      </li>`;
+    }).join('')}</ul>`
+    : '<p class="muted card">No templates yet. Create one to get started - a template works with nothing but text and a logo, so you do not have to wait for artwork.</p>'}
     <section class="card">
       <h2>Recent posters</h2>
-      ${table((posters.items || []).map(p => ({ ...p, updated_at: date(p.updated_at) })),
-        [['title', 'Title'], ['family', 'Template'], ['created_by', 'Made by'], ['updated_at', 'Updated']])}
-      ${(posters.items || []).length ? `<div class="poster-reopen">${posters.items.map(p => `<button class="open-poster secondary" data-id="${esc(p.id)}" data-family="${esc(p.family)}">Reopen ${esc(p.title || p.family)}</button>`).join('')}</div>` : ''}
+      ${(posters.items || []).length
+        ? table(posters.items.map(p => ({ ...p, updated_at: date(p.updated_at) })),
+            [['title', 'Title'], ['family', 'Template'], ['created_by', 'Made by'], ['updated_at', 'Updated']])
+          + `<div class="poster-reopen">${posters.items.map(p => `<button class="open-poster secondary" data-id="${esc(p.id)}" data-family="${esc(p.family)}">Reopen ${esc(p.title || p.family)}</button>`).join('')}</div>`
+        : '<p class="muted">Nothing yet. Posters you save appear here so you can reopen and adjust them.</p>'}
     </section>
   </div>`;
 
+  // The page's CSP is style-src 'self', so a style="" attribute is dropped
+  // before it ever reaches layout. Script-driven CSSOM is not covered by that
+  // directive, and .poster-thumb carries a cream fallback for the strictest
+  // case, so nothing depends on this succeeding.
+  document.querySelectorAll('.poster-thumb[data-bg]').forEach(el => {
+    try { el.style.background = el.dataset.bg; } catch { /* fallback stands */ }
+  });
+
   bind('poster-back', 'click', () => adminPage());
   bind('new-template', 'click', () => templateBuilder(null, { family: '', size: '4x5' }));
+  navigate('.poster-pick', el => posterEditor(el.dataset.family));
   navigate('.make-poster', el => posterEditor(el.dataset.family));
   navigate('.edit-template', el => templateBuilder(el.dataset.id));
-  navigate('.add-size', el => templateBuilder(null, { family: el.dataset.family, size: '1x1' }));
+  navigate('.add-size', el => templateBuilder(null, { family: el.dataset.family, size: el.dataset.size }));
   navigate('.open-poster', el => posterEditor(el.dataset.family, el.dataset.id));
+
+  // Switching look re-points the card's actions at the other family, so the
+  // menu never acts on the look that is not showing.
+  document.querySelectorAll('.poster-look').forEach(el => el.addEventListener('click', () => {
+    const card = el.closest('.poster-card');
+    const family = el.dataset.family;
+    card.querySelectorAll('.poster-look').forEach(b => b.classList.toggle('active', b === el));
+    card.querySelectorAll('.poster-pick').forEach(b => b.classList.toggle('active', b.dataset.family === family));
+    const group = postTypes().find(g => g.key === card.dataset.type);
+    const chosen = group.looks.find(l => l.family === family);
+    card.querySelector('.poster-sizes').textContent =
+      chosen.list.map(t => PS.sizeLabels[t.size] || t.size).join(' · ');
+    card.querySelector('.make-poster').dataset.family = family;
+    card.querySelector('.dup-template').dataset.family = family;
+    card.querySelector('.retire-template').dataset.family = family;
+    const menu = card.querySelector('.poster-menu-items');
+    menu.querySelectorAll('.edit-template').forEach((b, i) => {
+      const t = chosen.list[i];
+      if (t) { b.dataset.id = t.id; b.textContent = 'Edit ' + (PS.sizeLabels[t.size] || t.size); b.hidden = false; }
+      else b.hidden = true;
+    });
+  }));
+
+  document.querySelectorAll('.dup-template').forEach(el => el.addEventListener('click', () => {
+    const card = el.closest('.poster-card');
+    card.querySelector('.poster-menu').open = false;
+    const form = card.querySelector('.poster-dup-form');
+    form.hidden = false;
+    form.querySelector('input').focus();
+  }));
+  document.querySelectorAll('.dup-cancel').forEach(el => el.addEventListener('click', () => {
+    el.closest('.poster-dup-form').hidden = true;
+  }));
+  document.querySelectorAll('.poster-dup-form').forEach(form =>
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        const card = form.closest('.poster-card');
+        await busy(e.submitter, async () => {
+          const out = await post('/admin/posters/templates/duplicate', {
+            family: card.querySelector('.dup-template').dataset.family,
+            name: form.querySelector('input').value.trim(),
+          });
+          message(`Copied to "${out.name}" with ${out.sizes} size${out.sizes === 1 ? '' : 's'}. It is yours to edit.`);
+          await posterHome();
+        });
+      } catch (err) { message(err.message, true); }
+    }));
+
+  document.querySelectorAll('.retire-template').forEach(el => el.addEventListener('click', async () => {
+    el.closest('.poster-menu').open = false;
+    if (!confirm(`Retire "${el.dataset.title}"? It disappears from this list. `
+      + `Posters already made from it keep their wording, and it can be brought back by a manager.`)) return;
+    try {
+      await post('/admin/posters/templates/retire', { family: el.dataset.family, size: '' });
+      message('Template retired.');
+      await posterHome();
+    } catch (err) { message(err.message, true); }
+  }));
 }
 
 /* ----------------------------------------------------------- poster editor */

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"image"
 	"io/fs"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -201,5 +202,154 @@ func TestSeedPostersIsIdempotentAndPreservesStaffEdits(t *testing.T) {
 	}
 	if refs != 0 {
 		t.Errorf("%d seeded art layers point at a missing asset", refs)
+	}
+}
+
+// The point of origin: staff can customise a shipped template and a later
+// artwork rollout must not undo it.
+func TestSeedNeverOverwritesAStaffEditedTemplate(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	if _, err := a.SeedPosters(ctx, false); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	var id, family, size, spec string
+	if err := a.DB.QueryRow(ctx,
+		"SELECT id,family,size,spec::text FROM poster_templates WHERE active AND origin='seed' ORDER BY family,size LIMIT 1").
+		Scan(&id, &family, &size, &spec); err != nil {
+		t.Fatal(err)
+	}
+
+	// Saving an edit through the console is what takes ownership.
+	sid, _ := addStaff(t, a, "editor@bioconnect.test", "reviewer")
+	body, _ := json.Marshal(map[string]any{
+		"id": id, "family": family, "name": "Our own version", "size": size,
+		"spec": json.RawMessage(spec),
+	})
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v1/admin/posters/templates", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	a.savePosterTemplate(rr, req, principal{ID: sid, Role: "reviewer"})
+	if rr.Code != 200 {
+		t.Fatalf("edit returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var origin string
+	if err := a.DB.QueryRow(ctx, "SELECT origin FROM poster_templates WHERE id=$1", id).Scan(&origin); err != nil {
+		t.Fatal(err)
+	}
+	if origin != "staff" {
+		t.Fatalf("origin after an edit = %q, want staff", origin)
+	}
+
+	// A full artwork rollout must leave exactly that one alone.
+	results, err := a.SeedPosters(ctx, true)
+	if err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+	var kept int
+	for _, r := range results {
+		if r.Family == family && r.Size == size {
+			if r.Status != "kept (edited)" {
+				t.Errorf("%s %s: %s, want kept (edited)", r.Family, r.Size, r.Status)
+			}
+			kept++
+		} else if r.Status != "replaced" {
+			t.Errorf("%s %s: %s, want replaced", r.Family, r.Size, r.Status)
+		}
+	}
+	if kept != 1 {
+		t.Fatalf("%d templates reported as edited, want 1", kept)
+	}
+	var name string
+	if err := a.DB.QueryRow(ctx,
+		"SELECT name FROM poster_templates WHERE family=$1 AND size=$2 AND active", family, size).Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != "Our own version" {
+		t.Fatalf("the edit was reverted: name = %q", name)
+	}
+}
+
+// Duplicating is how staff start from a shipped template safely.
+func TestDuplicateFamilyCopiesEverySizeAsStaffOwned(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	if _, err := a.SeedPosters(ctx, false); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	sid, _ := addStaff(t, a, "editor@bioconnect.test", "reviewer")
+
+	dup := func(family, name string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"family": family, "name": name})
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/v1/admin/posters/templates/duplicate", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		a.duplicatePosterFamily(rr, req, principal{ID: sid, Role: "reviewer"})
+		return rr
+	}
+
+	before := count(t, a, "SELECT count(*) FROM poster_templates WHERE active")
+	rr := dup("speaker-reveal-light", "Keynote reveal")
+	if rr.Code != 200 {
+		t.Fatalf("duplicate returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var out struct {
+		Family string `json:"family"`
+		Sizes  int    `json:"sizes"`
+	}
+	json.Unmarshal(rr.Body.Bytes(), &out)
+	if out.Family != "keynote-reveal" || out.Sizes != 3 {
+		t.Fatalf("got family %q with %d sizes, want keynote-reveal with 3", out.Family, out.Sizes)
+	}
+	if n := count(t, a, "SELECT count(*) FROM poster_templates WHERE active"); n != before+3 {
+		t.Fatalf("%d active templates, want %d", n, before+3)
+	}
+	if n := count(t, a, "SELECT count(*) FROM poster_templates WHERE family='keynote-reveal' AND origin='staff'"); n != 3 {
+		t.Fatal("the copy is not staff-owned, so a rollout could overwrite it")
+	}
+	// The copy shares the original's artwork rather than duplicating megabytes.
+	var same bool
+	if err := a.DB.QueryRow(ctx, `
+		SELECT (SELECT spec->'layers'->0->>'asset_id' FROM poster_templates WHERE family='keynote-reveal' AND size='4x5')
+		     = (SELECT spec->'layers'->0->>'asset_id' FROM poster_templates WHERE family='speaker-reveal-light' AND size='4x5' AND active)`).Scan(&same); err != nil {
+		t.Fatal(err)
+	}
+	if !same {
+		t.Error("the copy does not reuse the original artwork")
+	}
+
+	// Rolling out artwork must not touch the copy.
+	if _, err := a.SeedPosters(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, a, "SELECT count(*) FROM poster_templates WHERE family='keynote-reveal' AND active"); n != 3 {
+		t.Error("a rollout disturbed the copy")
+	}
+
+	if rr := dup("speaker-reveal-light", "Keynote reveal"); rr.Code != 409 {
+		t.Errorf("duplicating onto an existing name returned %d, want 409", rr.Code)
+	}
+	if rr := dup("speaker-reveal-light", "  "); rr.Code != 400 {
+		t.Errorf("a blank name returned %d, want 400", rr.Code)
+	}
+	if rr := dup("no-such-family", "Whatever"); rr.Code != 404 {
+		t.Errorf("duplicating a missing family returned %d, want 404", rr.Code)
+	}
+
+	// Retiring hides a template without losing the row.
+	body, _ := json.Marshal(map[string]string{"family": "keynote-reveal", "size": ""})
+	ret := httptest.NewRecorder()
+	req := httptest.NewRequest("POST", "/api/v1/admin/posters/templates/retire", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	a.retirePosterTemplates(ret, req, principal{ID: sid, Role: "reviewer"})
+	if ret.Code != 200 {
+		t.Fatalf("retire returned %d: %s", ret.Code, ret.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM poster_templates WHERE family='keynote-reveal' AND active"); n != 0 {
+		t.Error("retire left active rows")
+	}
+	if n := count(t, a, "SELECT count(*) FROM poster_templates WHERE family='keynote-reveal'"); n != 3 {
+		t.Error("retire deleted rows instead of hiding them")
 	}
 }

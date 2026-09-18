@@ -65,20 +65,131 @@
 .poster-photo-tools { margin: -6px 0 16px; display: grid; gap: 10px; }
 .poster-photo-tools button { min-height: 34px; padding: 0 12px; font-size: 11px; justify-self: start; }
 
-.poster-families { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.poster-families li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  background: var(--cream);
-  border-radius: 10px;
+/* ---- template gallery ---- */
+.poster-gallery {
+  list-style: none;
+  margin: 26px 0 22px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
 }
-.poster-sizes { display: block; margin-top: 4px; font-size: 12px; color: var(--muted); }
-.poster-family-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.poster-family-actions button { min-height: 34px; padding: 0 12px; font-size: 11px; }
+.poster-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+/* Both looks are rendered; the inactive one is hidden rather than swapped, so
+   toggling never waits on a network round trip. */
+.poster-pick { display: none; padding: 0; border: 0; border-radius: 0; background: none; }
+.poster-pick.active { display: block; }
+.poster-pick:hover { transform: none; background: none; }
+.poster-pick:hover .poster-thumb { filter: brightness(1.04); }
+.poster-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  /* Fallback for the template's own background, which is applied by script:
+     a style attribute would be dropped by the page's style-src 'self' CSP. */
+  background: var(--cream);
+  border-bottom: 1px solid var(--line);
+}
+/* The first layer is in normal flow and sets the height from its own intrinsic
+   ratio; the rest stack over it. An aspect-ratio on this wrapper does not
+   survive the button's flex formatting context. */
+.poster-thumb img { display: block; width: 100%; height: auto; }
+.poster-thumb img + img { position: absolute; inset: 0; height: 100%; }
+.poster-thumb-plain { aspect-ratio: 4 / 5; }
+.poster-card-body { padding: 14px 16px 0; }
+.poster-card-body strong { display: block; font-size: 15px; }
+.poster-looks { display: inline-flex; gap: 4px; margin: 8px 0 2px; }
+.poster-looks button {
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--line);
+}
+.poster-looks button.active { background: var(--forest); color: white; border-color: var(--forest); }
+.poster-looks button:hover { transform: none; }
+.poster-sizes { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.poster-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 16px;
+  margin-top: auto;
+}
+.poster-card-actions .make-poster { flex: 1; min-height: 38px; padding: 0 12px; font-size: 11px; }
+
+/* A <details> menu needs no open/close script and stays keyboard reachable. */
+.poster-menu { position: relative; }
+.poster-menu summary {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--forest);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--forest);
+  list-style: none;
+}
+.poster-menu summary::-webkit-details-marker { display: none; }
+.poster-menu summary:hover { background: var(--forest); color: white; }
+.poster-menu-items {
+  position: absolute;
+  right: 0;
+  bottom: 46px;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  padding: 8px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(16, 32, 27, 0.16);
+}
+.poster-menu-items button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 11px;
+  justify-content: flex-start;
+  background: transparent;
+  color: var(--ink);
+  border-color: transparent;
+}
+.poster-menu-items button:hover { background: var(--cream); transform: none; }
+.poster-menu-items .danger { color: var(--danger); }
+.poster-menu-items .danger:hover { background: var(--danger); color: white; }
+
+.poster-dup-form { padding: 0 16px 16px; border-top: 1px solid var(--line); margin-top: 4px; }
+.poster-dup-form label { margin-top: 14px; }
+.poster-dup-form .actions { margin-top: 12px; gap: 8px; }
+.poster-dup-form .actions button { min-height: 34px; padding: 0 12px; font-size: 11px; }
+
+.poster-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--forest);
+  background: var(--lime);
+  border-radius: 20px;
+}
+
 .poster-reopen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .poster-reopen button { min-height: 34px; padding: 0 12px; font-size: 11px; }
 
@@ -128,5 +239,5 @@
 }
 @media (max-width: 620px) {
   .poster-fields .fields { grid-template-columns: 1fr; }
-  .poster-families li { flex-direction: column; align-items: stretch; }
+  .poster-gallery { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 }

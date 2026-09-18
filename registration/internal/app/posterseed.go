@@ -78,11 +78,20 @@ func (a *App) seedTemplate(ctx context.Context, s seedSpec, replace bool) (strin
 		return "", fmt.Errorf("unknown size %q", s.Size)
 	}
 
-	var existing string
+	var existing, origin string
 	err := a.DB.QueryRow(ctx,
-		"SELECT id FROM poster_templates WHERE family=$1 AND size=$2 AND active", s.Family, s.Size).Scan(&existing)
-	if err == nil && !replace {
-		return "kept", nil
+		"SELECT id,origin FROM poster_templates WHERE family=$1 AND size=$2 AND active",
+		s.Family, s.Size).Scan(&existing, &origin)
+	if err == nil {
+		if !replace {
+			return "kept", nil
+		}
+		// --replace rolls out new artwork; it must not undo a layout staff
+		// changed in the builder. Saving an edit sets origin='staff', which is
+		// the signal to leave this one alone.
+		if origin == "staff" {
+			return "kept (edited)", nil
+		}
 	}
 
 	// Resolve the artwork placeholders to real asset ids before validating, so
@@ -120,7 +129,7 @@ func (a *App) seedTemplate(ctx context.Context, s seedSpec, replace bool) (strin
 		return "", err
 	}
 	if _, err = tx.Exec(ctx,
-		"INSERT INTO poster_templates(id,family,name,size,width,height,spec) VALUES($1,$2,$3,$4,$5,$6,$7)",
+		"INSERT INTO poster_templates(id,family,name,size,width,height,spec,origin) VALUES($1,$2,$3,$4,$5,$6,$7,'seed')",
 		id(), s.Family, s.Name, s.Size, dim[0], dim[1], encoded); err != nil {
 		return "", err
 	}

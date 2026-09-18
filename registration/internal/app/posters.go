@@ -87,6 +87,10 @@ func (a *App) posterAPI(w http.ResponseWriter, r *http.Request, p principal, pat
 		a.posterTemplates(w, r)
 	case head == "templates" && rest == "" && r.Method == "POST":
 		a.savePosterTemplate(w, r, p)
+	case head == "templates" && rest == "duplicate" && r.Method == "POST":
+		a.duplicatePosterFamily(w, r, p)
+	case head == "templates" && rest == "retire" && r.Method == "POST":
+		a.retirePosterTemplates(w, r, p)
 	case head == "assets" && rest == "" && r.Method == "POST":
 		a.uploadPosterAsset(w, r, p)
 	case head == "assets" && rest == "" && r.Method == "GET":
@@ -235,7 +239,7 @@ func hexColor(v string) bool {
 }
 
 func (a *App) posterTemplates(w http.ResponseWriter, r *http.Request) {
-	items, e := a.queryMaps(r, "SELECT id,family,name,size,width,height,spec,updated_at FROM poster_templates WHERE active ORDER BY family,CASE size WHEN '4x5' THEN 1 WHEN '1x1' THEN 2 ELSE 3 END")
+	items, e := a.queryMaps(r, "SELECT id,family,name,size,width,height,spec,origin,updated_at FROM poster_templates WHERE active ORDER BY family,CASE size WHEN '4x5' THEN 1 WHEN '1x1' THEN 2 ELSE 3 END")
 	if e != nil {
 		fail(w, 503, "templates unavailable")
 		return
@@ -306,7 +310,9 @@ func (a *App) savePosterTemplate(w http.ResponseWriter, r *http.Request, p princ
 		}
 		_, e = tx.Exec(r.Context(), "INSERT INTO poster_templates(id,family,name,size,width,height,spec,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", tid, in.Family, in.Name, in.Size, dim[0], dim[1], encoded, p.ID)
 	} else {
-		ct, ee := tx.Exec(r.Context(), "UPDATE poster_templates SET name=$2,spec=$3,updated_at=now() WHERE id=$1 AND active", tid, in.Name, encoded)
+		// Editing a shipped template makes it staff-owned. Without this the
+		// next "poster-seed --replace" would quietly revert the change.
+		ct, ee := tx.Exec(r.Context(), "UPDATE poster_templates SET name=$2,spec=$3,origin='staff',updated_at=now() WHERE id=$1 AND active", tid, in.Name, encoded)
 		e = ee
 		if e == nil && ct.RowsAffected() == 0 {
 			fail(w, 404, "template not found")
@@ -511,4 +517,160 @@ func (a *App) savePoster(w http.ResponseWriter, r *http.Request, p principal) {
 		return
 	}
 	respond(w, 200, map[string]string{"id": pid})
+}
+
+// duplicatePosterFamily copies every active size of one family into a new one.
+// It is how staff customise a shipped template safely: the copy is staff-owned
+// from birth, so no rollout of new artwork can touch it, and the original stays
+// available to everyone else.
+func (a *App) duplicatePosterFamily(w http.ResponseWriter, r *http.Request, p principal) {
+	var in struct {
+		Family string `json:"family"`
+		Name   string `json:"name"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Family == "" || in.Name == "" || len(in.Name) > 120 {
+		fail(w, 400, "choose a template and give the copy a name")
+		return
+	}
+	// The new family slug comes from the name, so staff never type one.
+	slug := slugify(in.Name)
+	if slug == "" {
+		fail(w, 400, "give the copy a name with some letters or digits in it")
+		return
+	}
+
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		fail(w, 503, "duplicate unavailable")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var clash int
+	if e = tx.QueryRow(r.Context(), "SELECT count(*) FROM poster_templates WHERE family=$1 AND active", slug).Scan(&clash); e != nil {
+		fail(w, 503, "duplicate unavailable")
+		return
+	}
+	if clash > 0 {
+		fail(w, 409, "a template called that already exists; pick another name")
+		return
+	}
+
+	rows, e := tx.Query(r.Context(), "SELECT size,width,height,spec FROM poster_templates WHERE family=$1 AND active", in.Family)
+	if e != nil {
+		fail(w, 503, "duplicate unavailable")
+		return
+	}
+	type copyOf struct {
+		size          string
+		width, height int
+		spec          []byte
+	}
+	var sizes []copyOf
+	for rows.Next() {
+		var c copyOf
+		if e = rows.Scan(&c.size, &c.width, &c.height, &c.spec); e != nil {
+			rows.Close()
+			fail(w, 503, "duplicate unavailable")
+			return
+		}
+		sizes = append(sizes, c)
+	}
+	rows.Close()
+	if e = rows.Err(); e != nil {
+		fail(w, 503, "duplicate unavailable")
+		return
+	}
+	if len(sizes) == 0 {
+		fail(w, 404, "that template has no sizes to copy")
+		return
+	}
+
+	// The copy points at the same artwork rows. Nothing mutates an asset, so
+	// sharing them is safe and avoids duplicating megabytes per copy.
+	for _, c := range sizes {
+		if _, e = tx.Exec(r.Context(),
+			"INSERT INTO poster_templates(id,family,name,size,width,height,spec,origin,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,'staff',$8)",
+			id(), slug, in.Name, c.size, c.width, c.height, c.spec, p.ID); e != nil {
+			fail(w, 503, "duplicate could not be saved; retry")
+			return
+		}
+	}
+	if e = audit(r.Context(), tx, p.ID, "", "poster_family_duplicated", in.Family+" -> "+slug); e != nil {
+		fail(w, 503, "duplicate could not be saved; retry")
+		return
+	}
+	if e = tx.Commit(r.Context()); e != nil {
+		fail(w, 503, "duplicate could not be saved; retry")
+		return
+	}
+	respond(w, 200, map[string]any{"family": slug, "name": in.Name, "sizes": len(sizes)})
+}
+
+// retirePosterTemplates hides a template without deleting it: posters already
+// made from it keep their saved values, and the row stays for the audit trail.
+func (a *App) retirePosterTemplates(w http.ResponseWriter, r *http.Request, p principal) {
+	var in struct {
+		Family string `json:"family"`
+		Size   string `json:"size"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Family == "" {
+		fail(w, 400, "choose a template to retire")
+		return
+	}
+	tx, e := a.DB.Begin(r.Context())
+	if e != nil {
+		fail(w, 503, "retire unavailable")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	q := "UPDATE poster_templates SET active=false,updated_at=now() WHERE family=$1 AND active"
+	args := []any{in.Family}
+	if in.Size != "" {
+		q += " AND size=$2"
+		args = append(args, in.Size)
+	}
+	ct, e := tx.Exec(r.Context(), q, args...)
+	if e != nil {
+		fail(w, 503, "retire unavailable")
+		return
+	}
+	if ct.RowsAffected() == 0 {
+		fail(w, 404, "template not found")
+		return
+	}
+	if e = audit(r.Context(), tx, p.ID, "", "poster_template_retired", in.Family+" "+in.Size); e != nil {
+		fail(w, 503, "retire could not be saved; retry")
+		return
+	}
+	if e = tx.Commit(r.Context()); e != nil {
+		fail(w, 503, "retire could not be saved; retry")
+		return
+	}
+	respond(w, 200, map[string]any{"retired": ct.RowsAffected()})
+}
+
+// slugify turns a staff-typed name into a family key. Mirrors the client's own
+// slug so the name they type and the family they get agree.
+func slugify(v string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(v) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			dash = false
+		case b.Len() > 0 && !dash:
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	return strings.TrimSuffix(b.String(), "-")
 }

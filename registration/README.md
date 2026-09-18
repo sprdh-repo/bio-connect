@@ -147,9 +147,29 @@ The artwork is generated, not hand-drawn, and its source is in
 and all 24 specs. Artwork is template *content*, so it lives in the database and
 object storage; the binary only carries the copy `poster-seed` installs.
 
-Staff are not limited to these: a template can still be built from scratch in
-the builder, with nothing but a background colour, an embedded logo, text and a
-QR.
+Staff are not limited to these. The studio's gallery shows every template as a
+thumbnail of its own artwork, grouped by post type with the light and dark looks
+on a toggle, and each card can:
+
+- **Make a poster** - the common case, one click from the picture.
+- **Edit** any of its sizes in the builder.
+- **Duplicate** the whole family under a new name. This is the safe way to start
+  from a shipped template: the copy is staff-owned from birth, shares the
+  original's artwork rather than re-uploading it, and no rollout can touch it.
+- **Retire** it, which hides it without deleting the row - posters already made
+  from it keep their wording.
+
+**Editing a shipped template makes it staff-owned**, recorded as
+`poster_templates.origin`. `poster-seed --replace` then reports it as
+`kept (edited)` and leaves it alone, so a deploy can never revert work done in
+the builder. A template built from scratch is staff-owned already.
+
+One CSP consequence worth knowing before touching `poster.js`: the page is
+served `style-src 'self'`, so a `style=""` attribute in generated markup is
+dropped before it reaches layout - silently, with only a console warning. The
+gallery applies a template's background colour through CSSOM for that reason and
+carries a CSS fallback. `app.js` contains no inline styles at all; keep it that
+way.
 
 ## Layout
 
