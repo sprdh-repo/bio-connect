@@ -293,15 +293,25 @@ function renderPoster(canvas, template, values, transforms) {
 
 // loadImage caches promises; the draw path needs the resolved element, so settle
 // them onto the promise before any render.
+// Returns the layers whose image could not be loaded. drawArt and drawPhoto
+// skip a missing image rather than throwing, which keeps the editor usable but
+// would otherwise let someone download a poster quietly missing its artwork.
+// Callers surface this; nothing else can tell the difference.
 async function settleImages(template, values) {
   await preload(template, values);
   for (const [, p] of imageCache) {
     if (p.settled === undefined) p.settled = await p.then(v => v, () => null);
   }
+  return template.spec.layers.filter(l => {
+    const src = layerSrc(l, values);
+    return src && !(imageCache.get(src) || {}).settled;
+  });
 }
 
 async function exportPNG(template, values, transforms) {
-  await settleImages(template, values);
+  const broken = await settleImages(template, values);
+  if (broken.length) throw Error(`Cannot export: ${broken.length} of this template's images `
+    + `could not be loaded (${broken.map(l => l.label || l.id).join(', ')}).`);
   const canvas = document.createElement('canvas');
   renderPoster(canvas, template, values, transforms);
   return canvas.toDataURL('image/png');
@@ -452,8 +462,14 @@ async function posterEditor(family, posterId) {
     const t = template();
     const canvas = document.getElementById('poster-canvas');
     if (!canvas) return;
-    await settleImages(t, state.values);
+    const broken = await settleImages(t, state.values);
     renderPoster(canvas, t, state.values, transformsFor(t.size));
+    // Without this a poster whose artwork failed to load looks merely plain,
+    // and downloads that way.
+    if (broken.length) {
+      message(`${broken.length} image${broken.length === 1 ? '' : 's'} could not be loaded `
+        + `(${broken.map(l => l.label || l.id).join(', ')}). The download will be missing them.`, true);
+    }
   }
 
   function shell() {

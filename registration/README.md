@@ -26,7 +26,7 @@ A sequential series does publish how many registrations a category has, and a pr
 - PostgreSQL-backed delivery queue with ret/uncertain handling, channel-specific resend, reissue (revokes the previous pass), and failed-delivery retry.
 - Postmark and Meta status webhooks, authenticated and correlated to delivery records.
 - Filtered CSV and XLSX exports with separate sheets and spreadsheet-formula-injection protection.
-- A social poster studio in the console, open to both staff roles: staff lay out a template once on uploaded artwork, then fill it per post and download a PNG at every size in the family.
+- A social poster studio in the console, open to both staff roles, with 24 templates shipped in the binary: four post types in a light and a dark look at three sizes each. Staff fill a template per post and download a PNG at every size, or lay out a new one in the builder.
 
 API contract: [`docs/api.md`](docs/api.md).
 Deployment, backups, restore, and rollback: [`docs/operations.md`](docs/operations.md).
@@ -69,6 +69,7 @@ TEST_DATABASE_URL='postgres://bioconnect:local-development-only@localhost:55432/
 
 They cover both registration journeys and every category, the exact exhibitor roster counts (3 / 2 / 2) with registrations made before a roster change keeping their original roster, fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
 For posters they cover template-spec validation rule by rule, the 8 MB image checks, poster QR payload rejection, inline asset serving (a redirect here would taint the export canvas), a template save retiring the family's previous active size, field and per-size framing round-tripping, both staff roles reaching the poster routes while registrations stay separated, and every offered builtin logo actually being embedded.
+The shipped artwork is checked too: every spec validates, references two embedded PNGs of exactly its declared canvas size, carries defaults for the event furniture and an https QR payload, and leaves no orphan PNG in the binary; and `poster-seed` is idempotent, keeps staff-edited templates, duplicates no assets on `--replace`, and leaves no template pointing at a missing asset.
 
 To eyeball a rendered pass:
 
@@ -126,16 +127,29 @@ carry an attribution, and ShareAlike would reach the poster itself. An official
 Government of Kerala emblem, which carries no such obligation, can be uploaded as
 artwork - and doing that is the right fix if posters need the emblem.
 
-A template needs no artwork to be useful: a solid background with text, an embedded
-logo and a QR works on day one.
+**Twenty-four templates ship in the binary** - four post types (speaker reveal,
+session announce, countdown, partner welcome), each in a light and a dark look,
+each at 4:5, 1:1 and 9:16. Install them on any environment with:
 
-The speaker-reveal template at 4:5 does have artwork, and its source is in
-[`artwork/`](artwork/README.md) - two layers plus the script that builds them, so
-it can be regenerated rather than only re-uploaded. Artwork is template content,
-so it lives in the database and object storage, not in the binary; `artwork/README.md`
-has the two calls that install it on a fresh environment. The other sizes and the
-other three families have no artwork yet, and the studio is what lets a designer
-drop it in without a code change.
+```sh
+bioconnect poster-seed            # creates what is missing, keeps what exists
+bioconnect poster-seed --replace  # rolls out changed artwork
+```
+
+It is safe to re-run. Without `--replace` it never touches a template that is
+already there, so a deploy cannot undo a layout staff changed in the builder.
+Assets are keyed by a hash of their bytes, so unchanged artwork is never
+uploaded twice, and an asset whose object has gone missing is restored rather
+than handed out as a broken reference.
+
+The artwork is generated, not hand-drawn, and its source is in
+[`artwork/`](artwork/README.md) along with the script that builds all 48 PNGs
+and all 24 specs. Artwork is template *content*, so it lives in the database and
+object storage; the binary only carries the copy `poster-seed` installs.
+
+Staff are not limited to these: a template can still be built from scratch in
+the builder, with nothing but a background colour, an embedded logo, text and a
+QR.
 
 ## Layout
 

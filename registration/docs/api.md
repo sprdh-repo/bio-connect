@@ -206,3 +206,22 @@ A delivery already marked `delivered` or `failed` is never downgraded.
 ## Health
 
 `GET /healthz` -> `200 {"status":"ok"}` when the database is reachable, otherwise `503`.
+
+### Shipped templates
+
+24 templates ride in the binary - four post types (speaker reveal, session
+announce, countdown, partner welcome), each in a light and a dark look, each at
+`4x5`, `1x1` and `9x16`. They are installed by the CLI, not by a migration and
+not on boot:
+
+```sh
+bioconnect poster-seed            # creates what is missing, keeps what exists
+bioconnect poster-seed --replace  # rolls out changed artwork
+```
+
+Each look is its own `family` (`speaker-reveal-light`, `speaker-reveal-dark`)
+because of the `UNIQUE (family, size) WHERE active` index; the studio lists them
+as separate families. Without `--replace` the seeder leaves any existing
+template alone, so a deploy never reverts a layout staff changed in the builder.
+Seeded assets carry a `seed:<label>:<sha256 prefix>` label, which is how
+unchanged artwork is reused rather than uploaded again.

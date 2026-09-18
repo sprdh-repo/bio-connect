@@ -10,92 +10,79 @@ than a one-off upload nobody can regenerate.
 
 | File | |
 |---|---|
-| `motif-sheet.png` | the parts catalogue: nine motifs on a 3x3 grid, transparent, exact brand palette |
-| `compose.py` | builds the two template layers from `motif-sheet.png` |
-| `backdrop-4x5.png` | 1080x1350 opaque, drawn **below** the portrait |
-| `overlay-4x5.png` | 1080x1350 RGBA, drawn **above** the portrait |
-| `speaker-reveal-4x5.json` | the template spec, with the two asset ids left as placeholders |
+| `motif-sheet.png`, `motif-sheet-2.png` | the parts catalogues: nine motifs each on a 3x3 grid, transparent, exact brand palette |
+| `extract.py`, `extract2.py` | clean a freshly generated sheet into the committed one |
+| `compose.py` | builds every template's artwork **and** its spec |
+| `../internal/app/artwork/` | the 48 generated PNGs and 24 specs, embedded in the binary |
 
-`motif-sheet.png` was produced with OpenAI image generation, the same route as
-`assets/hero-biotech.webp` on the marketing site. Its nine cells, in reading
-order, are: an arching palm frond, a fuller frond angled the other way, a
-botanical sprig with gold berries, a DNA helix fragment, a molecular
-node-and-connector cluster, a hexagonal molecular lattice, a petri dish, flask
-and pipette glassware, and a microscopy cell field. `compose.py` cuts each one
-from its cell and trims it to its own alpha bounds, so adding a motif to the
-sheet makes it available by name.
+Eighteen motifs, in sheet order:
 
-Only four of the nine are used by the 4:5 speaker reveal. The sprig, glassware,
-microscopy field and one molecule are spare, deliberately - they are there for
-the session-announce, countdown and sponsor families.
+1. arching palm frond, fuller frond, botanical sprig with gold berries
+2. DNA helix fragment, molecular cluster, hexagonal lattice
+3. petri dish, flask and pipette, microscopy cell field
+4. coconut palm tree, backwater waves, rising sun
+5. hourglass, clock, microscope
+6. award rosette, laurel arc, network flow
 
-The division of labour is the point: **generate the illustration, compose the
-geometry.** Exact pixel placement, a flat photo window and a controlled alpha
-channel are the three things image generation is reliably bad at, so the panels,
-bands, event bar and photo window are drawn in `compose.py`. Asking a generator
-for the whole poster produces garbled text and a photo window you cannot use.
+`compose.py` cuts each from its cell by name and trims it to its own alpha
+bounds, so adding a motif to a sheet makes it available everywhere.
 
-Two gotchas if you regenerate the sheet:
+## What it builds
 
-- Motifs must not touch each other or a cell edge, or they cannot be cut apart.
-- The sheet arrives with a haze of near-zero alpha and slightly off-palette
-  greens. Both are cleaned before it lands here: alpha below 20 is zeroed, and
-  fully-opaque pixels are snapped to the nearest brand colour **in int32** -
-  a channel difference of 242 squares to 58564, which wraps negative in int16
-  and silently maps every dark green to cream.
+Four post types, each in a light and a dark look, each at three sizes - 24
+templates, 48 PNGs, about 4.4 MB embedded:
 
-Regenerate the layers from `motif-sheet.png` rather than editing the PNGs by hand:
+```
+speaker-reveal-{light,dark}     portrait, name, designation
+session-announce-{light,dark}   two circular portraits, session title, time
+countdown-{light,dark}          a numeral, no photograph
+sponsor-welcome-{light,dark}    a partner logo on a light card
+                                x  {4x5, 1x1, 9x16}
+```
+
+Two looks are two *families* rather than one family with a variant column,
+because the schema has `UNIQUE (family, size) WHERE active`. The studio lists
+them as separate pickable families, which is also how staff think about them.
+
+## Regenerating
 
 ```sh
 cd registration/artwork && python3 compose.py
 ```
 
-It needs Pillow, is deterministic (the paper grain is seeded), and asserts the
-three things that quietly ruin a poster: the overlay must not cover the face
-area, the backdrop's photo window must stay one flat colour, and both layers
-must be exactly 1080x1350. The face assertion has already caught a frond that
-grew two pixels into the guard.
+Pillow only, deterministic (the grain is seeded). It asserts the failures that
+quietly ruin a poster rather than leaving them to the eye:
 
-## Why two layers
+- both layers are exactly the canvas size,
+- every photo slot sits on **one** flat colour **under its clip shape** - a
+  circular slot is meant to leave its bounding box's corners showing,
+- no overlay decoration covers the middle of a photo slot,
+- no content layer falls outside the canvas,
+- the event furniture all has defaults.
 
-Array order in a template spec is draw order. The decoration has to cross in
-front of the portrait, and the gold caption band has to straddle the photo's
-bottom edge, so both live on the layer above it:
+Those checks have already caught a frond two pixels into a face guard, a corner
+motif reaching into the photo window at 1x1, and a flow diagram that covered a
+face once the square crop shrank the circles.
 
-```
-backdrop-4x5.png  ->  portrait  ->  overlay-4x5.png  ->  text + QR
-```
+## The division of labour
 
-`backdrop-4x5.png` keeps the photo window (x=115..965, y=195..1005) a single flat
-colour, because a photograph covers it.
-`overlay-4x5.png` is ~84% transparent and keeps the face area completely clear.
+**Generate the illustration, compose the geometry.** Exact pixel placement, a
+flat photo window and a controlled alpha channel are the three things image
+generation is reliably bad at, so panels, bands, the event bar and the photo
+windows are drawn in `compose.py`. Asking a generator for a whole poster
+produces garbled text and a photo window you cannot use.
 
-## Installing it as a template
+Three traps, all of which cost real time here:
 
-The artwork is template *content*, so it lives in the database and object storage
-rather than in the binary. On a fresh environment, upload both layers and create
-the template with their returned ids:
+- Motifs must not touch each other or a cell edge, or they cannot be cut apart.
+- A sheet arrives with a haze of near-zero alpha and slightly off-palette
+  greens. Alpha below 20 is zeroed and opaque pixels are snapped to the nearest
+  brand colour **in int32** - a channel difference of 242 squares to 58564,
+  which wraps negative in int16 and silently maps every dark green to cream.
+- Text placed against a slot's box lands on the mounting panels, which bleed
+  well past it. `panels()` returns its real bottom for that reason.
 
-```sh
-# signed in as staff; $CSRF is the bc_csrf cookie value
-for f in backdrop overlay; do
-  curl -s -b jar.txt -X POST \
-    "$BASE/api/v1/admin/posters/assets?kind=art&label=speaker-reveal-$f-4x5" \
-    -H "X-CSRF-Token: $CSRF" -H 'Content-Type: application/octet-stream' \
-    --data-binary @$f-4x5.png
-done
-# substitute the two returned ids into speaker-reveal-4x5.json, then:
-curl -s -b jar.txt -X POST "$BASE/api/v1/admin/posters/templates" \
-  -H 'Content-Type: application/json' -H "X-CSRF-Token: $CSRF" \
-  -d @speaker-reveal-4x5.json
-```
+## Installing
 
-Staff can do the same thing through the template builder without any of this;
-the JSON is here so the exact shipped layout can be restored.
-
-## Only 4:5 so far
-
-`1x1` (1080x1080) and `9x16` (1080x1920) are not built. Adapting `compose.py` is
-the intended route: the palette, the motifs and the layer split all carry over,
-only the geometry constants change. The other three template families - session
-announce, countdown, sponsor welcome - have no artwork at all yet.
+The binary carries the artwork; `bioconnect poster-seed` installs it. See the
+"Social posters" section of [`../README.md`](../README.md).
