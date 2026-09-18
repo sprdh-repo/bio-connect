@@ -10,26 +10,51 @@ than a one-off upload nobody can regenerate.
 
 | File | |
 |---|---|
-| `motifs-src.png` | the generated illustration this is cut from: flat palm fronds and molecular node-and-connector clusters, brand palette, transparent |
-| `compose.py` | builds the two template layers from `motifs-src.png` |
+| `motif-sheet.png` | the parts catalogue: nine motifs on a 3x3 grid, transparent, exact brand palette |
+| `compose.py` | builds the two template layers from `motif-sheet.png` |
 | `backdrop-4x5.png` | 1080x1350 opaque, drawn **below** the portrait |
 | `overlay-4x5.png` | 1080x1350 RGBA, drawn **above** the portrait |
 | `speaker-reveal-4x5.json` | the template spec, with the two asset ids left as placeholders |
 
-`motifs-src.png` was produced with OpenAI image generation, the same route as
-`assets/hero-biotech.webp` on the marketing site.
-The geometry is composed in `compose.py` instead of being generated, because
-exact pixel placement, a flat photo window and a real alpha channel are the three
-things image generation does badly.
-Regenerate the layers from `motifs-src.png` rather than editing the PNGs by hand:
+`motif-sheet.png` was produced with OpenAI image generation, the same route as
+`assets/hero-biotech.webp` on the marketing site. Its nine cells, in reading
+order, are: an arching palm frond, a fuller frond angled the other way, a
+botanical sprig with gold berries, a DNA helix fragment, a molecular
+node-and-connector cluster, a hexagonal molecular lattice, a petri dish, flask
+and pipette glassware, and a microscopy cell field. `compose.py` cuts each one
+from its cell and trims it to its own alpha bounds, so adding a motif to the
+sheet makes it available by name.
+
+Only four of the nine are used by the 4:5 speaker reveal. The sprig, glassware,
+microscopy field and one molecule are spare, deliberately - they are there for
+the session-announce, countdown and sponsor families.
+
+The division of labour is the point: **generate the illustration, compose the
+geometry.** Exact pixel placement, a flat photo window and a controlled alpha
+channel are the three things image generation is reliably bad at, so the panels,
+bands, event bar and photo window are drawn in `compose.py`. Asking a generator
+for the whole poster produces garbled text and a photo window you cannot use.
+
+Two gotchas if you regenerate the sheet:
+
+- Motifs must not touch each other or a cell edge, or they cannot be cut apart.
+- The sheet arrives with a haze of near-zero alpha and slightly off-palette
+  greens. Both are cleaned before it lands here: alpha below 20 is zeroed, and
+  fully-opaque pixels are snapped to the nearest brand colour **in int32** -
+  a channel difference of 242 squares to 58564, which wraps negative in int16
+  and silently maps every dark green to cream.
+
+Regenerate the layers from `motif-sheet.png` rather than editing the PNGs by hand:
 
 ```sh
 cd registration/artwork && python3 compose.py
 ```
 
-It needs Pillow, is deterministic (the paper grain is seeded), and prints the
-dimensions plus a check that the portrait's face area is fully transparent on the
-overlay.
+It needs Pillow, is deterministic (the paper grain is seeded), and asserts the
+three things that quietly ruin a poster: the overlay must not cover the face
+area, the backdrop's photo window must stay one flat colour, and both layers
+must be exactly 1080x1350. The face assertion has already caught a frond that
+grew two pixels into the guard.
 
 ## Why two layers
 
