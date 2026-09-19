@@ -21,6 +21,57 @@ Omit `--name-column` for an unpersonalised greeting.
 Legacy `.xls` files must first be saved as `.xlsx`.
 Use contacts who have agreed to receive event invitations.
 
+### First two supplied workbooks
+
+The supplied Aggappe and Bangalore workbooks are irregular: they contain repeated header blocks, duplicate addresses, multiple addresses in single cells, and one address with a missing `@`.
+Use the wrapper below instead of manually cleaning them:
+
+```sh
+./cmd/marketing/run-first-two-batches.sh
+```
+
+This scans every sheet, extracts every address, normalises and deduplicates it across both files, rejects malformed addresses, flags common public-provider spelling mistakes, and filters domains that have neither MX nor RFC 5321 A/AAAA fallback records.
+It writes `var/marketing/first-two-batches/validation.csv`, `validated-contacts.csv`, and the invitation preview without sending anything.
+The validation report preserves the source workbook, sheet, and cell for every accepted or excluded value.
+Addresses are not auto-corrected, and all recipients receive the safe generic greeting because the source sheets do not reliably map multiple names to multiple addresses.
+
+Review `validation.csv` and `preview.html`, then send the same validated set with:
+
+```sh
+./cmd/marketing/run-first-two-batches.sh --send
+```
+
+The wrapper loads `ops/secrets/bioconnect-infra.env` when it exists.
+The stable campaign ID and shared state directory prevent an address duplicated across the two source files from being sent twice and make an interrupted run resumable.
+The timestamped post-send CSV is written to the same state directory.
+DNS and spelling checks cannot prove that an individual mailbox exists; final delivery and bounce status must still be checked in Postmark Activity by message ID.
+
+For the supplied Global Ayurveda Summit workbook, use the same two-step flow:
+
+```sh
+./cmd/marketing/run-global-ayurveda-summit.sh
+./cmd/marketing/run-global-ayurveda-summit.sh --send
+```
+
+This wrapper reuses the campaign and durable send log from the first two batches, so an address already accepted in those batches is skipped rather than invited twice.
+It also applies the confirmed `gmai.com` to `gmail.com` correction and records that correction in the validation report.
+
+The 12th Industry Meet workbook contains multiple overlapping sheets.
+The following wrapper scans every sheet, merges and deduplicates the addresses, applies the confirmed obvious source corrections, and reuses the prior send log:
+
+```sh
+./cmd/marketing/run-industry-meet.sh
+./cmd/marketing/run-industry-meet.sh --send
+```
+
+The Kerala life-science startups workbook has two sheets.
+This wrapper merges them and records two verified corrections: the Jibs address is confirmed by its duplicate row in the workbook, and the Heka replacement is the contact address published at `https://hekamedicals.com/`.
+
+```sh
+./cmd/marketing/run-lifescience-startups.sh
+./cmd/marketing/run-lifescience-startups.sh --send
+```
+
 ### Domain validation
 
 Whenever `--contacts` is used, every unique recipient domain is checked concurrently for an MX record (falling back to an A/AAAA record, per RFC 5321) before anything is sent.
