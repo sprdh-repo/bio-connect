@@ -9,7 +9,7 @@ as a font.
 
 Three things have to come out, because they are per-poster content rather than
 template furniture: the speaker's cut-out portrait, the name/designation text in
-the card, and the QR (the studio generates its own so the URL is editable).
+the card. The QR stays: it is the real registration code, already correct.
 
 The split into two layers matters: the badge, the name card and the QR card are
 all drawn *over* the portrait, so they cannot live in the backdrop.
@@ -39,8 +39,7 @@ LIME = (185, 220, 114)
 # Measured from the artwork itself; see README for how.
 PHOTO = (240, 248, 831, 986)      # the portrait's own placement in the PDF
 CARD = (734, 467, 986, 686)       # name / designation / topic card
-QR_CARD = (149, 618, 324, 860)    # white card with the SCAN & REGISTER tab
-QR = (157, 670, 310, 823)         # the code itself, measured off the artwork
+QR_CARD = (149, 618, 324, 860)    # white card with the SCAN & REGISTER tab (kept as drawn)
 LOOKS = {
     # page, page background, colour of the name card's fill
     "light": (1, (250, 244, 232), (23, 72, 60)),
@@ -123,20 +122,20 @@ def arch_mask(rgb):
 
 
 def clear_regions(img, card_fill, clear_card):
-    """Remove the per-speaker text and the sample QR.
+    """Remove the per-speaker name and designation, and nothing else.
+
+    The QR in the artwork is the real registration code, so it stays: erasing it
+    to draw our own left an empty white card, and the studio's QR is only worth
+    generating when the URL needs to vary, which here it does not.
 
     The card keeps its shape and shadow; only its inside is repainted, inset far
     enough to leave the rounded corners and the drop shadow untouched. A source
-    the designer already supplied empty needs only the QR clearing.
+    the designer already supplied empty needs no clearing at all.
     """
-    d = ImageDraw.Draw(img)
     if clear_card:
+        d = ImageDraw.Draw(img)
         x0, y0, x1, y1 = CARD
         d.rectangle([x0 + 9, y0 + 9, x1 - 10, y1 - 10], fill=card_fill + (255,))
-    # The QR sits inside a white card below a "SCAN & REGISTER" tab. Clear only
-    # the code; the card and the tab are furniture the studio draws its QR onto.
-    qx0, qy0, qx1, qy1 = QR_CARD
-    d.rectangle([qx0 + 11, qy0 + 52, qx1 - 12, qy1 - 12], fill=(255, 255, 255, 255))
     return img
 
 
@@ -211,7 +210,6 @@ def write_spec(family, look, bg, card_fill):
     # card_fill here prints dark text on a dark card and it vanishes.
     ink = hexof(bg)
     cx0, cy0, cx1, cy1 = CARD
-    qx0, qy0, qx1, qy1 = QR
 
     text = lambda key, label, box, **kw: dict(
         id=key, type="text", key=key, label=label,
@@ -224,8 +222,7 @@ def write_spec(family, look, bg, card_fill):
 
     spec = dict(
         background=hexof(bg),
-        defaults={"qr_url": "https://reg.bioconnect.kerala.gov.in/delegates",
-                  "topic": "TOPIC:"},
+        defaults={"topic": "TOPIC:"},
         layers=[
             dict(id="backdrop", type="art", asset_id="__BACKDROP__",
                  label="Background & arch", x=0, y=0, w=1080, h=1080),
@@ -246,8 +243,6 @@ def write_spec(family, look, bg, card_fill):
             text("topic", "Topic line",
                  (cx0 + 12, cy0 + 190, cx1 - 12, cy1 - 14),
                  size=11, upper=True, tracking=0.04, lh=1.3),
-            dict(id="qr", type="qr", key="qr_url", label="Registration QR",
-                 x=qx0, y=qy0, w=qx1 - qx0, h=qy1 - qy0),
         ])
     with open(os.path.join(OUT, "specs", f"{family}-1x1.json"), "w") as f:
         json.dump(dict(family=family, name=f"Speaker reveal official - {look}",

@@ -99,8 +99,12 @@ func TestEmbeddedPosterArtworkIsConsistent(t *testing.T) {
 				t.Errorf("%s: layer %q has no default", name, key)
 			}
 		}
-		if got := spec.Defaults["qr_url"]; !strings.HasPrefix(got, "https://") {
-			t.Errorf("%s: qr_url default %q is not https", name, got)
+		// A template may carry its QR in the artwork instead of generating one;
+		// the designer's official poster does, because the code never varies.
+		if keyed["qr_url"] {
+			if got := spec.Defaults["qr_url"]; !strings.HasPrefix(got, "https://") {
+				t.Errorf("%s: qr_url default %q is not https", name, got)
+			}
 		}
 		if !keyed["photo"] && !keyed["photo_a"] && !keyed["logo"] && !keyed["count"] {
 			t.Errorf("%s: nothing for staff to fill; no photo, logo or headline field", name)

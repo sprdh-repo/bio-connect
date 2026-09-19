@@ -135,6 +135,14 @@ overlay = everything else. Each of these cost a wrong render:
   backdrop and the portrait shows through the lettering. Closing and hole-filling
   keeps each card, bar and logo solid.
 
+### The QR is the designer's, not ours
+
+The code in the artwork is the real registration QR, so it is left exactly as
+drawn and the template has no `qr` layer. Erasing it to draw our own left an
+empty white card on the poster. It resolves to `https://bioconnect.kerala.gov.in/`
+- the main site rather than the registration page - so if that needs to change,
+it changes in the source PDF, not here.
+
 ### What this template expects
 
 The portrait slot is a **cut-out**: upload a PNG with the background removed, as
