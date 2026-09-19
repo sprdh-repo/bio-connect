@@ -84,15 +84,26 @@ func TestEmbeddedPosterArtworkIsConsistent(t *testing.T) {
 			continue
 		}
 
-		// The event furniture is what makes a template usable without retyping
-		// the venue on every poster.
-		for _, key := range []string{"tagline", "dates", "month", "venue", "website", "qr_url"} {
-			if spec.Defaults[key] == "" {
-				t.Errorf("%s: no default for %q", name, key)
+		// Any event-furniture field a template exposes as a layer must carry a
+		// default, so nobody retypes the venue on every poster. A template may
+		// legitimately expose none of them: the designer's official poster
+		// draws the dates, venue and website into the artwork itself.
+		keyed := map[string]bool{}
+		for _, l := range spec.Layers {
+			if l.Key != "" {
+				keyed[l.Key] = true
+			}
+		}
+		for _, key := range []string{"tagline", "dates", "month", "venue", "website"} {
+			if keyed[key] && spec.Defaults[key] == "" {
+				t.Errorf("%s: layer %q has no default", name, key)
 			}
 		}
 		if got := spec.Defaults["qr_url"]; !strings.HasPrefix(got, "https://") {
 			t.Errorf("%s: qr_url default %q is not https", name, got)
+		}
+		if !keyed["photo"] && !keyed["photo_a"] && !keyed["logo"] && !keyed["count"] {
+			t.Errorf("%s: nothing for staff to fill; no photo, logo or headline field", name)
 		}
 		// A QR layer's payload must reach the encoder, which rejects anything
 		// that is not an https URL.

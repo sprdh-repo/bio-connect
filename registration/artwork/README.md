@@ -86,3 +86,65 @@ Three traps, all of which cost real time here:
 
 The binary carries the artwork; `bioconnect poster-seed` installs it. See the
 "Social posters" section of [`../README.md`](../README.md).
+
+## The designer's poster (`official.py`)
+
+`speaker-official-light` and `-dark` are not generated art - they are the
+designer's own Illustrator poster, lifted so the lettering, the logos and the
+geometry stay exactly as drawn. The type is Konsens, embedded as outlines and
+not a font we hold, so redrawing it was never an option.
+
+| Source | |
+|---|---|
+| `speaker-poster-blank.pdf` | the designer's empty template. **Preferred.** 1 page, the dark look. |
+| `speaker-poster-filled.pdf` | an earlier filled sample, 2 pages. The light look is derived from its page 1. |
+
+```sh
+python3 official.py \
+  'dark=speaker-poster-blank.pdf#1#blank' \
+  'light=speaker-poster-filled.pdf#1'
+```
+
+`#blank` says the source is already empty, so only the sample QR is cleared.
+Without it the portrait is removed and the name card is repainted too.
+
+Removing the portrait is done in the PDF, not the pixels: `qpdf --qdf` leaves the
+content streams uncompressed, so its draw operator is overwritten with spaces of
+the same length, which keeps every byte offset and `/Length` valid. It is matched
+by its placement matrix rather than its name - it is `/Im0` on both pages, but so
+are the logos inside their own nested form XObjects, and blanking those strips
+the logos.
+
+### Why two layers, and three traps in splitting them
+
+The badge, the name card and the QR card are all drawn **over** the portrait, so
+they cannot sit in the backdrop. The split is backdrop = background + lime arch,
+overlay = everything else. Each of these cost a wrong render:
+
+- **The arch mask.** A flood fill from the border leaks through any notch a card
+  opens at the arch's edge and eats card-shaped bites out of it. A plain colour
+  test also catches lime in the logo and the bottom bar, stretching a span fill
+  far past the arch. It takes the largest connected lime region, span-filled
+  inside its own bounding box.
+- **The arch's anti-aliased rim.** Those pixels are background-to-lime blends;
+  left in the overlay they draw over the portrait as a pale halo. They belong to
+  the backdrop - but only on the rim, because pure lime matches the same test and
+  a wider neighbourhood punches the bottom bar's lime panel out of the overlay.
+- **Elements are regions, not pixels.** The dark look's bar text is the page's
+  own background colour, so a per-pixel difference test scores those glyphs as
+  backdrop and the portrait shows through the lettering. Closing and hole-filling
+  keeps each card, bar and logo solid.
+
+### What this template expects
+
+The portrait slot is a **cut-out**: upload a PNG with the background removed, as
+the designer's own sample is. A rectangular photo fills the slot and covers the
+arch. Duotone is off - the design uses a plain greyscale portrait.
+
+The name, designation, organisation and topic render in Manrope, not Konsens.
+That is the one visible departure from the original and the reason the name card
+is the only region that does not match it closely.
+
+Only 1:1 so far, and only the dark look comes from the designer's blank; the
+light look is derived from the older filled sample and so is missing the bio360
+logo that the blank carries. Ask for the light blank and rerun to fix that.

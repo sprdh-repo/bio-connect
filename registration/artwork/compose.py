@@ -516,8 +516,14 @@ if __name__ == "__main__":
     if absent:
         raise SystemExit(f"missing motif sheet(s): {', '.join(absent)}")
 
-    shutil.rmtree(OUT, ignore_errors=True)
-    os.makedirs(os.path.join(OUT, "specs"))
+    # Remove only what this script generates. official.py writes its own
+    # families into the same directory, and a blanket rmtree would delete them.
+    os.makedirs(os.path.join(OUT, "specs"), exist_ok=True)
+    mine = {f"{base}-{look}" for base in FAMILIES for look in LOOKS}
+    for d, suffix in ((OUT, ".png"), (os.path.join(OUT, "specs"), ".json")):
+        for f in os.listdir(d):
+            if f.endswith(suffix) and any(f.startswith(m + "-") for m in mine):
+                os.remove(os.path.join(d, f))
 
     total = 0
     for base in FAMILIES:
