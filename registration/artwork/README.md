@@ -94,19 +94,27 @@ designer's own Illustrator poster, lifted so the lettering, the logos and the
 geometry stay exactly as drawn. The type is Konsens, embedded as outlines and
 not a font we hold, so redrawing it was never an option.
 
-| Source | |
-|---|---|
-| `speaker-poster-blank.pdf` | the designer's empty template. **Preferred.** 1 page, the dark look. |
-| `speaker-poster-filled.pdf` | an earlier filled sample, 2 pages. The light look is derived from its page 1. |
+**Dark only.** `speaker-poster-blank.pdf` is the designer's empty template and
+has one page, the dark look. A light look was derived from the older filled
+sample for a while and shipped visibly worse - it carried the previous logo
+lockup, so no bio360 mark, and a ghost of the arch's drop shadow. It was removed
+rather than left in the studio looking unfinished.
+
+To add it back, ask the designer for the light page as a blank too:
 
 ```sh
 python3 official.py \
   'dark=speaker-poster-blank.pdf#1#blank' \
-  'light=speaker-poster-filled.pdf#1'
+  'light=<the light blank>#1#blank'
 ```
 
-`#blank` says the source is already empty, so only the sample QR is cleared.
-Without it the portrait is removed and the name card is repainted too.
+`#blank` says the source is already empty, so nothing is cleared. Without it the
+portrait is removed and the name card is repainted, which is what the filled
+sample needed.
+
+Recolouring the dark one into a light one is not a shortcut worth taking: the
+SCAN & REGISTER tab and the logos' white backing plates do not invert with the
+rest of the palette, so it guesses at the design instead of matching it.
 
 Removing the portrait is done in the PDF, not the pixels: `qpdf --qdf` leaves the
 content streams uncompressed, so its draw operator is overwritten with spaces of
@@ -153,6 +161,4 @@ The name, designation, organisation and topic render in Manrope, not Konsens.
 That is the one visible departure from the original and the reason the name card
 is the only region that does not match it closely.
 
-Only 1:1 so far, and only the dark look comes from the designer's blank; the
-light look is derived from the older filled sample and so is missing the bio360
-logo that the blank carries. Ask for the light blank and rerun to fix that.
+Only 1:1, and only the dark look. See above for adding the light one back.
