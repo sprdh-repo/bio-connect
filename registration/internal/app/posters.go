@@ -26,6 +26,14 @@ const (
 	posterUploadMax = 8 << 20 // artwork at 1080x1920 can exceed the 5 MB registration cap
 	posterLayerMax  = 40
 	qrPayloadMax    = 512
+
+	// A design tool exports a poster at print resolution: a 4500x4500 artboard
+	// is 20.25 MP and was rejected by the registration path's 20 MP ceiling,
+	// which exists to stop decompression bombs rather than to police artwork.
+	// The host has ~1.3 GB free and validation decodes the whole image once, so
+	// the ceiling is what fits in memory, not what the canvas needs.
+	posterPixelMax = 32_000_000
+	posterSideMax  = 8000
 )
 
 // builtinLogos are the brand marks shipped in the binary under web/logos, so a
@@ -344,11 +352,23 @@ func validatePosterImage(b []byte) (string, int, int, error) {
 		return "", 0, 0, errors.New("upload a PNG or JPEG image")
 	}
 	cfg, _, e := image.DecodeConfig(bytes.NewReader(b))
-	if e != nil || cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > 6000 || cfg.Height > 6000 || int64(cfg.Width)*int64(cfg.Height) > 20000000 {
-		return "", 0, 0, errors.New("invalid or oversized image")
+	if e != nil {
+		return "", 0, 0, errors.New("this file is not a readable PNG or JPEG")
+	}
+	// Say which limit was hit. "invalid or oversized image" sent someone
+	// looking at AWS for an image that was 1.25% over the pixel ceiling.
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return "", 0, 0, errors.New("this image reports no width or height")
+	}
+	if cfg.Width > posterSideMax || cfg.Height > posterSideMax {
+		return "", 0, 0, fmt.Errorf("image is %dx%d; each side must be %d pixels or fewer", cfg.Width, cfg.Height, posterSideMax)
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > posterPixelMax {
+		return "", 0, 0, fmt.Errorf("image is %dx%d (%.1f megapixels); the limit is %d. Export it at a smaller size - posters render at 1080x1920 at most",
+			cfg.Width, cfg.Height, float64(cfg.Width)*float64(cfg.Height)/1e6, posterPixelMax/1_000_000)
 	}
 	if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
-		return "", 0, 0, errors.New("invalid image")
+		return "", 0, 0, errors.New("this image is truncated or corrupt")
 	}
 	return mime, cfg.Width, cfg.Height, nil
 }

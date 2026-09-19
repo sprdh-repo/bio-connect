@@ -96,6 +96,32 @@ func TestPosterImageValidation(t *testing.T) {
 	if mime != "image/png" || w != 64 || h != 48 {
 		t.Fatalf("got %s %dx%d, want image/png 64x48", mime, w, h)
 	}
+
+	// A long, thin image is barely any pixels but breaks the per-side limit,
+	// and the message has to name the side rather than say "oversized".
+	_, _, _, err = validatePosterImage(samplePNG(t, posterSideMax+1, 2))
+	if err == nil {
+		t.Fatalf("accepted an image %d pixels wide", posterSideMax+1)
+	}
+	if !strings.Contains(err.Error(), "each side") {
+		t.Errorf("side-limit error does not say which limit was hit: %v", err)
+	}
+}
+
+// A 4500x4500 artboard is what a designer exports and is 20.25 MP, which the
+// registration path's 20 MP ceiling rejected with "invalid or oversized image".
+// That read as a storage fault and cost a round of debugging in production.
+func TestPosterImageAcceptsAPrintResolutionArtboard(t *testing.T) {
+	if testing.Short() {
+		t.Skip("decodes 20 megapixels")
+	}
+	_, w, h, err := validatePosterImage(samplePNG(t, 4500, 4500))
+	if err != nil {
+		t.Fatalf("rejected a 4500x4500 artboard: %v", err)
+	}
+	if w != 4500 || h != 4500 {
+		t.Fatalf("got %dx%d, want 4500x4500", w, h)
+	}
 }
 
 // --- QR --------------------------------------------------------------------

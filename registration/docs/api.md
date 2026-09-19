@@ -148,7 +148,7 @@ an image, which is why there is no image encoder in `go.mod`.
 | `POST /admin/posters/templates/duplicate` | `{family, name}` copies every active size of `family` into a new one whose slug comes from `name`. The copy is `origin='staff'` and points at the same artwork rows - nothing mutates an asset, so sharing them avoids duplicating megabytes. 409 if the name is taken, 404 if the source has no active sizes. |
 | `POST /admin/posters/templates/retire` | `{family, size?}` sets `active=false` for that family, or for one size of it. The rows stay: posters made from the template keep their values, and the audit trail keeps its history. |
 | `GET /admin/posters/assets?kind=art\|photo\|logo` | uploaded artwork, newest first, 200 max |
-| `POST /admin/posters/assets?kind=&label=` | raw-body PNG/JPEG upload, 8 MB, ≤6000x6000 and ≤20 MP. Returns `{id, width, height, mime}`. The larger cap applies here only; registration uploads stay at 5 MB. |
+| `POST /admin/posters/assets?kind=&label=` | raw-body PNG/JPEG upload, 8 MB, ≤8000x8000 and ≤32 MP (a 4500x4500 print export is 20.25 MP, so the registration path's 20 MP ceiling was too low). Each limit reports itself by name. Returns `{id, width, height, mime}`. The larger cap applies here only; registration uploads stay at 5 MB. |
 | `GET /admin/posters/assets/{id}` | **the image bytes inline, never a redirect.** The editor draws these into a canvas and reads it back with `toDataURL`; a redirect to a presigned S3 URL would taint that canvas and break every export. |
 | `GET /admin/posters/qr?data=` | `image/png` QR, same encoder and error-correction level as the passes. `data` must be an `https://` URL of at most 512 characters. |
 | `GET /admin/posters` | saved posters, newest first, 100 max |
