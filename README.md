@@ -22,6 +22,11 @@ Then open <http://localhost:4173>.
   G.O.(Rt) No. 879/2026/ID.
   It is titled *Leadership* everywhere in the UI; the filename is deliberately unchanged,
   because `/committee.html` is the URL already in the sitemap and in the index.
+- `exhibitors.html` - searchable confirmed exhibitor profiles loaded from the registration backend at `/api/v1/public/exhibitors`.
+  Only approved exhibitors are included; company names, descriptions and logos update without editing the site.
+  Loading, empty, error/retry, search and logo fallback states are handled in `script.js`.
+- `sponsors.html` - sponsor profiles, currently Kerala Rubber Limited.
+  The supplied logo is preserved in `assets/kerala-rubber-logo.png`; profile information comes from [Kerala Rubber's official website](https://krl.kerala.gov.in/about.php).
 - `404.html` - served by CloudFront for any unknown path.
   The domain previously hosted Bio Connect 3.0, so search engines still request old
   URLs like `/about/` and `/agenda/`; without this they get an S3 `AccessDenied` 403,
@@ -143,6 +148,12 @@ position, then applies the shared forest-green duotone: a three-stop gradient
 contrast stretch. Requires `opencv-python`, `numpy` and `Pillow`.
 
 ## Deploy
+
+Deploy the registration backend before publishing the exhibitor directory for the first time; it provides the anonymous directory and logo endpoints.
+The marketing site fetches these from `https://reg.bioconnect.kerala.gov.in` without credentials.
+The directory response permits anonymous cross-origin reads and exposes no contact, attendee or payment fields.
+Both directory and logo responses retain `Cache-Control: no-store` so approval changes take effect on the next request.
+The legacy redirect function is still deployed separately, as described above.
 
 Deploy the current working tree to the production S3 bucket and invalidate CloudFront:
 

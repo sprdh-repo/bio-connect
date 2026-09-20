@@ -115,6 +115,8 @@ func (a *App) Handler() http.Handler {
 		}
 		respond(w, 201, out)
 	})
+	m.HandleFunc("GET /api/v1/public/exhibitors", a.publicExhibitors)
+	m.HandleFunc("GET /api/v1/public/exhibitors/logos/{file}", a.publicExhibitorLogo)
 	m.HandleFunc("POST /api/v1/recovery", a.recover)
 	m.HandleFunc("POST /api/v1/recovery/exchange", a.exchange)
 	m.HandleFunc("POST /api/v1/auth/login", a.login)

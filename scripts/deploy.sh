@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html speakers.html committee.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
+for file in index.html speakers.html committee.html exhibitors.html sponsors.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -47,6 +47,13 @@ aws s3 cp committee.html "s3://$BUCKET/committee.html" \
   --content-type "text/html; charset=utf-8" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --only-show-errors
+
+for page in exhibitors sponsors; do
+  aws s3 cp "$page.html" "s3://$BUCKET/$page.html" \
+    --content-type "text/html; charset=utf-8" \
+    --cache-control "no-cache, no-store, must-revalidate" \
+    --only-show-errors
+done
 
 aws s3 cp 404.html "s3://$BUCKET/404.html" \
   --content-type "text/html; charset=utf-8" \
@@ -88,7 +95,7 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/speakers.html" "/committee.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
+    --paths "/" "/index.html" "/speakers.html" "/committee.html" "/exhibitors.html" "/sponsors.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
             "/styles.css" "/script.js" "/assets/*" \
     --query 'Invalidation.Id' \
     --output text
@@ -132,5 +139,12 @@ if ! cmp -s committee.html "$REMOTE_COMMITTEE"; then
   echo "Error: production HTML does not match the deployed committee.html." >&2
   exit 1
 fi
+
+for page in exhibitors sponsors; do
+  if ! curl --fail --silent --show-error --location --retry 3 --retry-delay 2 "$SITE_URL/$page.html" | cmp -s "$page.html" -; then
+    echo "Error: production HTML does not match the deployed $page.html." >&2
+    exit 1
+  fi
+done
 
 echo "Deployment complete: $SITE_URL"

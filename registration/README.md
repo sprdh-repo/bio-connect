@@ -29,6 +29,7 @@ A sequential series does publish how many registrations a category has, and a pr
 - A social poster studio in the console, open to both staff roles, with 24 templates shipped in the binary: four post types in a light and a dark look at three sizes each. Staff fill a template per post and download a PNG at every size, or lay out a new one in the builder.
 
 API contract: [`docs/api.md`](docs/api.md).
+Public exhibitor directory: [`docs/public-exhibitors.md`](docs/public-exhibitors.md).
 Deployment, backups, restore, and rollback: [`docs/operations.md`](docs/operations.md).
 
 ## Local development

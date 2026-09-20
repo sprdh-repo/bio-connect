@@ -390,3 +390,122 @@ const revealSponsorshipPayment = () => {
 };
 window.addEventListener("hashchange", revealSponsorshipPayment);
 revealSponsorshipPayment();
+
+/* Anonymous, current exhibitor profiles from the registration backend. */
+const exhibitorDirectory = document.querySelector('[data-exhibitor-directory]');
+if (exhibitorDirectory) {
+  const endpoint = 'https://reg.bioconnect.kerala.gov.in/api/v1/public/exhibitors';
+  const grid = exhibitorDirectory.querySelector('[data-exhibitor-grid]');
+  const state = exhibitorDirectory.querySelector('[data-directory-state]');
+  const toolbar = exhibitorDirectory.querySelector('[data-directory-toolbar]');
+  const count = exhibitorDirectory.querySelector('[data-directory-count]');
+  const query = exhibitorDirectory.querySelector('[data-exhibitor-query]');
+  const retry = exhibitorDirectory.querySelector('[data-directory-retry]');
+  const clear = exhibitorDirectory.querySelector('[data-directory-clear]');
+  let entries = [];
+  let cards = [];
+  const normalise = (value) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+  const filter = () => {
+    const term = normalise(query.value.trim());
+    let visible = 0;
+    cards.forEach(({ node, text }) => {
+      node.hidden = !text.includes(term);
+      if (!node.hidden) visible++;
+    });
+    count.textContent = term ? `${visible} of ${entries.length} exhibitors` : `${entries.length} confirmed exhibitor${entries.length === 1 ? '' : 's'}`;
+    state.hidden = visible > 0;
+    state.textContent = entries.length === 0 ? 'The exhibitor line-up is being confirmed. Check back soon to discover who is joining the expo.' : visible === 0 ? 'No exhibitors match your search. Try another organisation or area of expertise.' : '';
+    clear.hidden = !term;
+  };
+  const render = () => {
+    grid.replaceChildren();
+    cards = entries.map((entry, index) => {
+      const node = document.createElement('li');
+      node.className = 'exhibitor-card';
+      const logo = document.createElement('div');
+      logo.className = 'exhibitor-logo';
+      const fallback = () => {
+        const initials = document.createElement('span');
+        initials.className = 'exhibitor-monogram';
+        initials.setAttribute('aria-hidden', 'true');
+        initials.textContent = entry.name.trim().split(/\s+/).slice(0, 2).map(word => Array.from(word)[0] || '').join('');
+        logo.replaceChildren(initials);
+      };
+      fallback();
+      if (entry.logo_url) {
+        const url = new URL(entry.logo_url, endpoint);
+        // Only the dedicated public image route is valid here.
+        if (url.origin === new URL(endpoint).origin && /^\/api\/v1\/public\/exhibitors\/logos\/[a-zA-Z0-9_-]+$/.test(url.pathname)) {
+          const img = document.createElement('img');
+          img.src = url.href;
+          img.alt = '';
+          img.loading = 'lazy';
+          img.decoding = 'async';
+          img.addEventListener('error', fallback, { once: true });
+          logo.replaceChildren(img);
+        }
+      }
+      const meta = document.createElement('div');
+      meta.className = 'exhibitor-meta';
+      const label = document.createElement('span');
+      label.className = 'detail-label';
+      label.textContent = 'Confirmed exhibitor';
+      const name = document.createElement('h3');
+      name.textContent = entry.name;
+      const description = document.createElement('p');
+      description.id = `exhibitor-description-${index}`;
+      description.className = 'exhibitor-description';
+      description.textContent = entry.description;
+      meta.append(label, name, description);
+      if (entry.description.length > 200) {
+        description.classList.add('is-collapsed');
+        const expand = document.createElement('button');
+        expand.type = 'button';
+        expand.className = 'exhibitor-expand';
+        expand.setAttribute('aria-expanded', 'false');
+        expand.setAttribute('aria-controls', description.id);
+        expand.setAttribute('aria-label', `Read company profile: ${entry.name}`);
+        expand.textContent = 'Read company profile +';
+        expand.addEventListener('click', () => {
+          const open = expand.getAttribute('aria-expanded') !== 'true';
+          expand.setAttribute('aria-expanded', String(open));
+          expand.setAttribute('aria-label', `${open ? 'Close' : 'Read'} company profile: ${entry.name}`);
+          expand.textContent = open ? 'Close company profile −' : 'Read company profile +';
+          description.classList.toggle('is-collapsed', !open);
+        });
+        meta.append(expand);
+      }
+      node.append(logo, meta);
+      grid.append(node);
+      return { node, text: normalise(`${entry.name} ${entry.description}`) };
+    });
+    toolbar.hidden = entries.length === 0;
+    filter();
+  };
+  const load = async () => {
+    retry.hidden = true;
+    state.hidden = false;
+    state.textContent = 'Loading the exhibitor line-up…';
+    grid.setAttribute('aria-busy', 'true');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+    try {
+      const response = await fetch(endpoint, { credentials: 'omit', signal: controller.signal, cache: 'no-store' });
+      if (!response.ok) throw new Error('Directory unavailable');
+      const data = await response.json();
+      if (!Array.isArray(data.exhibitors) || !data.exhibitors.every(entry => entry && typeof entry.name === 'string' && typeof entry.description === 'string' && typeof entry.logo_url === 'string')) throw new Error('Invalid directory');
+      entries = data.exhibitors;
+      render();
+    } catch {
+      state.textContent = 'We couldn’t load the exhibitor line-up. Please try again in a moment.';
+      retry.hidden = false;
+    } finally {
+      clearTimeout(timeout);
+      grid.setAttribute('aria-busy', 'false');
+    }
+  };
+  query.addEventListener('input', filter);
+  clear.addEventListener('click', () => { query.value = ''; filter(); query.focus(); });
+  retry.addEventListener('click', load);
+  load();
+}

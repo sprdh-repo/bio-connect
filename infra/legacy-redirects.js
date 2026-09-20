@@ -20,9 +20,8 @@ var MOVED = {
   "/delegate-registration": "/#registration",
   "/expo-registration": "/#registration",
   "/product-launch": "/#registration",
-  /* The 3.0 exhibitor list and photo gallery: the programme section, which covers the
-     expo, and the past-edition highlights are the closest the 4.0 site has. */
-  "/exhibitors": "/#programme",
+  "/exhibitors": "/exhibitors.html",
+  "/sponsors": "/sponsors.html",
   "/creatives": "/#highlights",
   "/speakers": "/speakers.html",
   /* No venue section on the 4.0 site yet - the event bar in the hero carries the
