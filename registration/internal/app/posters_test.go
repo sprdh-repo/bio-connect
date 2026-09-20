@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -38,6 +39,26 @@ const (
 // form - a rect carrying radius = w/2, which is how the seeded session-announce
 // slots express a circle - has to stay valid. Losing it would turn every
 // circular portrait in production back into a square.
+// Every role the picker offers must validate, and each needs an @font-face or
+// the canvas silently falls back to a system font in the exported PNG.
+func TestPosterTextFonts(t *testing.T) {
+	css, err := os.ReadFile("web/fonts/fonts.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for role, family := range map[string]string{
+		"display": "Manrope", "body": "DM Sans", "serif": "Fraunces", "condensed": "Archivo Narrow",
+	} {
+		spec := fmt.Sprintf(`{"layers":[{"id":"t","type":"text","key":"a","x":0,"y":0,"w":100,"h":40,"font":%q,"weight":400,"size":20,"color":"#0b3329","align":"left","line_height":1.2}]}`, role)
+		if _, err := validateSpec(json.RawMessage(spec), 1080, 1350); err != nil {
+			t.Errorf("rejected font role %q: %v", role, err)
+		}
+		if !bytes.Contains(css, []byte("font-family: '"+family+"'")) {
+			t.Errorf("role %q maps to %q, which has no @font-face in fonts.css", role, family)
+		}
+	}
+}
+
 func TestPosterPhotoShapes(t *testing.T) {
 	for _, shape := range []string{"", "rect", "rounded", "circle", "arch"} {
 		spec := fmt.Sprintf(`{"layers":[{"id":"p","type":"photo","key":"photo","x":0,"y":0,"w":210,"h":210,"fit":"cover","shape":%q}]}`, shape)
@@ -89,6 +110,7 @@ func TestPosterSpecValidation(t *testing.T) {
 		{"non-square QR", `{"layers":[{"id":"x","type":"qr","key":"q","x":0,"y":0,"w":100,"h":140}]}`},
 		{"photo without a key", `{"layers":[{"id":"x","type":"photo","x":0,"y":0,"w":10,"h":10,"fit":"cover"}]}`},
 		{"unknown fit", `{"layers":[{"id":"x","type":"photo","key":"p","x":0,"y":0,"w":10,"h":10,"fit":"stretch"}]}`},
+		{"unknown font", `{"layers":[{"id":"x","type":"text","key":"a","x":0,"y":0,"w":10,"h":10,"font":"comic","weight":400,"size":20,"color":"#000000","align":"left","line_height":1.2}]}`},
 		{"unknown shape", `{"layers":[{"id":"x","type":"photo","key":"p","x":0,"y":0,"w":10,"h":10,"fit":"cover","shape":"star"}]}`},
 	} {
 		if _, err := validateSpec(json.RawMessage(c.spec), 1080, 1350); err == nil {

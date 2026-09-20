@@ -164,12 +164,17 @@ background or overlay concept. At most 40 layers.
 |---|---|
 | `art` | exactly one of `asset_id` (uploaded) or `builtin` (an embedded brand logo: `bio-connect`, `bio-connect-mark`, `bio360`, `ksidc`, `klip`, `invest-kerala`). The Government of Kerala emblem is not embedded: the site's copy is CC BY-SA 4.0 and a poster cannot carry the attribution. Upload the official emblem as artwork instead. |
 | `photo` | `key`, `fit` (`cover`/`contain`), `shape` (`rect`/`rounded`/`circle`/`arch`), `radius` (rounded only), `duotone`. `contain` is also the partner-logo slot, so there is no separate type. An absent `shape` with `radius` set is the pre-shape form the seeded circular slots use, and still renders as a rounded rect. |
-| `text` | `key`, `font` (`display`=Manrope / `body`=DM Sans), `weight` (400/500/600/700), `size`, `color`, `align`, `transform` (`none`/`upper`), `tracking`, `line_height`, `autofit` |
+| `text` | `key`, `font` (`display`=Manrope / `body`=DM Sans / `serif`=Fraunces / `condensed`=Archivo Narrow), `weight` (400/500/600/700), `size`, `color`, `align`, `transform` (`none`/`upper`), `tracking`, `line_height`, `autofit`. The spec stores the role, not the face; each one needs an `@font-face` in `web/fonts/fonts.css` or the export silently falls back to a system font. |
 | `qr` | `key`; must be square |
 
 Every layer has `id`, `x`, `y`, `w`, `h` and an optional `label`. Keyed layers name
 a field the poster fills; a `family` groups the sizes that share field names, so a
 poster is filled once and exported at each size. `content.transforms` holds the
+Layers are keyed by `key`, and two layers sharing one draw the same content and
+share a default.
+That is deliberate - a name can appear twice on a poster - but the builder hands
+every new layer its own free key so it is never what you get by accident.
+
 photo framing per key per size, because the same portrait needs a different crop at
 4:5 and at 9:16.
 

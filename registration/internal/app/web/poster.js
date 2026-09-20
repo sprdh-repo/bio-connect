@@ -16,12 +16,25 @@ const PS = {
   // The portrait duotone from scripts/portrait.py, so a poster portrait and the
   // one on speakers.html read as the same set.
   duotoneStops: [[0.0, [5, 28, 22]], [0.55, [118, 150, 122]], [1.0, [232, 238, 216]]],
+  // The spec stores a role, not a face, so a template survives a face being
+  // swapped. Every entry needs an @font-face in web/fonts/fonts.css and a
+  // matching case in validateSpec.
+  fonts: {
+    display: { name: 'Manrope', label: 'Manrope (display)' },
+    body: { name: 'DM Sans', label: 'DM Sans (body)' },
+    serif: { name: 'Fraunces', label: 'Fraunces (serif)' },
+    condensed: { name: 'Archivo Narrow', label: 'Archivo Narrow (condensed)' },
+  },
   sizes: { '4x5': [1080, 1350], '1x1': [1080, 1080], '9x16': [1080, 1920] },
   sizeLabels: { '4x5': 'Feed 4:5', '1x1': 'Square 1:1', '9x16': 'Story 9:16' },
   minFont: 6,
 };
 
 /* ------------------------------------------------------------------ images */
+
+// An unknown role falls back to the body face rather than a system font, so a
+// template saved against a face that was later removed still renders.
+const fontName = role => (PS.fonts[role] || PS.fonts.body).name;
 
 const imageCache = new Map();
 
@@ -68,7 +81,7 @@ async function loadFonts(templates) {
   for (const t of templates) {
     for (const l of t.spec.layers) {
       if (l.type !== 'text') continue;
-      const family = l.font === 'display' ? 'Manrope' : 'DM Sans';
+      const family = fontName(l.font);
       for (let size = PS.minFont; size <= Math.ceil(l.size); size += 6) {
         wanted.add(`${l.weight} ${size}px "${family}"`);
       }
@@ -82,8 +95,8 @@ async function loadFonts(templates) {
 /* -------------------------------------------------------------------- text */
 
 function fontString(layer, size) {
-  const family = layer.font === 'display' ? '"Manrope", sans-serif' : '"DM Sans", sans-serif';
-  return `${layer.weight} ${size}px ${family}`;
+  const generic = layer.font === 'serif' ? 'serif' : 'sans-serif';
+  return `${layer.weight} ${size}px "${fontName(layer.font)}", ${generic}`;
 }
 
 // Tracking is applied by hand rather than through ctx.letterSpacing so the
@@ -873,12 +886,29 @@ function samplePhoto(fit) {
   return samplePhotoCache[key];
 }
 
-const newLayer = (type, width, height) => {
+// A layer's key is its field: two layers sharing one draw the same content and
+// share a default. That is deliberate - a name can appear twice on a poster -
+// but it must not be what you get by accident. Every new layer takes the first
+// free key, so adding three text layers gives three fields, not one field
+// drawn three times.
+function freeKey(base, taken) {
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) if (!taken.has(`${base}-${n}`)) return `${base}-${n}`;
+}
+
+const newLayer = (type, width, height, taken = new Set()) => {
   const base = { id: 'l' + Math.random().toString(36).slice(2, 8), type, x: Math.round(width * 0.1), y: Math.round(height * 0.1), w: Math.round(width * 0.5), h: Math.round(height * 0.12) };
   if (type === 'art') return { ...base, builtin: 'bio-connect', x: 0, y: 0, w: width, h: height };
-  if (type === 'photo') return { ...base, key: 'photo', label: 'Portrait', fit: 'cover', shape: 'rect', radius: 0, h: Math.round(height * 0.5) };
-  if (type === 'qr') return { ...base, key: 'qr_url', label: 'Registration QR', w: 160, h: 160 };
-  return { ...base, key: 'headline', label: 'Headline', font: 'display', weight: 600, size: 56, color: PS.forest, align: 'left', transform: 'none', tracking: 0, line_height: 1.15, autofit: true };
+  if (type === 'photo') {
+    const key = freeKey('photo', taken);
+    return { ...base, key, label: key === 'photo' ? 'Portrait' : 'Portrait ' + key.slice(6), fit: 'cover', shape: 'rect', radius: 0, h: Math.round(height * 0.5) };
+  }
+  if (type === 'qr') {
+    const key = freeKey('qr_url', taken);
+    return { ...base, key, label: 'Registration QR', w: 160, h: 160 };
+  }
+  const key = freeKey('headline', taken);
+  return { ...base, key, label: key === 'headline' ? 'Headline' : 'Text ' + key.slice(9), font: 'display', weight: 600, size: 56, color: PS.forest, align: 'left', transform: 'none', tracking: 0, line_height: 1.15, autofit: true };
 };
 
 async function templateBuilder(templateId, seed) {
@@ -1017,6 +1047,14 @@ async function templateBuilder(templateId, seed) {
   // a seeded slot saved before `shape` existed.
   const photoShape = l => l.shape || (l.radius ? 'rounded' : 'rect');
 
+  // Two layers on one key draw the same content. Say so where it is decided,
+  // rather than leaving someone to discover it by typing a default and seeing
+  // it appear twice.
+  const shareNote = l => {
+    const n = tpl.spec.layers.filter(x => x !== l && x.key && x.key === l.key).length;
+    return n ? `<p class="help">This key is shared with ${n} other layer${n > 1 ? 's' : ''}, so they all draw the same content. Change it to make this one its own field.</p>` : '';
+  };
+
   function layerControls(l) {
     const box = `<div class="fields grid-4">
       ${['x', 'y', 'w', 'h'].map(k => `<label>${k.toUpperCase()}<input class="layer-num" data-prop="${k}" type="number" value="${Math.round(l[k])}"></label>`).join('')}</div>`;
@@ -1038,18 +1076,20 @@ async function templateBuilder(templateId, seed) {
           ${photoShape(l) === 'rounded' ? `<label>Corner radius<input class="layer-num" data-prop="radius" type="number" min="0" value="${Math.round(l.radius || 0)}"></label>` : ''}
         </div>
         ${photoShape(l) === 'circle' && Math.round(l.w) !== Math.round(l.h) ? '<p class="help">This box is not square, so the slot is an oval. Match W and H for a circle.</p>' : ''}
+        ${shareNote(l)}
         <label class="check"><input type="checkbox" class="layer-bool" data-prop="duotone" ${l.duotone ? 'checked' : ''}>Apply the event duotone by default</label>`;
     }
     if (l.type === 'qr') {
       return `${box}<div class="fields">
         <label>Field key<input class="layer-prop" data-prop="key" value="${esc(l.key)}" maxlength="64"></label>
         <label>Label<input class="layer-prop" data-prop="label" value="${esc(l.label || '')}" maxlength="64"></label></div>
-        <p class="help">A QR layer stays square; width follows height.</p>`;
+        <p class="help">A QR layer stays square; width follows height.</p>${shareNote(l)}`;
     }
     return `${box}<div class="fields">
       <label>Field key<input class="layer-prop" data-prop="key" value="${esc(l.key)}" maxlength="64"></label>
       <label>Label<input class="layer-prop" data-prop="label" value="${esc(l.label || '')}" maxlength="64"></label>
-      <label>Font<select class="layer-prop" data-prop="font"><option value="display" ${l.font === 'display' ? 'selected' : ''}>Manrope (display)</option><option value="body" ${l.font === 'body' ? 'selected' : ''}>DM Sans (body)</option></select></label>
+      <label>Font<select class="layer-prop" data-prop="font">${Object.entries(PS.fonts)
+        .map(([role, f]) => `<option value="${role}" ${l.font === role ? 'selected' : ''}>${esc(f.label)}</option>`).join('')}</select></label>
       <label>Weight<select class="layer-num" data-prop="weight">${[400, 500, 600, 700].map(x => `<option value="${x}" ${l.weight === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
       <label>Size<input class="layer-num" data-prop="size" type="number" min="6" max="400" value="${Math.round(l.size)}"></label>
       <label>Colour<input class="layer-prop" data-prop="color" type="color" value="${esc(l.color)}"></label>
@@ -1058,6 +1098,7 @@ async function templateBuilder(templateId, seed) {
       <label>Tracking<input class="layer-num" data-prop="tracking" type="number" step="0.01" min="-0.2" max="1" value="${l.tracking || 0}"></label>
       <label>Line height<input class="layer-num" data-prop="line_height" type="number" step="0.05" min="0.6" max="3" value="${l.line_height || 1.2}"></label>
       </div>
+      ${shareNote(l)}
       <label class="check"><input type="checkbox" class="layer-bool" data-prop="autofit" ${l.autofit !== false ? 'checked' : ''}>Shrink to fit the box rather than overflow</label>
       <label>Default text<textarea class="tpl-default" data-key="${esc(l.key)}" rows="2" maxlength="600">${esc((tpl.spec.defaults || {})[l.key] || '')}</textarea></label>`;
   }
@@ -1083,7 +1124,7 @@ async function templateBuilder(templateId, seed) {
 
     on('.layer-pick', 'click', el => { state.selected = el.dataset.id; shell(); });
     on('.add-layer', 'click', el => {
-      const l = newLayer(el.dataset.type, tpl.width, tpl.height);
+      const l = newLayer(el.dataset.type, tpl.width, tpl.height, new Set(tpl.spec.layers.map(x => x.key).filter(Boolean)));
       tpl.spec.layers.push(l); state.selected = l.id; shell();
     });
     on('.layer-up', 'click', el => { move(el.dataset.id, 1); });
@@ -1100,7 +1141,13 @@ async function templateBuilder(templateId, seed) {
       if (l.type === 'qr' && (el.dataset.prop === 'w' || el.dataset.prop === 'h')) l.w = l.h = Number(el.value) || 1;
       draw();
     });
-    on('.layer-prop', 'input', el => { selected()[el.dataset.prop] = el.value; draw(); });
+    on('.layer-prop', 'input', el => {
+      selected()[el.dataset.prop] = el.value;
+      // The default textarea is bound to the key, so renaming a key has to
+      // rebuild the panel or it keeps writing to the old field.
+      if (el.dataset.prop === 'key') { shell(); document.querySelector('.layer-prop[data-prop="key"]')?.focus(); return; }
+      draw();
+    });
     on('.layer-prop', 'change', el => { selected()[el.dataset.prop] = el.value; draw(); });
     on('.layer-bool', 'change', el => { selected()[el.dataset.prop] = el.checked; draw(); });
     // Shape needs the whole panel back: the radius field only belongs to

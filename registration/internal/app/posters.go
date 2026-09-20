@@ -201,8 +201,12 @@ func validateSpec(raw json.RawMessage, width, height int) (posterSpec, error) {
 			if l.Key == "" || len(l.Key) > 64 {
 				return s, errors.New("a text layer needs a field key")
 			}
-			if l.Font != "display" && l.Font != "body" {
-				return s, errors.New(`text font must be "display" or "body"`)
+			// Roles, not faces: web/fonts/fonts.css maps each to a real
+			// family and PS.fonts in poster.js mirrors this list.
+			switch l.Font {
+			case "display", "body", "serif", "condensed":
+			default:
+				return s, errors.New(`text font must be "display", "body", "serif" or "condensed"`)
 			}
 			if l.Weight != 400 && l.Weight != 500 && l.Weight != 600 && l.Weight != 700 {
 				return s, errors.New("text weight must be 400, 500, 600 or 700")
