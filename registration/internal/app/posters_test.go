@@ -34,6 +34,32 @@ const (
 
 // --- template validation ---------------------------------------------------
 
+// Every shape the picker offers has to survive a round trip, and the pre-shape
+// form - a rect carrying radius = w/2, which is how the seeded session-announce
+// slots express a circle - has to stay valid. Losing it would turn every
+// circular portrait in production back into a square.
+func TestPosterPhotoShapes(t *testing.T) {
+	for _, shape := range []string{"", "rect", "rounded", "circle", "arch"} {
+		spec := fmt.Sprintf(`{"layers":[{"id":"p","type":"photo","key":"photo","x":0,"y":0,"w":210,"h":210,"fit":"cover","shape":%q}]}`, shape)
+		out, err := validateSpec(json.RawMessage(spec), 1080, 1080)
+		if err != nil {
+			t.Fatalf("rejected shape %q: %v", shape, err)
+		}
+		if out.Layers[0].Shape != shape {
+			t.Errorf("shape %q came back as %q", shape, out.Layers[0].Shape)
+		}
+	}
+
+	seeded := `{"layers":[{"id":"photo_a","type":"photo","key":"photo_a","x":190,"y":194,"w":210,"h":210,"fit":"cover","radius":105,"duotone":true}]}`
+	out, err := validateSpec(json.RawMessage(seeded), 1080, 1080)
+	if err != nil {
+		t.Fatalf("rejected a seeded circular slot saved before shapes existed: %v", err)
+	}
+	if out.Layers[0].Shape != "" || out.Layers[0].Radius != 105 {
+		t.Errorf("got shape %q radius %v, want the radius left untouched", out.Layers[0].Shape, out.Layers[0].Radius)
+	}
+}
+
 func TestPosterSpecValidation(t *testing.T) {
 	good, err := validateSpec(specJSON(textLayer, photoLayer, qrLayer), 1080, 1350)
 	if err != nil {
@@ -63,6 +89,7 @@ func TestPosterSpecValidation(t *testing.T) {
 		{"non-square QR", `{"layers":[{"id":"x","type":"qr","key":"q","x":0,"y":0,"w":100,"h":140}]}`},
 		{"photo without a key", `{"layers":[{"id":"x","type":"photo","x":0,"y":0,"w":10,"h":10,"fit":"cover"}]}`},
 		{"unknown fit", `{"layers":[{"id":"x","type":"photo","key":"p","x":0,"y":0,"w":10,"h":10,"fit":"stretch"}]}`},
+		{"unknown shape", `{"layers":[{"id":"x","type":"photo","key":"p","x":0,"y":0,"w":10,"h":10,"fit":"cover","shape":"star"}]}`},
 	} {
 		if _, err := validateSpec(json.RawMessage(c.spec), 1080, 1350); err == nil {
 			t.Errorf("accepted %s", c.name)

@@ -163,7 +163,7 @@ background or overlay concept. At most 40 layers.
 | Layer `type` | Fields |
 |---|---|
 | `art` | exactly one of `asset_id` (uploaded) or `builtin` (an embedded brand logo: `bio-connect`, `bio-connect-mark`, `bio360`, `ksidc`, `klip`, `invest-kerala`). The Government of Kerala emblem is not embedded: the site's copy is CC BY-SA 4.0 and a poster cannot carry the attribution. Upload the official emblem as artwork instead. |
-| `photo` | `key`, `fit` (`cover`/`contain`), `radius`, `duotone`. `contain` is also the partner-logo slot, so there is no separate type. |
+| `photo` | `key`, `fit` (`cover`/`contain`), `shape` (`rect`/`rounded`/`circle`/`arch`), `radius` (rounded only), `duotone`. `contain` is also the partner-logo slot, so there is no separate type. An absent `shape` with `radius` set is the pre-shape form the seeded circular slots use, and still renders as a rounded rect. |
 | `text` | `key`, `font` (`display`=Manrope / `body`=DM Sans), `weight` (400/500/600/700), `size`, `color`, `align`, `transform` (`none`/`upper`), `tracking`, `line_height`, `autofit` |
 | `qr` | `key`; must be square |
 

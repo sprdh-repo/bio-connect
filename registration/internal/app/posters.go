@@ -67,6 +67,7 @@ type posterLayer struct {
 
 	// photo
 	Fit     string  `json:"fit,omitempty"`
+	Shape   string  `json:"shape,omitempty"`
 	Radius  float64 `json:"radius,omitempty"`
 	Duotone bool    `json:"duotone,omitempty"`
 
@@ -184,6 +185,14 @@ func validateSpec(raw json.RawMessage, width, height int) (posterSpec, error) {
 			}
 			if l.Fit != "cover" && l.Fit != "contain" {
 				return s, errors.New(`photo fit must be "cover" or "contain"`)
+			}
+			// "" is the pre-shape form: seeded circular slots express
+			// themselves as a rect with radius = w/2, and must keep rendering
+			// as circles after this field was added.
+			switch l.Shape {
+			case "", "rect", "rounded", "circle", "arch":
+			default:
+				return s, errors.New(`photo shape must be "rect", "rounded", "circle" or "arch"`)
 			}
 			if l.Radius < 0 || l.Radius > l.W || l.Radius > l.H {
 				return s, errors.New("photo corner radius is out of range")

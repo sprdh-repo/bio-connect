@@ -221,6 +221,39 @@ function roundedPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// The clip a photo slot is cut to. Returns false when the slot is a plain
+// rectangle and no clipping is needed.
+//
+// An absent `shape` is the pre-shape form: the seeded session-announce slots
+// are rects carrying radius = w/2, which is how a circle was expressed before
+// there was a picker. They have to keep drawing as circles.
+function photoPath(ctx, layer) {
+  const { x, y, w, h } = layer;
+  const shape = layer.shape || (layer.radius ? 'rounded' : 'rect');
+  if (shape === 'rect') return false;
+  if (shape === 'circle') {
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    return true;
+  }
+  if (shape === 'arch') {
+    // A semicircular top on straight sides, the shape the designer's speaker
+    // poster uses. The arc flattens into an ellipse when the box is too short
+    // to fit a true half-circle.
+    const r = Math.min(w / 2, h);
+    ctx.beginPath();
+    ctx.moveTo(x, y + h);
+    ctx.lineTo(x, y + r);
+    // Canvas angles run clockwise with y down, so PI -> 2PI is the top half.
+    ctx.ellipse(x + w / 2, y + r, w / 2, r, 0, Math.PI, Math.PI * 2);
+    ctx.lineTo(x + w, y + h);
+    ctx.closePath();
+    return true;
+  }
+  roundedPath(ctx, x, y, w, h, layer.radius || 0);
+  return true;
+}
+
 function drawPhoto(ctx, layer, values, transform) {
   const src = layerSrc(layer, values);
   const img = src && imageCache.get(src) && imageCache.get(src).settled;
@@ -244,7 +277,7 @@ function drawPhoto(ctx, layer, values, transform) {
   if (layer.duotone) applyDuotone(sctx, slot.width, slot.height);
 
   ctx.save();
-  if (layer.radius) { roundedPath(ctx, layer.x, layer.y, layer.w, layer.h, layer.radius); ctx.clip(); }
+  if (photoPath(ctx, layer)) ctx.clip();
   ctx.drawImage(slot, layer.x, layer.y, layer.w, layer.h);
   ctx.restore();
 }
@@ -791,10 +824,59 @@ async function posterEditor(family, posterId) {
 
 /* --------------------------------------------------------- template builder */
 
+// A stand-in image so a photo slot is not an empty hole while a template is
+// being laid out - you cannot judge a crop or a shape against nothing. Drawn
+// rather than shipped: no bytes to embed, and a data URL is what the CSP's
+// `img-src 'self' data:` allows, the same reason uploads are read as data URLs.
+const samplePhotoCache = {};
+function samplePhoto(fit) {
+  const logo = fit === 'contain';
+  const key = logo ? 'logo' : 'portrait';
+  if (samplePhotoCache[key]) return samplePhotoCache[key];
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  if (logo) {
+    // A contain-fit slot is the partner-logo slot, where a face is misleading.
+    c.width = 640; c.height = 320;
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = 'rgba(11,51,41,0.35)';
+    g.lineWidth = 6;
+    g.setLineDash([18, 14]);
+    g.strokeRect(12, 12, c.width - 24, c.height - 24);
+    g.setLineDash([]);
+    g.fillStyle = PS.forest;
+    g.font = '600 64px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('PARTNER LOGO', c.width / 2, c.height / 2);
+  } else {
+    // Head and shoulders in the portrait duotone's own three stops, at 4:5 with
+    // the head high enough to survive a square or circular centre crop.
+    c.width = 800; c.height = 1000;
+    g.fillStyle = 'rgb(18,44,35)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = 'rgb(118,150,122)';
+    g.beginPath();
+    g.ellipse(400, 1090, 330, 360, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgb(232,238,216)';
+    g.beginPath();
+    g.arc(400, 420, 172, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(232,238,216,0.65)';
+    g.font = '600 38px sans-serif';
+    g.textAlign = 'center';
+    g.fillText('SAMPLE', 400, 960);
+  }
+  samplePhotoCache[key] = c.toDataURL('image/png');
+  return samplePhotoCache[key];
+}
+
 const newLayer = (type, width, height) => {
   const base = { id: 'l' + Math.random().toString(36).slice(2, 8), type, x: Math.round(width * 0.1), y: Math.round(height * 0.1), w: Math.round(width * 0.5), h: Math.round(height * 0.12) };
   if (type === 'art') return { ...base, builtin: 'bio-connect', x: 0, y: 0, w: width, h: height };
-  if (type === 'photo') return { ...base, key: 'photo', label: 'Portrait', fit: 'cover', radius: 0, h: Math.round(height * 0.5) };
+  if (type === 'photo') return { ...base, key: 'photo', label: 'Portrait', fit: 'cover', shape: 'rect', radius: 0, h: Math.round(height * 0.5) };
   if (type === 'qr') return { ...base, key: 'qr_url', label: 'Registration QR', w: 160, h: 160 };
   return { ...base, key: 'headline', label: 'Headline', font: 'display', weight: 600, size: 56, color: PS.forest, align: 'left', transform: 'none', tracking: 0, line_height: 1.15, autofit: true };
 };
@@ -832,6 +914,7 @@ async function templateBuilder(templateId, seed) {
     for (const l of tpl.spec.layers) {
       if (l.type === 'text') sample[l.key] = (tpl.spec.defaults || {})[l.key] || l.label || 'Sample text';
       if (l.type === 'qr') sample[l.key] = (tpl.spec.defaults || {})[l.key] || 'https://bioconnect.kerala.gov.in';
+      if (l.type === 'photo') sample[l.key] = { data_url: samplePhoto(l.fit) };
     }
     await settleImages(tpl, sample);
     const ctx = renderPoster(canvas, tpl, sample, {});
@@ -843,9 +926,20 @@ async function templateBuilder(templateId, seed) {
       ctx.strokeStyle = on ? PS.gold : 'rgba(11,51,41,0.35)';
       ctx.lineWidth = on ? 4 : 2;
       ctx.setLineDash(on ? [] : [10, 8]);
-      ctx.strokeRect(l.x, l.y, l.w, l.h);
+      // Outline the shape the photo is actually cut to, or a circular slot
+      // reads as a square while you drag it.
+      const shaped = l.type === 'photo' && photoPath(ctx, l);
+      if (shaped) ctx.stroke(); else ctx.strokeRect(l.x, l.y, l.w, l.h);
       if (on) {
         ctx.setLineDash([]);
+        // The drag target is still the box, so a shaped slot shows it faintly.
+        if (shaped) {
+          ctx.lineWidth = 2;
+          ctx.setLineDash([10, 8]);
+          ctx.strokeStyle = 'rgba(228,173,84,0.5)';
+          ctx.strokeRect(l.x, l.y, l.w, l.h);
+          ctx.setLineDash([]);
+        }
         ctx.fillStyle = PS.gold;
         ctx.fillRect(l.x + l.w - 18, l.y + l.h - 18, 18, 18);
       }
@@ -858,7 +952,7 @@ async function templateBuilder(templateId, seed) {
     app.innerHTML = `<div class="admin-page poster-page">
       <header class="admin-heading">
         <div><p class="admin-kicker">Social posters</p><h1>${templateId ? 'Edit template' : 'New template'}</h1>
-        <p class="admin-intro">Drag the boxes to lay out the slots. Layer order is draw order, so move a decoration above the photo to have it sit over the portrait.</p></div>
+        <p class="admin-intro">Drag the boxes to lay out the slots. The layer list reads like a stack, topmost first, so move a decoration above the photo to have it sit over the portrait. Photo slots preview a sample image.</p></div>
         <div class="admin-header-actions"><button id="builder-home" class="quiet">All posters</button></div>
       </header>
       <div class="poster-studio">
@@ -878,8 +972,8 @@ async function templateBuilder(templateId, seed) {
             </div>
           </div>
           <div class="card">
-            <h2>Layers <span class="help-inline">bottom to top</span></h2>
-            <ul class="layer-list">${tpl.spec.layers.map((x, i) => `<li class="${x.id === state.selected ? 'active' : ''}">
+            <h2>Layers <span class="help-inline">topmost first</span></h2>
+            <ul class="layer-list">${stackOrder().map(({ x, i }) => `<li class="${x.id === state.selected ? 'active' : ''}">
               <button class="layer-pick" data-id="${esc(x.id)}">${esc(x.label || x.key || x.builtin || x.type)} <span class="layer-type">${esc(x.type)}</span></button>
               <span class="layer-order">
                 <button class="layer-up secondary" data-id="${esc(x.id)}" ${i === tpl.spec.layers.length - 1 ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
@@ -902,6 +996,18 @@ async function templateBuilder(templateId, seed) {
     draw();
   }
 
+  // spec.layers is draw order, so index 0 is the bottom of the stack. The list
+  // reads the other way round - topmost first, like every design tool - so that
+  // "move up" moves the row up and the layer up at the same time. Before this
+  // the list was in array order and the up arrow visibly moved a row down.
+  function stackOrder() {
+    return tpl.spec.layers.map((x, i) => ({ x, i })).reverse();
+  }
+
+  // Mirrors photoPath's fallback so the picker shows what is actually drawn for
+  // a seeded slot saved before `shape` existed.
+  const photoShape = l => l.shape || (l.radius ? 'rounded' : 'rect');
+
   function layerControls(l) {
     const box = `<div class="fields grid-4">
       ${['x', 'y', 'w', 'h'].map(k => `<label>${k.toUpperCase()}<input class="layer-num" data-prop="${k}" type="number" value="${Math.round(l[k])}"></label>`).join('')}</div>`;
@@ -918,8 +1024,11 @@ async function templateBuilder(templateId, seed) {
           <label>Field key<input class="layer-prop" data-prop="key" value="${esc(l.key)}" maxlength="64"></label>
           <label>Label<input class="layer-prop" data-prop="label" value="${esc(l.label || '')}" maxlength="64"></label>
           <label>Fit<select class="layer-prop" data-prop="fit"><option value="cover" ${l.fit === 'cover' ? 'selected' : ''}>Cover (fills, crops)</option><option value="contain" ${l.fit === 'contain' ? 'selected' : ''}>Contain (fits, for logos)</option></select></label>
-          <label>Corner radius<input class="layer-num" data-prop="radius" type="number" min="0" value="${Math.round(l.radius || 0)}"></label>
+          <label>Shape<select class="layer-shape" data-prop="shape">${[['rect', 'Rectangle'], ['rounded', 'Rounded corners'], ['circle', 'Circle / oval'], ['arch', 'Arch']]
+            .map(([v, name]) => `<option value="${v}" ${photoShape(l) === v ? 'selected' : ''}>${name}</option>`).join('')}</select></label>
+          ${photoShape(l) === 'rounded' ? `<label>Corner radius<input class="layer-num" data-prop="radius" type="number" min="0" value="${Math.round(l.radius || 0)}"></label>` : ''}
         </div>
+        ${photoShape(l) === 'circle' && Math.round(l.w) !== Math.round(l.h) ? '<p class="help">This box is not square, so the slot is an oval. Match W and H for a circle.</p>' : ''}
         <label class="check"><input type="checkbox" class="layer-bool" data-prop="duotone" ${l.duotone ? 'checked' : ''}>Apply the event duotone by default</label>`;
     }
     if (l.type === 'qr') {
@@ -979,6 +1088,14 @@ async function templateBuilder(templateId, seed) {
     on('.layer-prop', 'input', el => { selected()[el.dataset.prop] = el.value; draw(); });
     on('.layer-prop', 'change', el => { selected()[el.dataset.prop] = el.value; draw(); });
     on('.layer-bool', 'change', el => { selected()[el.dataset.prop] = el.checked; draw(); });
+    // Shape needs the whole panel back: the radius field only belongs to
+    // "rounded", and the not-square warning only to "circle".
+    on('.layer-shape', 'change', el => {
+      const l = selected();
+      l.shape = el.value;
+      if (l.shape !== 'rounded') l.radius = 0;
+      shell();
+    });
     on('.tpl-default', 'input', el => {
       tpl.spec.defaults = tpl.spec.defaults || {};
       tpl.spec.defaults[el.dataset.key] = el.value;
