@@ -103,6 +103,16 @@ A `family` groups the sizes that share field names - 4:5 (1080x1350), 1:1 and 9:
 so a poster is filled once and exported at each of them, with the photo framing kept
 per size because one portrait needs a different crop at 4:5 and at 9:16.
 
+A layer's `key` is its field, so two layers sharing one draw the same content and
+share a default.
+That is a real design - a name can appear twice on a poster - so the builder allows
+it, names it in the panel when it happens, and hands every new layer its own free
+key so it is never what you get by accident.
+
+In the builder, drag a box to move it and its bottom-right corner to resize.
+Hold Shift while resizing to keep the box's proportions.
+Arrow keys nudge the selected layer by a pixel and Shift by ten; Delete removes it.
+
 **Rendering happens in the browser**, on a canvas at true output resolution, so the
 preview a staff member drags a portrait around in is the file they download. There
 is no second renderer to drift from it and no image encoder in `go.mod`. Three

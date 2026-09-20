@@ -483,6 +483,7 @@ function thumbnail(list, eager) {
 }
 
 async function posterHome() {
+  builderKeys?.abort();
   await loadTemplates();
   const posters = await api('/admin/posters');
   const types = postTypes();
@@ -619,6 +620,7 @@ async function posterHome() {
 /* ----------------------------------------------------------- poster editor */
 
 async function posterEditor(family, posterId) {
+  builderKeys?.abort();
   const templates = (studio.families.get(family) || []).slice();
   if (!templates.length) throw Error('That template family has no sizes yet.');
   await loadFonts(templates);
@@ -841,6 +843,10 @@ async function posterEditor(family, posterId) {
 // being laid out - you cannot judge a crop or a shape against nothing. Drawn
 // rather than shipped: no bytes to embed, and a data URL is what the CSP's
 // `img-src 'self' data:` allows, the same reason uploads are read as data URLs.
+// One live builder at a time, so one controller. Aborted whenever another
+// screen takes over, or its key handler would outlive the screen it belongs to.
+let builderKeys = null;
+
 const samplePhotoCache = {};
 function samplePhoto(fit) {
   const logo = fit === 'contain';
@@ -939,6 +945,7 @@ async function templateBuilder(templateId, seed) {
   if (derived) tpl.family = slugify(tpl.name);
 
   const state = { selected: tpl.spec.layers[0].id };
+  let nudgeSettle = null;
   const assets = await api('/admin/posters/assets?kind=art');
   const selected = () => tpl.spec.layers.find(l => l.id === state.selected);
 
@@ -995,7 +1002,7 @@ async function templateBuilder(templateId, seed) {
       <div class="poster-studio">
         <div class="poster-stage">
           <canvas id="builder-canvas" width="${tpl.width}" height="${tpl.height}"></canvas>
-          <p class="help">Drag inside a box to move it, or its bottom-right corner to resize.</p>
+          <p class="help">Drag inside a box to move it, or its bottom-right corner to resize. Hold <kbd>Shift</kbd> while resizing to keep its proportions. Arrow keys nudge the selected layer by 1, with <kbd>Shift</kbd> by 10; <kbd>Delete</kbd> removes it.</p>
         </div>
         <div class="poster-fields">
           <div class="card">
@@ -1141,14 +1148,27 @@ async function templateBuilder(templateId, seed) {
       if (l.type === 'qr' && (el.dataset.prop === 'w' || el.dataset.prop === 'h')) l.w = l.h = Number(el.value) || 1;
       draw();
     });
-    on('.layer-prop', 'input', el => {
-      selected()[el.dataset.prop] = el.value;
-      // The default textarea is bound to the key, so renaming a key has to
-      // rebuild the panel or it keeps writing to the old field.
-      if (el.dataset.prop === 'key') { shell(); document.querySelector('.layer-prop[data-prop="key"]')?.focus(); return; }
-      draw();
+    // Never rebuild the panel from an 'input' event on a text field: shell()
+    // replaces the input, and focus() on the new one puts the caret at 0, so
+    // every keystroke lands in front of the last and the text comes out
+    // backwards. Renaming a key is finished on 'change', which fires on blur.
+    let keyBefore = null;
+    on('.layer-prop', 'focus', el => { if (el.dataset.prop === 'key') keyBefore = selected().key; });
+    on('.layer-prop', 'input', el => { selected()[el.dataset.prop] = el.value; draw(); });
+    on('.layer-prop', 'change', el => {
+      const l = selected();
+      l[el.dataset.prop] = el.value;
+      if (el.dataset.prop !== 'key') { draw(); return; }
+      // Defaults are stored per key, so a rename has to carry its own with it
+      // or the text silently detaches from the layer that showed it.
+      const d = tpl.spec.defaults || {};
+      if (keyBefore && keyBefore !== l.key && d[keyBefore] !== undefined && d[l.key] === undefined) {
+        d[l.key] = d[keyBefore];
+        delete d[keyBefore];
+      }
+      keyBefore = null;
+      shell();
     });
-    on('.layer-prop', 'change', el => { selected()[el.dataset.prop] = el.value; draw(); });
     on('.layer-bool', 'change', el => { selected()[el.dataset.prop] = el.checked; draw(); });
     // Shape needs the whole panel back: the radius field only belongs to
     // "rounded", and the not-square warning only to "circle".
@@ -1228,7 +1248,7 @@ async function templateBuilder(templateId, seed) {
     };
     const handleSize = () => 18 * (canvas.width / canvas.getBoundingClientRect().width) * 1.6;
 
-    let mode = null, layer = null, last = null;
+    let mode = null, layer = null, last = null, ratio = 1;
     canvas.addEventListener('pointerdown', e => {
       const p = toCanvas(e);
       const grab = handleSize();
@@ -1238,6 +1258,9 @@ async function templateBuilder(templateId, seed) {
       if (!target) return;
       const corner = p.x >= target.x + target.w - grab && p.y >= target.y + target.h - grab;
       mode = corner ? 'resize' : 'move';
+      // Held from the grab, not recomputed per frame, or rounding walks the
+      // proportions away while you drag.
+      ratio = target.w / Math.max(1, target.h);
       layer = target; last = p;
       if (state.selected !== target.id) { state.selected = target.id; shell(); return; }
       canvas.setPointerCapture(e.pointerId);
@@ -1248,7 +1271,12 @@ async function templateBuilder(templateId, seed) {
       const p = toCanvas(e);
       const dx = p.x - last.x, dy = p.y - last.y;
       if (mode === 'move') { layer.x += dx; layer.y += dy; }
-      else {
+      else if (e.shiftKey) {
+        // Follow whichever axis moved more, so the corner tracks the pointer.
+        layer.w = Math.max(16, layer.w + (Math.abs(dx) > Math.abs(dy) ? dx : dy * ratio));
+        layer.h = Math.max(16, layer.w / ratio);
+        if (layer.type === 'qr') layer.w = layer.h = Math.max(layer.w, layer.h);
+      } else {
         layer.w = Math.max(16, layer.w + dx);
         layer.h = Math.max(16, layer.h + dy);
         if (layer.type === 'qr') layer.w = layer.h = Math.max(layer.w, layer.h);
@@ -1267,5 +1295,43 @@ async function templateBuilder(templateId, seed) {
     canvas.addEventListener('pointercancel', stop);
   }
 
+  // Keys are bound to the document so they work wherever focus sits on the
+  // screen, which means exactly one listener per builder: shell() runs on
+  // every edit, and binding there would stack a handler per render and move a
+  // layer further on each keypress. The controller is aborted when another
+  // screen takes over.
+  function bindKeys() {
+    builderKeys?.abort();
+    builderKeys = new AbortController();
+    document.addEventListener('keydown', e => {
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const l = selected();
+      if (!l) return;
+      const step = e.shiftKey ? 10 : 1;
+      const nudge = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (nudge) {
+        e.preventDefault();
+        l.x += nudge[0];
+        l.y += nudge[1];
+        draw();
+        // The X/Y boxes are stale until the panel catches up, but redrawing it
+        // per keypress would fight a held arrow key, so it waits for the key
+        // to come back up.
+        clearTimeout(nudgeSettle);
+        nudgeSettle = setTimeout(shell, 250);
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (tpl.spec.layers.length === 1) return message('A template needs at least one layer.', true);
+        tpl.spec.layers = tpl.spec.layers.filter(x => x.id !== l.id);
+        state.selected = tpl.spec.layers[tpl.spec.layers.length - 1].id;
+        shell();
+      }
+    }, { signal: builderKeys.signal });
+  }
+
+  bindKeys();
   shell();
 }
