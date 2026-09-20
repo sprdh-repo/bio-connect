@@ -31,7 +31,11 @@ if [ "${LIVE_DELIVERY}" = "true" ]; then
 fi
 
 SSH_KEY="$SECRETS/bioconnect-registration.pem"
-SSH="ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 ${SSH_USER}@${SERVER_IP}"
+# ServerAlive*: a stalled connection otherwise blocks forever with no keepalive,
+# which hung a deploy between shipping the image and pushing the env files.
+# Three missed 15s probes is a dead link; the script is safe to re-run.
+SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
+SSH="ssh -i $SSH_KEY $SSH_OPTS ${SSH_USER}@${SERVER_IP}"
 TAG="$(cd "$ROOT" && git rev-parse --short HEAD 2>/dev/null || date +%s)"
 IMAGE="bioconnect-registration:${TAG}"
 
@@ -100,7 +104,7 @@ for f in app postgres caddy backup; do
 done
 
 echo "== sync compose + Caddyfile + ops scripts to ${COMPOSE_DIR} =="
-rsync -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new" -az --delete \
+rsync -e "ssh -i $SSH_KEY $SSH_OPTS" -az --delete \
   "$HERE/compose.production.yaml" "$HERE/Caddyfile" "$HERE/backup.sh" "$HERE/monitor.sh" "$HERE/alert.sh" \
   "$HERE"/bioconnect-*.service "$HERE"/bioconnect-*.timer \
   "${SSH_USER}@${SERVER_IP}:/tmp/bioconnect-ops/"

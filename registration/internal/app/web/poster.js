@@ -901,6 +901,13 @@ async function templateBuilder(templateId, seed) {
     };
   }
 
+  // Family is the key that ties a template's three sizes together, and it is
+  // the one field staff could not be expected to reason about. It is derived
+  // from the name on a new template, inherited and locked when adding a size,
+  // and frozen when editing - so it is never typed twice and cannot drift.
+  const derived = !templateId && !(seed && seed.family);
+  if (derived) tpl.family = slugify(tpl.name);
+
   const state = { selected: tpl.spec.layers[0].id };
   const assets = await api('/admin/posters/assets?kind=art');
   const selected = () => tpl.spec.layers.find(l => l.id === state.selected);
@@ -964,9 +971,11 @@ async function templateBuilder(templateId, seed) {
           <div class="card">
             <h2>Template</h2>
             <div class="fields one-column">
-              <label>Family <span class="help-inline">groups the sizes</span>
-                <input id="tpl-family" value="${esc(tpl.family)}" maxlength="64" ${templateId ? 'disabled' : ''}></label>
               <label>Name<input id="tpl-name" value="${esc(tpl.name)}" maxlength="120"></label>
+              ${derived
+                ? `<p class="help">Saved as <code id="tpl-family-preview">${esc(tpl.family)}</code>, the key that keeps this template's three sizes together. The other sizes inherit it.</p>`
+                : `<label>Family <span class="help-inline">shared by this template's sizes</span>
+                <input id="tpl-family" value="${esc(tpl.family)}" maxlength="64" disabled></label>`}
               <label>Size<select id="tpl-size" ${templateId ? 'disabled' : ''}>${Object.keys(PS.sizes).map(s => `<option value="${s}" ${tpl.size === s ? 'selected' : ''}>${esc(PS.sizeLabels[s])} (${PS.sizes[s].join('x')})</option>`).join('')}</select></label>
               <label>Background<input id="tpl-bg" type="color" value="${esc(tpl.spec.background || PS.cream)}"></label>
             </div>
@@ -1057,8 +1066,14 @@ async function templateBuilder(templateId, seed) {
     bind('builder-home', 'click', () => posterHome());
     const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, () => fn(el)));
 
-    document.getElementById('tpl-family').addEventListener('input', e => { tpl.family = e.target.value; });
-    document.getElementById('tpl-name').addEventListener('input', e => { tpl.name = e.target.value; });
+    document.getElementById('tpl-name').addEventListener('input', e => {
+      tpl.name = e.target.value;
+      if (!derived) return;
+      tpl.family = slugify(tpl.name);
+      // textContent, not innerHTML: the name is staff input and this runs on
+      // every keystroke.
+      document.getElementById('tpl-family-preview').textContent = tpl.family;
+    });
     document.getElementById('tpl-bg').addEventListener('input', e => { tpl.spec.background = e.target.value; draw(); });
     document.getElementById('tpl-size').addEventListener('change', e => {
       tpl.size = e.target.value;
@@ -1126,7 +1141,18 @@ async function templateBuilder(templateId, seed) {
 
     bindBoxDragging();
     bind('tpl-save', 'click', async e => busy(e.target, async () => {
-      if (!tpl.family.trim() || !tpl.name.trim()) throw Error('Give the template a family and a name.');
+      if (!tpl.name.trim()) throw Error('Give the template a name.');
+      if (derived && !/[a-z0-9]/i.test(tpl.name)) {
+        throw Error('The name needs a letter or a digit; it becomes this template\'s key.');
+      }
+      if (!tpl.family.trim()) throw Error('This template has no family key.');
+      // Saving a family+size that already exists retires the old one. That is
+      // how you replace a seeded template deliberately, and a nasty surprise
+      // when two different names happen to slug the same way.
+      if (derived && studio.families.has(tpl.family)) {
+        throw Error(`"${tpl.family}" already exists. Pick a different name, or open that template `
+          + `and use "Add a size" if you meant to extend it.`);
+      }
       const out = await post('/admin/posters/templates', {
         id: tpl.id, family: tpl.family.trim(), name: tpl.name.trim(), size: tpl.size, spec: tpl.spec,
       });
