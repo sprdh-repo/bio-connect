@@ -640,6 +640,51 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .speaker-empty strong { color: #4a7736; font-weight: 600; }
 .speaker-empty .inline-link { padding-inline: 0; background: none; border-width: 0 0 1px; cursor: pointer; }
 
+/* Card footer: LinkedIn on the left, "View profile" on the right. The profile
+   button's ::after covers the whole card, so a tap anywhere opens it; the
+   LinkedIn link is lifted above that layer to stay its own target. */
+.speaker { position: relative; }
+.speaker-org { padding-bottom: 18px; }
+.speaker-actions { margin-top: auto; padding-top: 14px; min-height: 55px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); }
+.speaker-linkedin { position: relative; z-index: 1; width: 40px; height: 40px; flex: none; display: grid; place-items: center; color: var(--forest); border: 1px solid rgba(11, 51, 41, 0.28); border-radius: 50%; transition: color 0.2s, background 0.2s, border-color 0.2s; }
+.speaker-linkedin:hover { color: var(--paper); background: #0a66c2; border-color: #0a66c2; }
+.speaker-open { margin-left: auto; padding: 8px 0; display: inline-flex; align-items: center; gap: 8px; color: var(--forest); font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; white-space: nowrap; background: none; border: 0; cursor: pointer; }
+.speaker-open::after { content: ""; position: absolute; inset: 0; }
+.speaker-open:focus-visible { outline: none; }
+.speaker:has(.speaker-open:focus-visible) { z-index: 1; outline: 3px solid var(--gold); outline-offset: 2px; }
+.speaker-open-arrow { display: inline-block; font-size: 14px; font-weight: 400; transition: transform 0.25s cubic-bezier(.2,.8,.2,1); }
+.speaker:hover .speaker-open-arrow, .speaker-open:focus-visible .speaker-open-arrow { transform: translateX(4px); }
+
+/* Speaker profile. A centred panel on wide screens, a bottom sheet on phones. */
+body.dialog-open { overflow: hidden; }
+.speaker-dialog { width: min(820px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); padding: 0; overflow: auto; display: none; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); color: var(--ink); background: var(--paper); border: 0; box-shadow: 0 30px 100px rgba(2, 14, 11, 0.45); overscroll-behavior: contain; }
+.speaker-dialog[open] { display: grid; animation: speaker-dialog-in 0.4s cubic-bezier(.2,.8,.2,1); }
+.speaker-dialog::backdrop { background: rgba(2, 14, 11, 0.78); backdrop-filter: blur(6px); }
+.speaker-dialog[open]::backdrop { animation: speaker-backdrop-in 0.3s ease-out; }
+@keyframes speaker-dialog-in { from { opacity: 0; transform: translateY(18px) scale(0.985); } }
+@keyframes speaker-backdrop-in { from { opacity: 0; } }
+.speaker-dialog-portrait { position: relative; min-height: 460px; overflow: hidden; background: var(--forest-deep); }
+.speaker-dialog-portrait .speaker-portrait { position: absolute; inset: 0; aspect-ratio: auto; }
+.speaker-dialog-portrait .speaker-portrait::after { content: none; }
+.speaker-dialog-portrait::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; background: var(--lime); }
+.speaker-dialog-body { min-width: 0; padding: 56px 48px 32px 44px; display: flex; flex-direction: column; }
+.speaker-dialog-label { margin: 0 0 16px; color: #4f7f3b; font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+.speaker-dialog-name { margin: 0; font: 600 clamp(28px, 3.4vw, 40px)/1.08 Manrope, sans-serif; letter-spacing: -0.045em; text-wrap: balance; }
+.speaker-dialog-role { margin: 20px 0 0; font-size: 16px; line-height: 1.55; }
+.speaker-dialog-org { margin: 4px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.speaker-dialog-linkedin { margin-top: 30px; align-self: flex-start; color: var(--paper); background: var(--forest); }
+.speaker-dialog-linkedin[hidden] { display: none; }
+.speaker-dialog-linkedin:hover { background: #0a66c2; }
+.speaker-dialog-linkedin .button-arrow { margin-left: -2px; }
+.speaker-dialog-linkedin:hover .button-arrow, .speaker-dialog-linkedin:focus-visible .button-arrow { transform: translate(2px, -2px); }
+.speaker-dialog-nav { margin-top: auto; padding-top: 40px; display: flex; align-items: center; gap: 14px; }
+.speaker-dialog-count { order: -1; margin: 0 auto 0 0; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 0.09em; font-variant-numeric: tabular-nums; }
+.speaker-dialog-step { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; color: var(--forest); font-size: 18px; background: transparent; border: 1px solid rgba(11, 51, 41, 0.28); border-radius: 50%; cursor: pointer; transition: color 0.2s, background 0.2s, border-color 0.2s; }
+.speaker-dialog-step[hidden] { display: none; }
+.speaker-dialog-step:hover { color: var(--paper); background: var(--forest); border-color: var(--forest); }
+.speaker-dialog-close { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 50%; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.speaker-dialog-close:hover { background: var(--cream); border-color: var(--line); }
+
 /* Home page pointer to the speakers page, set under the conclave strand. */
 .speakers-teaser { margin-top: 60px; padding: 26px 32px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px 34px; color: white; background: var(--forest); transition: background 0.25s; }
 .speakers-teaser:hover { background: #0e3d31; }
@@ -945,6 +990,23 @@ html.intro-on, html.intro-on body { overflow: hidden; }
   .speaker-role { margin-top: 7px; font-size: 12.5px; line-height: 1.45; }
   .speaker-org { font-size: 12px; line-height: 1.45; }
   .speaker-monogram span { font-size: 40px; }
+  .speaker-org { padding-bottom: 14px; }
+  .speaker-actions { min-height: 47px; padding-top: 10px; gap: 8px; }
+  .speaker-linkedin { width: 36px; height: 36px; }
+  .speaker-open { font-size: 10px; letter-spacing: 0.07em; gap: 6px; }
+  .speaker-dialog { width: 100%; max-height: min(92dvh, 720px); margin: auto 0 0; grid-template-columns: 1fr; }
+  .speaker-dialog[open] { animation-name: speaker-sheet-in; }
+  @keyframes speaker-sheet-in { from { transform: translateY(100%); } }
+  .speaker-dialog-portrait { width: 112px; min-height: 0; aspect-ratio: 4 / 5; margin: 28px 0 0 20px; }
+  .speaker-dialog-portrait .speaker-monogram span { font-size: 34px; }
+  .speaker-dialog-body { padding: 22px 20px calc(18px + env(safe-area-inset-bottom)); }
+  .speaker-dialog-label { margin-bottom: 10px; }
+  .speaker-dialog-name { font-size: clamp(26px, 8vw, 32px); }
+  .speaker-dialog-role { margin-top: 14px; font-size: 15px; }
+  .speaker-dialog-org { font-size: 14px; }
+  .speaker-dialog-linkedin { margin-top: 22px; align-self: stretch; }
+  .speaker-dialog-nav { padding-top: 26px; }
+  .speaker-dialog-close { top: 12px; right: 12px; }
   .speakers-teaser { margin-top: 44px; padding: 22px 20px 24px; grid-template-columns: 1fr; gap: 16px; }
   .speakers-teaser-faces img { width: 50px; height: 50px; }
   .speakers-teaser-cta { grid-column: auto; }

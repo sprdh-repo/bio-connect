@@ -316,9 +316,13 @@ if (speakerGrid) {
      find Prof. T. P. Singh. */
   const compact = (text) =>
     text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  /* Name, role and organisation only - not the screen-reader text on the
+     LinkedIn and profile controls, or "linkedin" would match every card. */
   const speakers = [...speakerGrid.querySelectorAll(".speaker")].map((card) => ({
     card,
-    text: compact(card.querySelector(".speaker-meta").textContent),
+    text: compact(
+      [...card.querySelectorAll(".speaker-name, .speaker-role, .speaker-org")].map((node) => node.textContent).join(" "),
+    ),
   }));
 
   const filterSpeakers = () => {
@@ -355,6 +359,94 @@ if (speakerGrid) {
   search.hidden = false;
   /* A back/forward visit can restore a typed query - honour it. */
   if (input.value) filterSpeakers();
+
+  /* Speaker profiles. Each card gets a "View profile" button stretched over the
+     whole card; the LinkedIn link sits above it, so both stay reachable. The
+     dialog steps through the cards the current search leaves visible. */
+  const dialog = document.querySelector("[data-speaker-dialog]");
+  const portrait = dialog.querySelector("[data-speaker-dialog-portrait]");
+  const dialogName = dialog.querySelector("[data-speaker-dialog-name]");
+  const dialogRole = dialog.querySelector("[data-speaker-dialog-role]");
+  const dialogOrg = dialog.querySelector("[data-speaker-dialog-org]");
+  const dialogLinkedin = dialog.querySelector("[data-speaker-dialog-linkedin]");
+  const dialogCount = dialog.querySelector("[data-speaker-dialog-count]");
+  const stepButtons = dialog.querySelectorAll("[data-speaker-dialog-step]");
+  let current = null;
+
+  const showSpeaker = (card) => {
+    current = card;
+    const name = card.querySelector(".speaker-name").textContent;
+    const linkedin = card.querySelector(".speaker-linkedin");
+
+    portrait.replaceChildren(card.querySelector(".speaker-portrait").cloneNode(true));
+    dialogName.textContent = name;
+    dialogRole.textContent = card.querySelector(".speaker-role").textContent;
+    dialogOrg.textContent = card.querySelector(".speaker-org").textContent;
+    /* Hiding the focused LinkedIn button would drop focus out of the dialog. */
+    if (!linkedin && document.activeElement === dialogLinkedin) dialog.querySelector("[data-speaker-dialog-close]").focus();
+    dialogLinkedin.hidden = !linkedin;
+    if (linkedin) {
+      dialogLinkedin.href = linkedin.href;
+      dialogLinkedin.setAttribute("aria-label", `${name} on LinkedIn (opens in a new tab)`);
+    }
+
+    const visible = speakers.filter(({ card: item }) => !item.hidden).map(({ card: item }) => item);
+    dialogCount.textContent = `${String(visible.indexOf(card) + 1).padStart(2, "0")} / ${String(visible.length).padStart(2, "0")}`;
+    stepButtons.forEach((button) => (button.hidden = visible.length < 2));
+  };
+
+  const stepSpeaker = (step) => {
+    const visible = speakers.filter(({ card }) => !card.hidden).map(({ card }) => card);
+    if (visible.length < 2) return;
+    const index = visible.indexOf(current);
+    showSpeaker(visible[(index + step + visible.length) % visible.length]);
+  };
+
+  const closeProfile = () => dialog.close();
+
+  speakers.forEach(({ card }) => {
+    const name = card.querySelector(".speaker-name").textContent;
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "speaker-open";
+    open.innerHTML = `View profile<span class="sr-only">: </span><span class="speaker-open-arrow" aria-hidden="true">&rarr;</span>`;
+    open.querySelector(".sr-only").append(name);
+    open.setAttribute("aria-haspopup", "dialog");
+    open.addEventListener("click", () => {
+      showSpeaker(card);
+      dialog.showModal();
+      document.body.classList.add("dialog-open");
+    });
+
+    let actions = card.querySelector(".speaker-actions");
+    if (!actions) {
+      actions = document.createElement("div");
+      actions.className = "speaker-actions";
+      card.querySelector(".speaker-meta").append(actions);
+    }
+    actions.append(open);
+  });
+
+  stepButtons.forEach((button) =>
+    button.addEventListener("click", () => stepSpeaker(Number(button.dataset.speakerDialogStep))),
+  );
+  dialog.querySelector("[data-speaker-dialog-close]").addEventListener("click", closeProfile);
+  /* A click on the backdrop lands on the dialog element itself. */
+  dialog.addEventListener("click", (event) => event.target === dialog && closeProfile());
+  document.addEventListener("keydown", (event) => {
+    if (!dialog.open) return;
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    stepSpeaker(step);
+  });
+  /* Back on the page, focus returns to the card whose profile was last shown -
+     which may not be the one that opened the dialog, after stepping through. */
+  dialog.addEventListener("close", () => {
+    document.body.classList.remove("dialog-open");
+    current?.querySelector(".speaker-open").focus({ preventScroll: true });
+    current?.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  });
 }
 
 /* Registration tabs: one panel at a time, with roving focus across the tablist. */

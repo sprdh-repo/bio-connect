@@ -16,8 +16,9 @@ Then open <http://localhost:4173>.
 
 - `index.html` - the landing page.
 - `speakers.html` - the speakers expected at the conclave, with a client-side search.
-  The list is static markup; the count in the hero, the toolbar and the home page teaser is
-  typed out, so update all three when speakers are added or removed.
+  The list is static markup, sourced from the organisers' speaker spreadsheet.
+  A speaker's LinkedIn profile is a `.speaker-linkedin` link inside the card's `.speaker-actions` row; leave it out when there is no confirmed URL.
+  `script.js` adds a "View profile" button to every card that opens a profile dialog (portrait, role, organisation, LinkedIn), with previous/next and arrow-key stepping through the speakers the search leaves visible.
 - `committee.html` - the State leadership and the Advisory Committee constituted by
   G.O.(Rt) No. 879/2026/ID.
   It is titled *Leadership* everywhere in the UI; the filename is deliberately unchanged,
@@ -131,6 +132,7 @@ originals rather than editing the `.webp` files by hand.
 The speaker portraits in `assets/speakers/` come from the organisers' speaker spreadsheet.
 Each is cropped to 4:5 around the detected face and given the same forest-green duotone as
 the leadership portraits, at 480x600.
+Two are not from the spreadsheet, which had no photo for them: `mrutyunjay-suar.webp` is from his Earthcare Awards panel page (`https://panel.earthcareawards.com/prof-dr-mrutyunjay-suar/`), padded with white above the head because the original is cropped tight, and `k-ampady.webp` is from the KRIBS-BioNest team page (`https://www.kribsbionest.com/team`).
 Regenerate them from the originals rather than editing the `.webp` files by hand.
 A speaker without a usable photo gets a lettered placeholder (`.speaker-monogram`) until one
 arrives.
