@@ -4,9 +4,11 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/mail"
 	"os"
@@ -73,6 +75,77 @@ func appendReason(current, next string) string {
 		return next
 	}
 	return current + "; " + next
+}
+
+func attemptedStatus(status string) bool {
+	status = strings.ToLower(strings.TrimSpace(status))
+	switch status {
+	case "attempted", "accepted", "rejected", "uncertain":
+		return true
+	}
+	return strings.HasPrefix(status, "skipped_previous_")
+}
+
+func historyEmails(path string) (map[string]bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	result := map[string]bool{}
+	if strings.EqualFold(filepath.Ext(path), ".jsonl") {
+		dec := json.NewDecoder(f)
+		for {
+			var event struct {
+				Email  string
+				Status string
+			}
+			if err := dec.Decode(&event); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return nil, fmt.Errorf("invalid JSONL: %w", err)
+			}
+			if attemptedStatus(event.Status) {
+				if email, err := strictAddress(event.Email); err == nil {
+					result[email] = true
+				}
+			}
+		}
+		return result, nil
+	}
+
+	r := csv.NewReader(f)
+	r.FieldsPerRecord = -1
+	rows, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return result, nil
+	}
+	emailColumn, statusColumn := -1, -1
+	for i, header := range rows[0] {
+		switch normalHeader(strings.TrimPrefix(header, "\ufeff")) {
+		case "email":
+			emailColumn = i
+		case "status":
+			statusColumn = i
+		}
+	}
+	if emailColumn < 0 || statusColumn < 0 {
+		return nil, errors.New("history CSV must contain email and status columns")
+	}
+	for _, row := range rows[1:] {
+		if emailColumn >= len(row) || statusColumn >= len(row) || !attemptedStatus(row[statusColumn]) {
+			continue
+		}
+		if email, err := strictAddress(row[emailColumn]); err == nil {
+			result[email] = true
+		}
+	}
+	return result, nil
 }
 
 func looksLikeMissingAt(s string) bool {
@@ -182,7 +255,7 @@ func checkDomain(ctx context.Context, domain string) error {
 	return nil
 }
 
-func validate(items []candidate, corrections map[string]string) []candidate {
+func validate(items []candidate, corrections map[string]string, previous map[string]bool) []candidate {
 	seen := map[string]bool{}
 	domains := map[string]bool{}
 	for i := range items {
@@ -200,6 +273,11 @@ func validate(items []candidate, corrections map[string]string) []candidate {
 			continue
 		}
 		seen[items[i].Email] = true
+		if previous[items[i].Email] {
+			items[i].Status = "previously_attempted"
+			items[i].Reason = appendReason(items[i].Reason, "address appears in a prior send log or report")
+			continue
+		}
 		domain = domainOf(items[i].Email)
 		if expected, ok := commonDomainTypos[domain]; ok {
 			items[i].Status, items[i].Reason = "suspicious_domain", "possible typo; expected "+expected
@@ -294,9 +372,10 @@ func writeContacts(path string, items []candidate) (int, error) {
 func run() error {
 	output := flag.String("output", "var/marketing/validated-contacts.csv", "filtered contacts CSV")
 	report := flag.String("report", "var/marketing/validation.csv", "complete validation report CSV")
-	var domainCorrectionFlags, addressCorrectionFlags stringFlags
+	var domainCorrectionFlags, addressCorrectionFlags, historyFlags stringFlags
 	flag.Var(&domainCorrectionFlags, "correct-domain", "confirmed domain correction in typo=correct form; repeatable")
 	flag.Var(&addressCorrectionFlags, "correct-address", "confirmed whole-address correction in typo=correct form; repeatable")
+	flag.Var(&historyFlags, "exclude-history", "prior sends.jsonl or report CSV whose attempted recipients must be excluded; repeatable")
 	flag.Parse()
 	if flag.NArg() == 0 {
 		return errors.New("provide one or more .xlsx or .csv contact files")
@@ -329,7 +408,17 @@ func run() error {
 		}
 		items = append(items, found...)
 	}
-	items = validate(items, corrections)
+	previous := map[string]bool{}
+	for _, path := range historyFlags {
+		found, err := historyEmails(path)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		for email := range found {
+			previous[email] = true
+		}
+	}
+	items = validate(items, corrections, previous)
 	for _, path := range []string{*output, *report} {
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			return err
@@ -347,7 +436,7 @@ func run() error {
 		counts[item.Status]++
 	}
 	fmt.Printf("Validation report: %s\nFiltered contacts: %s\n", *report, *output)
-	fmt.Printf("Eligible: %d; duplicates: %d; invalid syntax: %d; suspicious domains: %d; unresolvable domains: %d\n", eligible, counts["duplicate"], counts["invalid_syntax"], counts["suspicious_domain"], counts["unresolvable_domain"])
+	fmt.Printf("Eligible: %d; previously attempted: %d; duplicates: %d; invalid syntax: %d; suspicious domains: %d; unresolvable domains: %d\n", eligible, counts["previously_attempted"], counts["duplicate"], counts["invalid_syntax"], counts["suspicious_domain"], counts["unresolvable_domain"])
 	if eligible == 0 {
 		return errors.New("no eligible email addresses remain after validation")
 	}

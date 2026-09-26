@@ -72,6 +72,14 @@ This wrapper merges them and records two verified corrections: the Jibs address 
 ./cmd/marketing/run-lifescience-startups.sh --send
 ```
 
+The MFP and AIF wrapper scans both workbooks, corrects the obvious Gmail domain misspellings present in the source, validates recipient DNS, and excludes addresses found in any earlier marketing send log or report.
+Prior `attempted`, `accepted`, `rejected`, `uncertain`, and `skipped_previous_*` outcomes are all excluded so an unresolved attempt is never retried automatically.
+
+```sh
+./cmd/marketing/run-mfp-aif.sh
+./cmd/marketing/run-mfp-aif.sh --send
+```
+
 ### Domain validation
 
 Whenever `--contacts` is used, every unique recipient domain is checked concurrently for an MX record (falling back to an A/AAAA record, per RFC 5321) before anything is sent.
