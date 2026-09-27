@@ -208,7 +208,8 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			intro = "Your registration is saved. Use this private link to see the payment instructions and submit your evidence.\n\nThis is not a payment approval or an admission pass - keep the link to yourself."
 		case "payment_reminder":
 			var reference, catID string
-			if e = a.DB.QueryRow(ctx, "SELECT reference,category_id FROM registrations WHERE id=$1", j.RegistrationID).Scan(&reference, &catID); e != nil {
+			var discount int
+			if e = a.DB.QueryRow(ctx, "SELECT reference,category_id,discount_percent FROM registrations WHERE id=$1", j.RegistrationID).Scan(&reference, &catID, &discount); e != nil {
 				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
 			}
 			var c Category
@@ -218,7 +219,11 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			subject = "Bio Connect 4.0 - payment pending for " + reference
 			heading = "Complete your payment"
 			cta = "Open my registration"
-			intro = "Your registration " + reference + " is saved, but we have not received your payment details yet. The fee payable today is " + money(fee(c, a.Now())) + ".\n\nOpen your registration for the SBI Collect payment link, then submit your bank reference so we can verify the payment and issue your passes. If you have already paid, submit those payment details.\n\nThis link works once and expires in 7 days. Keep it to yourself."
+			how := "the SBI Collect payment link"
+			if discount > 0 {
+				how = "the bank account details for your transfer"
+			}
+			intro = "Your registration " + reference + " is saved, but we have not received your payment details yet. The fee payable today is " + money(payable(c, discount, a.Now())) + ".\n\nOpen your registration for " + how + ", then submit your bank reference so we can verify the payment and issue your passes. If you have already paid, submit those payment details.\n\nThis link works once and expires in 7 days. Keep it to yourself."
 		case "recovery":
 			subject = "Bio Connect 4.0 - recover your registration"
 			heading = "Recover your registration"

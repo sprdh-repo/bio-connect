@@ -54,6 +54,9 @@ type Category struct {
 	RosterCount  int    `json:"roster_count"`
 	Open         bool   `json:"open"`
 	PayablePaise int64  `json:"payable_paise"`
+	// CouponEligible says whether any coupon applies, so the form can offer the
+	// field without the client knowing codes or exclusions.
+	CouponEligible bool `json:"coupon_eligible"`
 }
 type Attendee struct {
 	ID              string `json:"id,omitempty"`
@@ -70,22 +73,27 @@ type RegistrationInput struct {
 	Email       string     `json:"email"`
 	Phone       string     `json:"phone"`
 	Description string     `json:"description"`
+	CouponCode  string     `json:"coupon_code"`
 	Attendees   []Attendee `json:"attendees"`
 }
 type Registration struct {
-	ID          string     `json:"id"`
-	Reference   string     `json:"reference"`
-	CategoryID  string     `json:"category_id"`
-	Institution string     `json:"institution"`
-	ContactName string     `json:"contact_name"`
-	Email       string     `json:"email"`
-	Phone       string     `json:"phone"`
-	Description string     `json:"description"`
-	Status      string     `json:"status"`
-	QuotedPaise int64      `json:"quoted_paise"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ReviewNote  string     `json:"review_note"`
-	Attendees   []Attendee `json:"attendees"`
+	ID          string    `json:"id"`
+	Reference   string    `json:"reference"`
+	CategoryID  string    `json:"category_id"`
+	Institution string    `json:"institution"`
+	ContactName string    `json:"contact_name"`
+	Email       string    `json:"email"`
+	Phone       string    `json:"phone"`
+	Description string    `json:"description"`
+	Status      string    `json:"status"`
+	QuotedPaise int64     `json:"quoted_paise"`
+	CreatedAt   time.Time `json:"created_at"`
+	ReviewNote  string    `json:"review_note"`
+	CouponCode  string    `json:"coupon_code"`
+	// DiscountPercent is frozen when the registration is saved; non-zero means
+	// the fee is paid by direct bank transfer.
+	DiscountPercent int        `json:"discount_percent"`
+	Attendees       []Attendee `json:"attendees"`
 }
 
 var phoneRE = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
@@ -100,6 +108,10 @@ func validEmail(s string) bool {
 func validateInput(in *RegistrationInput, c Category) error {
 	in.Institution = strings.TrimSpace(in.Institution)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.CouponCode = normalizeCoupon(in.CouponCode)
+	if _, e := lookupCoupon(in.CouponCode, c.ID); e != nil {
+		return e
+	}
 	if !validText(in.Institution, 180) || !validText(in.ContactName, 120) || !validEmail(in.Email) || !phoneRE.MatchString(in.Phone) {
 		return errors.New("provide institution, contact name, valid email and international phone number")
 	}
@@ -199,6 +211,7 @@ func (a *App) categories(ctx context.Context) ([]Category, error) {
 			return nil, e
 		}
 		c.PayablePaise = fee(c, a.Now())
+		c.CouponEligible = couponEligible(c.ID)
 		out = append(out, c)
 	}
 	return out, rows.Err()
@@ -214,7 +227,7 @@ func audit(ctx context.Context, tx pgx.Tx, staff, reg, action, detail string) er
 }
 func (a *App) registration(ctx context.Context, key string) (Registration, error) {
 	var r Registration
-	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote)
+	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,discount_percent FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.DiscountPercent)
 	if e != nil {
 		return r, e
 	}

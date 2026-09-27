@@ -68,12 +68,14 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 			return "", "", e
 		}
 	}
+	// validateInput already rejected a code that does not apply to this category.
+	coupon, _ := lookupCoupon(in.CouponCode, c.ID)
 	rid, token := id(), randomToken()
 	reference, e := nextReference(ctx, tx, c.ID)
 	if e != nil {
 		return "", "", e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires,roster_count) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, fee(c, a.Now()), hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount)
+	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires,roster_count,coupon_code,discount_percent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, payable(c, coupon.PercentOff, a.Now()), hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount, coupon.Code, coupon.PercentOff)
 	if e != nil {
 		return "", "", e
 	}
@@ -199,8 +201,8 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 	}
 	defer tx.Rollback(ctx)
 	var status, cat, email string
-	var roster int
-	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster); e != nil {
+	var roster, discount int
+	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count,discount_percent FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster, &discount); e != nil {
 		return e
 	}
 	if len(in.Note) > 2000 {
@@ -230,8 +232,8 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if e != nil {
 			return e
 		}
-		if in.VerifiedAmountPaise != fee(c, date) {
-			return fmt.Errorf("verified payment must equal %s for the verified date", money(fee(c, date)))
+		if due := payable(c, discount, date); in.VerifiedAmountPaise != due {
+			return fmt.Errorf("verified payment must equal %s for the verified date", money(due))
 		}
 		ref := normalizeReference(in.VerifiedReference)
 		if !validText(ref, 100) {

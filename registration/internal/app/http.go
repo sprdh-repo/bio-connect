@@ -71,6 +71,7 @@ func (a *App) Handler() http.Handler {
 		}
 		respond(w, 200, map[string]any{"categories": c, "registration_enabled": a.Config.RegistrationEnabled, "server_time": a.Now().In(india), "cutoff": cutoff, "sbi_url": a.Config.SBIURL})
 	})
+	m.HandleFunc("POST /api/v1/coupons", a.checkCoupon)
 	m.HandleFunc("POST /api/v1/registrations", func(w http.ResponseWriter, r *http.Request) {
 		if a.limited(r.Context(), "registration:"+a.clientPeer(r), 20, time.Hour) {
 			fail(w, 429, "too many submissions; try again later")
@@ -239,9 +240,47 @@ func (a *App) details(w http.ResponseWriter, r *http.Request, rid string, staff 
 	for _, c := range cats {
 		if c.ID == reg.CategoryID {
 			out["category"] = c
+			out["payable_paise"] = payable(c, reg.DiscountPercent, a.Now())
 		}
 	}
+	if reg.DiscountPercent > 0 {
+		out["bank_transfer"] = bankTransfer
+	}
 	respond(w, 200, out)
+}
+
+// checkCoupon lets the form show the offer price before saving. Create
+// validates the code again, so this is a convenience, never the authority.
+func (a *App) checkCoupon(w http.ResponseWriter, r *http.Request) {
+	if a.limited(r.Context(), "coupon:"+a.clientPeer(r), 60, time.Hour) {
+		fail(w, 429, "too many attempts; try again later")
+		return
+	}
+	var in struct {
+		Code       string `json:"code"`
+		CategoryID string `json:"category_id"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	cats, e := a.categories(r.Context())
+	if e != nil {
+		fail(w, 503, "fees unavailable")
+		return
+	}
+	for _, c := range cats {
+		if c.ID != in.CategoryID {
+			continue
+		}
+		coupon, e := lookupCoupon(normalizeCoupon(in.Code), c.ID)
+		if e != nil || coupon.Code == "" {
+			fail(w, 400, errCoupon.Error())
+			return
+		}
+		respond(w, 200, map[string]any{"code": coupon.Code, "percent_off": coupon.PercentOff, "payable_paise": payable(c, coupon.PercentOff, a.Now())})
+		return
+	}
+	fail(w, 400, "unknown category")
 }
 func (a *App) queryMaps(r *http.Request, q string, args ...any) ([]map[string]any, error) {
 	rows, e := a.DB.Query(r.Context(), q, args...)

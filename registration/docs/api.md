@@ -18,7 +18,7 @@ Amounts, roster counts, category state, and every registration state transition 
   "categories": [
     {"id":"student","kind":"delegate","label":"Students",
      "early_paise":100000,"regular_paise":150000,"roster_count":1,"open":true,
-     "payable_paise":100000}
+     "payable_paise":100000,"coupon_eligible":false}
   ],
   "registration_enabled": false,
   "server_time": "2026-09-07T18:00:00+05:30",
@@ -29,6 +29,19 @@ Amounts, roster counts, category state, and every registration state transition 
 
 `payable_paise` is the fee for the current server date.
 It flips from `early_paise` to `regular_paise` at `cutoff` (1 October 2026, 00:00 IST).
+`coupon_eligible` says whether the form should offer a coupon field for that category; codes and exclusions stay on the server.
+
+### `POST /coupons`
+
+```json
+{"code":"ksum30","category_id":"startup"}
+```
+
+Response `200`: `{"code":"KSUM30","percent_off":30,"payable_paise":245000}`, the offer price for the current server date.
+Codes are case-insensitive.
+An unknown code, or one that does not apply to the category, fails with 400.
+Rate-limited per client to 60 checks an hour.
+This only previews the price; `POST /registrations` validates the code again.
 
 ### `POST /registrations`
 
@@ -44,6 +57,7 @@ Reusing the key with a different body is rejected.
   "email": "ravi@example.com",
   "phone": "+919812345678",
   "description": "Molecular diagnostics",
+  "coupon_code": "",
   "attendees": [
     {"name":"Rep 0","email":"rep0@example.com","phone":"+919812345670",
      "designation":"Scientist","whatsapp_consent":true}
@@ -54,6 +68,9 @@ Reusing the key with a different body is rejected.
 - Delegates: `attendees` must hold exactly one person; contact fields are taken from that person.
 - Exhibitors: `attendees` must hold exactly 3 (premium), 2 (standard), or 2 (table space); `description` is required. The contact person receives a pass only if listed among the attendees.
 - `phone` must be `+` and 8 to 15 digits. `whatsapp_consent` records messaging permission; without it WhatsApp is skipped for that person.
+- `coupon_code` is optional. A valid code freezes its discount on the registration (`coupon_code`, `discount_percent`); an invalid one fails with 400 and saves nothing.
+  `KSUM30` gives 30% off every category except students, applied to whichever fee (early-bird or regular) is current on the verified payment date, rounded to the nearest rupee.
+  A coupon registration pays by direct bank transfer instead of SBI Collect.
 - Fails with 400 if registration is closed or the category is closed.
 
 Response `201`:
@@ -72,7 +89,7 @@ All routes require `Authorization: Bearer <management_token>` scoped to that `{i
 
 | Route | Notes |
 |---|---|
-| `GET /registrations/{id}` | `{registration, category, payments, files, sbi_url, reply_to}` |
+| `GET /registrations/{id}` | `{registration, category, payable_paise, payments, files, sbi_url, reply_to}`, plus `bank_transfer` (`account_name`, `bank`, `branch`, `account_number`, `ifsc`) for a coupon registration. `payable_paise` is what this registration owes today, after any discount. |
 | `POST /registrations/{id}/files?kind=logo\|receipt` | raw body, `Content-Type: application/octet-stream`, <= 5 MB. Logos: PNG/JPEG. Receipts: PDF/PNG/JPEG. File type is validated by content, not extension. `201 {"id":"<fid>"}` |
 | `POST /registrations/{id}/payments` | see below |
 | `GET /registrations/{id}/files/{file}` | returns the uploaded file (302 to a 60-second S3 URL in production) |
@@ -190,7 +207,7 @@ photo framing per key per size, because the same portrait needs a different crop
 
 | `action` | Effect |
 |---|---|
-| `approve_send` | verifies the payment, approves, atomically creates one pass per attendee and the pack (exhibitors), then queues delivery. Requires `successful` and `beneficiary_confirmed`. `verified_amount_paise` must equal the category fee for `verified_date`. `verified_reference` must not already belong to an approved payment. Idempotent once approved. |
+| `approve_send` | verifies the payment, approves, atomically creates one pass per attendee and the pack (exhibitors), then queues delivery. Requires `successful` and `beneficiary_confirmed`. `verified_amount_paise` must equal the category fee for `verified_date`, less any coupon discount frozen on the registration. `verified_reference` must not already belong to an approved payment. Idempotent once approved. |
 | `approve_only` | as above without queueing delivery |
 | `record_approve_send` | from `awaiting_payment`, records a payment found directly in SBI as both reported and verified, then approves and queues delivery. Takes the same verified payment fields and confirmation flags as `approve_send`; no `payment_id` is required. Exhibitors must already have an institution logo. The payment and reviewer action are recorded atomically in the payment history and audit trail. |
 | `record_approve_only` | as above without queueing delivery |

@@ -91,6 +91,9 @@ aside p { color: rgba(255,255,255,0.86); }
 aside small { color: rgba(255,255,255,0.6); }
 aside a { color: var(--lime); }
 .price { font-family: var(--display); font-weight: 700; font-size: 30px; letter-spacing: -0.03em; line-height: 1.15; color: white; margin: 6px 0 4px; }
+.price-was { margin: 6px 0 0; font-size: 15px; color: rgba(255,255,255,0.6); }
+.price-was s { margin-right: 8px; }
+.price-was + .price { margin-top: 0; }
 
 /* ---- forms ---- */
 .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
@@ -107,6 +110,9 @@ input[type=file] { padding: 9px; font-size: 13px; background: var(--cream); }
 input[type=checkbox] { width: 18px; height: 18px; margin: 0 9px 0 0; display: inline-block; vertical-align: -3px; accent-color: var(--forest); }
 .check { display: block; margin-top: 15px; font-size: 14px; font-weight: 400; }
 .help { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.coupon { display: flex; gap: 12px; align-items: flex-end; }
+.coupon label { flex: 1; }
+.coupon input { text-transform: uppercase; }
 
 /* ---- buttons ---- */
 button, .button {
