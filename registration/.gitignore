@@ -2,6 +2,6 @@
 .env.*
 !.env.example
 var/
-bioconnect
+/bioconnect
 coverage.out
 ops/secrets/
