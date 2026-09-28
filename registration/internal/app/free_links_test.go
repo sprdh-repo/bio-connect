@@ -11,19 +11,67 @@ import (
 	"time"
 )
 
-func addFreeLink(t *testing.T, a *App, token string, expires time.Time, autoApprove ...bool) string {
+func addFreeLink(t *testing.T, a *App, token string, expires time.Time, autoApprove bool, kind string) string {
 	t.Helper()
-	auto := true
-	if len(autoApprove) > 0 {
-		auto = autoApprove[0]
-	}
 	staff, _ := addStaff(t, a, "free-links-"+strings.ToLower(token[:8])+"@bioconnect.test", "reviewer")
 	linkID := id()
-	if _, err := a.DB.Exec(context.Background(), `INSERT INTO free_registration_links(id,token_hash,expires_at,auto_approve,created_by)
-		VALUES($1,$2,$3,$4,$5)`, linkID, hash(token), expires, auto, staff); err != nil {
+	if _, err := a.DB.Exec(context.Background(), `UPDATE free_registration_links SET revoked_at=now(),revoked_by=created_by
+		WHERE registration_kind=$1 AND revoked_at IS NULL`, kind); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.DB.Exec(context.Background(), `INSERT INTO free_registration_links(id,token_hash,expires_at,auto_approve,registration_kind,created_by)
+		VALUES($1,$2,$3,$4,$5,$6)`, linkID, hash(token), expires, autoApprove, kind, staff); err != nil {
 		t.Fatal(err)
 	}
 	return linkID
+}
+
+func TestFreeLinkRegistersEveryExhibitorCategory(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
+	a.Now = func() time.Time { return fixed }
+	a.Config.RegistrationEnabled = false
+	if _, err := a.DB.Exec(context.Background(), "UPDATE categories SET open=false WHERE kind='exhibitor'"); err != nil {
+		t.Fatal(err)
+	}
+	token := randomToken()
+	linkID := addFreeLink(t, a, token, fixed.Add(24*time.Hour), true, "exhibitor")
+
+	for i, tc := range []struct {
+		category string
+		roster   int
+	}{{"premium", 5}, {"standard", 3}, {"table", 2}} {
+		in := exhibitorInput(tc.category, tc.roster)
+		in.Email = tc.category + "-free@example.com"
+		in.FreeToken = token
+		rid, managementToken, err := a.Create(context.Background(), in, key(820+i), tinyPNG(t))
+		if err != nil {
+			t.Fatalf("%s free registration: %v", tc.category, err)
+		}
+		if managementToken == "" || status(t, a, rid) != "approved" {
+			t.Fatalf("%s was not immediately approved", tc.category)
+		}
+		var quoted int64
+		var storedLink string
+		if err = a.DB.QueryRow(context.Background(), "SELECT quoted_paise,free_link_id FROM registrations WHERE id=$1", rid).Scan(&quoted, &storedLink); err != nil {
+			t.Fatal(err)
+		}
+		if quoted != 0 || storedLink != linkID {
+			t.Fatalf("%s quoted=%d link=%q, want 0 and %q", tc.category, quoted, storedLink, linkID)
+		}
+		if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1 AND revoked_at IS NULL", rid); n != tc.roster {
+			t.Fatalf("%s active passes=%d, want %d", tc.category, n, tc.roster)
+		}
+		if n := count(t, a, "SELECT count(*) FROM files WHERE registration_id=$1 AND kind='logo'", rid); n != 1 {
+			t.Fatalf("%s logos=%d, want 1", tc.category, n)
+		}
+		if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass'", rid); n != tc.roster {
+			t.Fatalf("%s pass deliveries=%d, want %d", tc.category, n, tc.roster)
+		}
+		if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pack'", rid); n != 1 {
+			t.Fatalf("%s pack deliveries=%d, want 1", tc.category, n)
+		}
+	}
 }
 
 func TestFreeLinkRegistersEveryDelegateCategory(t *testing.T) {
@@ -35,7 +83,7 @@ func TestFreeLinkRegistersEveryDelegateCategory(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := randomToken()
-	linkID := addFreeLink(t, a, token, fixed.Add(24*time.Hour))
+	linkID := addFreeLink(t, a, token, fixed.Add(24*time.Hour), true, "delegate")
 
 	var lastID string
 	var lastInput RegistrationInput
@@ -84,7 +132,7 @@ func TestFreeLinkCanRequireReviewWithoutPayment(t *testing.T) {
 	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
 	a.Now = func() time.Time { return fixed }
 	token := randomToken()
-	addFreeLink(t, a, token, fixed.Add(24*time.Hour), false)
+	addFreeLink(t, a, token, fixed.Add(24*time.Hour), false, "delegate")
 	in := delegateInput("industry")
 	in.FreeToken = token
 	rid, managementToken, err := a.Create(context.Background(), in, key(850), nil)
@@ -132,6 +180,36 @@ func TestFreeLinkCanRequireReviewWithoutPayment(t *testing.T) {
 	}
 }
 
+func TestFreeExhibitorLinkCanRequireReviewWithoutPayment(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
+	a.Now = func() time.Time { return fixed }
+	token := randomToken()
+	addFreeLink(t, a, token, fixed.Add(24*time.Hour), false, "exhibitor")
+	in := exhibitorInput("standard", 3)
+	in.FreeToken = token
+	rid, _, err := a.Create(context.Background(), in, key(852), tinyPNG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status(t, a, rid) != "awaiting_review" {
+		t.Fatalf("status=%s, want awaiting_review", status(t, a, rid))
+	}
+	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE registration_id=$1", rid); n != 0 {
+		t.Fatalf("payment submissions=%d, want 0", n)
+	}
+	staff, _ := addStaff(t, a, "manual-free-exhibitor-reviewer@bioconnect.test", "reviewer")
+	if err = a.Review(context.Background(), rid, staff, ReviewInput{Action: "approve_send", Note: "complimentary stand approved"}); err != nil {
+		t.Fatalf("approve free exhibitor without payment: %v", err)
+	}
+	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1 AND revoked_at IS NULL", rid); n != 3 {
+		t.Fatalf("active passes=%d, want 3", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pack'", rid); n != 1 {
+		t.Fatalf("pack deliveries=%d, want 1", n)
+	}
+}
+
 func TestFreeLinkExpiryIncludesWholeIndiaDate(t *testing.T) {
 	expires, err := freeLinkExpiry("2026-09-30")
 	if err != nil {
@@ -143,13 +221,13 @@ func TestFreeLinkExpiryIncludesWholeIndiaDate(t *testing.T) {
 	}
 }
 
-func TestFreeLinkRejectsExpiredRevokedExhibitorAndCouponUse(t *testing.T) {
+func TestFreeLinkRejectsExpiredRevokedWrongKindAndCouponUse(t *testing.T) {
 	a := mustApp(t)
 	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
 	a.Now = func() time.Time { return fixed }
 
 	expired := randomToken()
-	addFreeLink(t, a, expired, fixed)
+	addFreeLink(t, a, expired, fixed, true, "delegate")
 	in := delegateInput("industry")
 	in.FreeToken = expired
 	if _, _, err := a.Create(context.Background(), in, key(900), nil); err == nil || !strings.Contains(err.Error(), "expired") {
@@ -157,7 +235,7 @@ func TestFreeLinkRejectsExpiredRevokedExhibitorAndCouponUse(t *testing.T) {
 	}
 
 	revoked := randomToken()
-	linkID := addFreeLink(t, a, revoked, fixed.Add(time.Hour))
+	linkID := addFreeLink(t, a, revoked, fixed.Add(time.Hour), true, "delegate")
 	if _, err := a.DB.Exec(context.Background(), "UPDATE free_registration_links SET revoked_at=$2 WHERE id=$1", linkID, fixed); err != nil {
 		t.Fatal(err)
 	}
@@ -167,11 +245,17 @@ func TestFreeLinkRejectsExpiredRevokedExhibitorAndCouponUse(t *testing.T) {
 	}
 
 	valid := randomToken()
-	addFreeLink(t, a, valid, fixed.Add(time.Hour))
+	addFreeLink(t, a, valid, fixed.Add(time.Hour), true, "delegate")
 	ex := exhibitorInput("table", 2)
 	ex.FreeToken = valid
-	if _, _, err := a.Create(context.Background(), ex, key(902), tinyPNG(t)); err == nil || !strings.Contains(err.Error(), "only valid for delegates") {
-		t.Fatalf("exhibitor free link error=%v", err)
+	if _, _, err := a.Create(context.Background(), ex, key(902), tinyPNG(t)); err == nil || !strings.Contains(err.Error(), "not valid for exhibitors") {
+		t.Fatalf("delegate link used for exhibitor error=%v", err)
+	}
+	exhibitorToken := randomToken()
+	addFreeLink(t, a, exhibitorToken, fixed.Add(time.Hour), true, "exhibitor")
+	in.FreeToken = exhibitorToken
+	if _, _, err := a.Create(context.Background(), in, key(904), nil); err == nil || !strings.Contains(err.Error(), "not valid for delegates") {
+		t.Fatalf("exhibitor link used for delegate error=%v", err)
 	}
 	in.FreeToken, in.CouponCode = valid, "KSUM30"
 	if _, _, err := a.Create(context.Background(), in, key(903), nil); err == nil || !strings.Contains(err.Error(), "cannot be combined") {
@@ -206,9 +290,9 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 		return rr
 	}
 
-	generate := func(date string, autoApprove bool) (linkID, token string) {
+	generate := func(date string, autoApprove bool, kind string) (linkID, token string) {
 		t.Helper()
-		rr := request("POST", "/api/v1/admin/free-links", map[string]any{"expires_on": date, "auto_approve": autoApprove})
+		rr := request("POST", "/api/v1/admin/free-links", map[string]any{"expires_on": date, "auto_approve": autoApprove, "registration_kind": kind})
 		if rr.Code != 201 {
 			t.Fatalf("generate returned %d: %s", rr.Code, rr.Body.String())
 		}
@@ -219,11 +303,22 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 		if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		return out.ID, strings.TrimPrefix(out.URL, a.Config.BaseURL+"/delegates#free=")
+		path := "/delegates#free="
+		if kind == "exhibitor" {
+			path = "/exhibitors#free="
+		}
+		if !strings.HasPrefix(out.URL, a.Config.BaseURL+path) {
+			t.Fatalf("%s URL=%q", kind, out.URL)
+		}
+		return out.ID, strings.TrimPrefix(out.URL, a.Config.BaseURL+path)
+	}
+	if rr := request("POST", "/api/v1/admin/free-links", map[string]any{"expires_on": "2026-09-30", "registration_kind": "sponsor"}); rr.Code != 400 {
+		t.Fatalf("invalid registration kind returned %d", rr.Code)
 	}
 
-	firstID, firstToken := generate("2026-09-30", true)
-	secondID, secondToken := generate("2026-10-01", false)
+	firstID, firstToken := generate("2026-09-30", true, "delegate")
+	exhibitorID, exhibitorToken := generate("2026-10-01", false, "exhibitor")
+	secondID, secondToken := generate("2026-10-02", false, "delegate")
 	if firstID == secondID || firstToken == secondToken {
 		t.Fatal("replacement reused link credentials")
 	}
@@ -241,6 +336,10 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 	if !firstAuto || secondAuto {
 		t.Fatalf("stored approval modes first=%v second=%v", firstAuto, secondAuto)
 	}
+	var exhibitorRevoked bool
+	if err := a.DB.QueryRow(context.Background(), "SELECT revoked_at IS NOT NULL FROM free_registration_links WHERE id=$1", exhibitorID).Scan(&exhibitorRevoked); err != nil || exhibitorRevoked {
+		t.Fatalf("exhibitor link revoked=%v err=%v", exhibitorRevoked, err)
+	}
 
 	rr := request("POST", "/api/v1/free-registration/validate", map[string]string{"token": firstToken})
 	if rr.Code != 404 {
@@ -250,6 +349,10 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("new link validation returned %d: %s", rr.Code, rr.Body.String())
 	}
+	rr = request("POST", "/api/v1/free-registration/validate", map[string]string{"token": exhibitorToken})
+	if rr.Code != 200 || !strings.Contains(rr.Body.String(), `"registration_kind":"exhibitor"`) {
+		t.Fatalf("exhibitor link validation returned %d: %s", rr.Code, rr.Body.String())
+	}
 	rr = request("POST", "/api/v1/admin/free-links/"+secondID+"/expire", map[string]any{})
 	if rr.Code != 200 {
 		t.Fatalf("expire returned %d: %s", rr.Code, rr.Body.String())
@@ -257,5 +360,9 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 	rr = request("POST", "/api/v1/free-registration/validate", map[string]string{"token": secondToken})
 	if rr.Code != 404 {
 		t.Fatalf("expired link validation returned %d", rr.Code)
+	}
+	rr = request("POST", "/api/v1/free-registration/validate", map[string]string{"token": exhibitorToken})
+	if rr.Code != 200 {
+		t.Fatalf("expiring delegate link also invalidated exhibitor link: %d %s", rr.Code, rr.Body.String())
 	}
 }

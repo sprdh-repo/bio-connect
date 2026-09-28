@@ -35,9 +35,6 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 		return "", "", errors.New("unknown category")
 	}
 	if in.FreeToken != "" {
-		if c.Kind != "delegate" {
-			return "", "", errors.New("free registration links are only valid for delegates")
-		}
 		if in.CouponCode != "" {
 			return "", "", errors.New("a coupon cannot be combined with a free registration link")
 		}
@@ -60,9 +57,13 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	var freeLinkID string
 	var autoApprove bool
 	if in.FreeToken != "" {
-		freeLinkID, autoApprove, e = a.validFreeLink(ctx, tx, in.FreeToken)
+		var registrationKind string
+		freeLinkID, autoApprove, registrationKind, e = a.validFreeLink(ctx, tx, in.FreeToken)
 		if e != nil {
 			return "", "", e
+		}
+		if c.Kind != registrationKind {
+			return "", "", fmt.Errorf("this free registration link is not valid for %ss", c.Kind)
 		}
 	} else if !a.Config.RegistrationEnabled {
 		return "", "", errors.New("registration is not open yet")
