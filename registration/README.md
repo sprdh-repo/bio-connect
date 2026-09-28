@@ -18,6 +18,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 - Staff console at `/admin` with individual accounts, mandatory TOTP, server sessions, CSRF protection, and login throttling. Account-management and registration-review permissions are separate roles (`manager`, `reviewer`).
 - Reviewers can record and approve a payment found directly in SBI when the registrant did not submit payment evidence; the verified payment and staff action are retained in the payment history and audit trail.
 - Approval atomically creates one pass per attendee plus the delivery jobs. Concurrent approvals and repeated clicks never create extra passes.
+- Exhibitor stalls include 5 (premium), 3 (standard) or 2 (table space) passes. The allowance rose from 3 / 2 / 2 at no extra fee, and existing registrations were given it too: the exhibitor, or staff on their behalf, adds the extra people later, and each new pass is issued and delivered to that person alone. `bioconnect roster-notice` emails affected exhibitors a link to do it (see [operations](docs/operations.md#exhibitor-pass-upgrade-migration-009)).
 - Branded A5 PDF passes with an opaque QR (no contact information). Attendance scanning is deferred.
 - Short human identifiers in one series per category: a registration is `BC4-EX-0007` (the 7th exhibitor), and each of its passes is that reference plus the holder's place in it, `BC4-EX-0007-3`, printed large on the pass and repeated in the pass email.
 The two letters are the word already printed on the pass (`EX`, `FC`, `IN`, `SP`, `ST`), so a code and a badge can never disagree.
@@ -69,7 +70,7 @@ TEST_DATABASE_URL='postgres://bioconnect:local-development-only@localhost:55432/
   go test ./...
 ```
 
-They cover both registration journeys and every category, the exact exhibitor roster counts (3 / 2 / 2) with registrations made before a roster change keeping their original roster, fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
+They cover both registration journeys and every category, the exact exhibitor roster counts (5 / 3 / 2) with registrations made before a roster change keeping their original roster, the 5 / 3 / 2 upgrade reaching only live registrations, filling unassigned passes before and after approval without re-sending anyone else's, the add-attendee notice reaching each open registration once, fee-cutoff boundaries, mismatched amounts, duplicate bank references, payment corrections, interrupted submissions, secure recovery, concurrent approval, approve-only then send, cancellation, reissue vs resend, bulk send, provider failures, worker-lease expiry, duplicate webhooks, staff permission separation, TOTP replay, private-file scoping, export contents and formula-injection neutralisation, the per-category reference series under concurrent registration, pass numbering across a roster and a reissue, staff search by either identifier, and QR readability.
 For posters they cover template-spec validation rule by rule, the 8 MB image checks, poster QR payload rejection, inline asset serving (a redirect here would taint the export canvas), a template save retiring the family's previous active size, field and per-size framing round-tripping, both staff roles reaching the poster routes while registrations stay separated, and every offered builtin logo actually being embedded.
 The shipped artwork is checked too: every spec validates, references two embedded PNGs of exactly its declared canvas size, carries defaults for the event furniture and an https QR payload, and leaves no orphan PNG in the binary; and `poster-seed` is idempotent, keeps staff-edited templates, duplicates no assets on `--replace`, and leaves no template pointing at a missing asset.
 
@@ -186,7 +187,7 @@ way.
 ## Layout
 
 ```
-cmd/bioconnect/         entry point; `migrate` and `staff-create` subcommands
+cmd/bioconnect/         entry point; `migrate`, `staff-create`, `poster-seed` and `roster-notice` subcommands
 internal/app/           the application (one package)
   migrations/           embedded SQL, applied once under an advisory lock
   web/                  embedded server-rendered page, CSS, and progressive-enhancement JS

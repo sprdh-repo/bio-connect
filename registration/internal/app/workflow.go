@@ -165,8 +165,10 @@ func (a *App) issuePasses(ctx context.Context, tx pgx.Tx, rid string, roster int
 	if err != nil {
 		return err
 	}
-	if len(people) != roster {
-		return errors.New("roster is incomplete")
+	// Places left empty after an allowance rise (migration 009) are filled
+	// later by AddAttendee, which issues their passes then.
+	if len(people) == 0 || len(people) > roster {
+		return errors.New("roster does not match the pass allowance")
 	}
 	for _, aid := range people {
 		if _, err = a.newPass(ctx, tx, rid, aid); err != nil {
@@ -417,6 +419,10 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if e = a.queue(ctx, tx, rid, "", "payment_reminder", "email", email, a.Config.BaseURL+"/recover#"+token, "payment_reminder:"+hash(token)); e != nil {
 			return e
 		}
+	case "roster_notice":
+		if e = a.rosterNotice(ctx, tx, rid, status, cat, email); e != nil {
+			return e
+		}
 	case "reissue":
 		if status != "approved" || strings.TrimSpace(in.Note) == "" {
 			return ErrConflict
@@ -485,6 +491,21 @@ func (a *App) queue(ctx context.Context, tx pgx.Tx, rid, pid, purpose, channel, 
 	_, e := tx.Exec(ctx, `INSERT INTO delivery_jobs(id,registration_id,pass_id,purpose,channel,recipient,payload_cipher,dedupe_key) VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8) ON CONFLICT(dedupe_key) DO NOTHING`, id(), rid, pid, purpose, channel, to, a.seal(payload), key)
 	return e
 }
+
+// queuePass queues one pass to its holder. The dedupe key is shared with
+// queuePasses, so a pass queued here under "initial" is not sent twice by a
+// later "send".
+func (a *App) queuePass(ctx context.Context, tx pgx.Tx, rid, pid, email, phone string, consent bool, channel, key string) error {
+	if channel == "" || channel == "email" {
+		if e := a.queue(ctx, tx, rid, pid, "pass", "email", email, "", key+":"+pid+":email"); e != nil {
+			return e
+		}
+	}
+	if consent && (channel == "" || channel == "whatsapp") {
+		return a.queue(ctx, tx, rid, pid, "pass", "whatsapp", phone, "", key+":"+pid+":whatsapp")
+	}
+	return nil
+}
 func (a *App) queuePasses(ctx context.Context, tx pgx.Tx, rid, channel, key string) error {
 	rows, e := tx.Query(ctx, `SELECT p.id,a.email,a.phone,a.whatsapp_consent FROM passes p JOIN attendees a ON a.id=p.attendee_id WHERE p.registration_id=$1 AND p.revoked_at IS NULL`, rid)
 	if e != nil {
@@ -509,15 +530,8 @@ func (a *App) queuePasses(ctx context.Context, tx pgx.Tx, rid, channel, key stri
 		return e
 	}
 	for _, p := range all {
-		if channel == "" || channel == "email" {
-			if e = a.queue(ctx, tx, rid, p.pid, "pass", "email", p.email, "", key+":"+p.pid+":email"); e != nil {
-				return e
-			}
-		}
-		if p.consent && (channel == "" || channel == "whatsapp") {
-			if e = a.queue(ctx, tx, rid, p.pid, "pass", "whatsapp", p.phone, "", key+":"+p.pid+":whatsapp"); e != nil {
-				return e
-			}
+		if e = a.queuePass(ctx, tx, rid, p.pid, p.email, p.phone, p.consent, channel, key); e != nil {
+			return e
 		}
 	}
 	var kind, email string

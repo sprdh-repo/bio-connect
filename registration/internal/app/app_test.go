@@ -237,7 +237,7 @@ func TestExhibitorRosterCountsEnforced(t *testing.T) {
 	cases := []struct {
 		cat  string
 		want int
-	}{{"premium", 3}, {"standard", 2}, {"table", 2}}
+	}{{"premium", 5}, {"standard", 3}, {"table", 2}}
 	for i, c := range cases {
 		if _, _, err := a.Create(ctx, exhibitorInput(c.cat, c.want-1), key(100+i), tinyPNG(t)); err == nil {
 			t.Fatalf("%s: accepted %d attendees, want exactly %d", c.cat, c.want-1, c.want)
@@ -620,7 +620,7 @@ func TestConcurrentApprovalCreatesNoExtraPasses(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 2), key(1), tinyPNG(t))
+	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 3), key(1), tinyPNG(t))
 	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
 
 	var wg sync.WaitGroup
@@ -638,11 +638,11 @@ func TestConcurrentApprovalCreatesNoExtraPasses(t *testing.T) {
 			t.Fatalf("concurrent approve %d errored: %v", i, e)
 		}
 	}
-	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 2 {
-		t.Fatalf("%d passes after concurrent approval, want 2", n)
+	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 3 {
+		t.Fatalf("%d passes after concurrent approval, want 3", n)
 	}
-	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass' AND channel='email'", rid); n != 2 {
-		t.Fatalf("%d email pass jobs, want 2", n)
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass' AND channel='email'", rid); n != 3 {
+		t.Fatalf("%d email pass jobs, want 3", n)
 	}
 	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND action='approve_send'", rid); n != 1 {
 		t.Fatalf("%d approval audit rows, want 1", n)
@@ -753,7 +753,7 @@ func TestSummaryCountsRegisteredAndConfirmedPerCategory(t *testing.T) {
 	if _, _, err := a.Create(ctx, delegateInput("industry"), key(3), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := a.Create(ctx, exhibitorInput("premium", 3), key(4), tinyPNG(t)); err != nil {
+	if _, _, err := a.Create(ctx, exhibitorInput("premium", 5), key(4), tinyPNG(t)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1138,7 +1138,7 @@ func TestPassNumbersFollowTheRegistrationReference(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
-	rid, _, err := a.Create(ctx, exhibitorInput("premium", 3), key(1), tinyPNG(t))
+	rid, _, err := a.Create(ctx, exhibitorInput("premium", 5), key(1), tinyPNG(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1151,7 +1151,7 @@ func TestPassNumbersFollowTheRegistrationReference(t *testing.T) {
 	if reference != "BC4-EX-0001" {
 		t.Fatalf("exhibitor reference %q, want BC4-EX-0001", reference)
 	}
-	for i, want := range []string{"-1", "-2", "-3"} {
+	for i, want := range []string{"-1", "-2", "-3", "-4", "-5"} {
 		if n := nth(t, a, rid, i); n != reference+want {
 			t.Fatalf("pass %d numbered %q, want %q", i+1, n, reference+want)
 		}
@@ -1161,8 +1161,8 @@ func TestPassNumbersFollowTheRegistrationReference(t *testing.T) {
 	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "reissue", PassID: passID, Note: "misprint"}); err != nil {
 		t.Fatalf("reissue: %v", err)
 	}
-	if n := nth(t, a, rid, 3); n != reference+"-4" {
-		t.Fatalf("reissued pass numbered %q, want %q", n, reference+"-4")
+	if n := nth(t, a, rid, 5); n != reference+"-6" {
+		t.Fatalf("reissued pass numbered %q, want %q", n, reference+"-6")
 	}
 }
 
@@ -1185,7 +1185,7 @@ func TestReferenceSeriesIsPerCategory(t *testing.T) {
 		in := delegateInput(cat)
 		var logo []byte
 		if cat == "premium" {
-			in = exhibitorInput(cat, 3)
+			in = exhibitorInput(cat, 5)
 			logo = tinyPNG(t)
 		}
 		rid, _, err := a.Create(ctx, in, key(i+1), logo)

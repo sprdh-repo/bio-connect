@@ -56,6 +56,22 @@ Keep the previous image tag recorded with each deploy.
 Because migrations are forward-only, a rollback that must also undo a schema change is a restore (below) to the pre-deploy hourly backup, then redeploy the previous image.
 Take a manual backup (`/opt/bioconnect/ops/backup.sh`) immediately before any deploy that includes a new migration.
 
+### Exhibitor pass upgrade (migration 009)
+
+Exhibitor allowances rose from 3 / 2 / 2 to 5 / 3 / 2 passes (premium, standard, table) at no extra fee.
+The migration runs on deploy and raises every live premium and standard registration to the new allowance; passes already issued are not touched or re-sent.
+Right after that deploy, tell the affected exhibitors they have passes to assign:
+
+```sh
+sudo docker compose -f /opt/bioconnect/compose.production.yaml exec app bioconnect roster-notice
+```
+
+It emails each exhibitor contact with unassigned passes a single-use link to their registration, valid for 7 days, and prints one line per registration.
+Re-running it only reaches registrations that have never had the notice; staff can send a single one again from the console (at most once per 24 hours).
+
+Do not roll back to an image from before 009 without also restoring the pre-deploy backup.
+Older code cannot approve a registration with unassigned passes, and would send a queued notice as a generic pass email.
+
 ## Backups and snapshots
 
 - **Hourly encrypted database backup**: `ops/bioconnect-backup.timer` runs `ops/backup.sh`, which `pg_dump -Fc`, verifies the archive with `pg_restore --list`, and uploads to `s3://$BACKUP_BUCKET/postgres/<ISO8601>.dump` with SSE-KMS.

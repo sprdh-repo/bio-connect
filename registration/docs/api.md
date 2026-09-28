@@ -66,7 +66,8 @@ Reusing the key with a different body is rejected.
 ```
 
 - Delegates: `attendees` must hold exactly one person; contact fields are taken from that person.
-- Exhibitors: `attendees` must hold exactly 3 (premium), 2 (standard), or 2 (table space); `description` is required. The contact person receives a pass only if listed among the attendees.
+- Exhibitors: `attendees` must hold exactly 5 (premium), 3 (standard), or 2 (table space); `description` is required. The contact person receives a pass only if listed among the attendees.
+  The allowance is recorded on the registration as `roster_count`. It rose from 3 / 2 / 2 in migration 009, which granted it to existing registrations too, so an older registration can hold fewer attendees than its allowance until the places are filled (see `POST /registrations/{id}/attendees`).
 - `phone` must be `+` and 8 to 15 digits. `whatsapp_consent` records messaging permission; without it WhatsApp is skipped for that person.
 - `coupon_code` is optional. A valid code freezes its discount on the registration (`coupon_code`, `discount_percent`); an invalid one fails with 400 and saves nothing.
   `KSUM30` gives 30% off every category except students, applied to whichever fee (early-bird or regular) is current on the verified payment date, rounded to the nearest rupee.
@@ -93,6 +94,7 @@ All routes require `Authorization: Bearer <management_token>` scoped to that `{i
 | `POST /registrations/{id}/files?kind=logo\|receipt` | raw body, `Content-Type: application/octet-stream`, <= 5 MB. Logos: PNG/JPEG. Receipts: PDF/PNG/JPEG. File type is validated by content, not extension. `201 {"id":"<fid>"}` |
 | `POST /registrations/{id}/payments` | see below |
 | `GET /registrations/{id}/files/{file}` | returns the uploaded file (302 to a 60-second S3 URL in production) |
+| `POST /registrations/{id}/attendees` | see below |
 
 Uploads are only accepted while the registration is `awaiting_payment` or `correction_requested`.
 
@@ -107,6 +109,17 @@ Requires `reference` and `date` (and a `logo` upload for exhibitors).
 `receipt_id` is optional: pass one from a prior `kind=receipt` upload to attach the SBI receipt, or omit it.
 Moves the registration to `awaiting_review` and appends to the payment history.
 Submitting evidence, uploading a receipt, or a browser redirect never approves payment on its own.
+
+`POST /registrations/{id}/attendees` fills one unassigned pass on an exhibitor registration:
+
+```json
+{"name":"Meera Pillai","designation":"Engineer","email":"meera@example.com","phone":"+919812345679","whatsapp_consent":true}
+```
+
+- 409 if every pass is assigned, the person's email is already on the registration, or the registration is `rejected` or `cancelled`. Delegate registrations have no additional passes.
+- Before approval the person joins the roster, and approval issues their pass with the rest.
+- After approval their pass is issued at once at the next free place (`BC4-EX-0007-4`). If the team's passes have already been sent, it is delivered to them alone and the contact receives a refreshed pack; nobody else is sent anything. After `approve_only`, the next `send` delivers it with the others.
+- `GET /registrations/{id}` returns `registration.roster_count` alongside `registration.attendees`, so the page can show how many passes are unassigned.
 
 ### Recovery (no account)
 
@@ -146,6 +159,7 @@ Roles are disjoint:
 | `GET /admin/registrations/{id}` | full record: registration, category, payments, files, passes, deliveries, audit trail |
 | `POST /admin/registrations/{id}/review` | state transitions, see below |
 | `GET /admin/registrations/{id}/files/{file}` | private receipt/logo download |
+| `POST /admin/registrations/{id}/attendees` | same body and rules as the registrant route; fills an unassigned pass on the exhibitor's behalf, attributed to the staff member in the audit trail |
 | `GET /admin/export?format=csv\|xlsx&sheet=&<same filters>` | CSV is one `sheet` (`Registrations`, `Attendees`, `Payments`, `Deliveries`); XLSX has all four. Cells that begin with `= + - @` are prefixed with `'`. 50,000-row cap. |
 | `POST /admin/categories` | `{id, open}` opens or closes a category |
 | `POST /admin/bulk-send` | `{ids:[...], channel:""}` runs `send` for 1-100 approved registrations; returns per-id `queued` or the error |
@@ -207,7 +221,7 @@ photo framing per key per size, because the same portrait needs a different crop
 
 | `action` | Effect |
 |---|---|
-| `approve_send` | verifies the payment, approves, atomically creates one pass per attendee and the pack (exhibitors), then queues delivery. Requires `successful` and `beneficiary_confirmed`. `verified_amount_paise` must equal the category fee for `verified_date`, less any coupon discount frozen on the registration. `verified_reference` must not already belong to an approved payment. Idempotent once approved. |
+| `approve_send` | verifies the payment, approves, atomically creates one pass per attendee on the registration (unassigned places get theirs when filled) and the pack (exhibitors), then queues delivery. Requires `successful` and `beneficiary_confirmed`. `verified_amount_paise` must equal the category fee for `verified_date`, less any coupon discount frozen on the registration. `verified_reference` must not already belong to an approved payment. Idempotent once approved. |
 | `approve_only` | as above without queueing delivery |
 | `record_approve_send` | from `awaiting_payment`, records a payment found directly in SBI as both reported and verified, then approves and queues delivery. Takes the same verified payment fields and confirmation flags as `approve_send`; no `payment_id` is required. Exhibitors must already have an institution logo. The payment and reviewer action are recorded atomically in the payment history and audit trail. |
 | `record_approve_only` | as above without queueing delivery |
@@ -215,6 +229,7 @@ photo framing per key per size, because the same portrait needs a different crop
 | `resend` | needs a unique `request_id`; queues a fresh delivery of the existing passes |
 | `reissue` | `{pass_id, note}`; revokes that pass, its QR and its pass number, issues the next version at the next free place in the registration (`...-4` after a roster of 3), queues delivery |
 | `payment_reminder` | from `awaiting_payment` only; emails the contact the reference, the fee payable today, and a single-use `/recover#<token>` link valid for 7 days. The existing management link keeps working until that link is used. At most one reminder per registration per 24 hours. A queued reminder is cancelled if the registration has left `awaiting_payment` by the time it is sent. |
+| `roster_notice` | exhibitors with unassigned passes, not `rejected` or `cancelled`; emails the contact how many passes are unassigned and a single-use `/recover#<token>` link valid for 7 days. At most one per registration per 24 hours. A queued notice is dropped if the places are filled, or the registration ends, before it is sent. `bioconnect roster-notice` sends it to every registration that has never had one. |
 | `correction_requested` / `rejected` | `{note}` required; only from `awaiting_review` |
 | `cancelled` | `{note}` required; revokes all passes and cancels queued pass/pack jobs |
 

@@ -71,6 +71,23 @@ func run() error {
 				fmt.Println("templates staff have edited are never overwritten; duplicate one to start from it")
 			}
 			return nil
+		case "roster-notice":
+			// Emails every exhibitor with unassigned passes a single-use link to
+			// add the people who will use them. Safe to re-run: a registration is
+			// only ever notified once this way.
+			results, e := a.NotifyOpenPlaces(ctx)
+			if e != nil {
+				return e
+			}
+			queued := 0
+			for _, r := range results {
+				if r.Outcome == "queued" {
+					queued++
+				}
+				fmt.Printf("  %-12s %-40.40s %s\n", r.Reference, r.Institution, r.Outcome)
+			}
+			fmt.Printf("\n%d of %d exhibitors notified\n", queued, len(results))
+			return nil
 		default:
 			return fmt.Errorf("unknown command")
 		}

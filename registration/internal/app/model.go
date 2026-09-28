@@ -94,8 +94,11 @@ type Registration struct {
 	Free        bool      `json:"free_registration"`
 	// DiscountPercent is frozen when the registration is saved; non-zero means
 	// the fee is paid by direct bank transfer.
-	DiscountPercent int        `json:"discount_percent"`
-	Attendees       []Attendee `json:"attendees"`
+	DiscountPercent int `json:"discount_percent"`
+	// RosterCount is this registration's pass allowance; fewer attendees than
+	// this means open places (see AddAttendee).
+	RosterCount int        `json:"roster_count"`
+	Attendees   []Attendee `json:"attendees"`
 }
 
 var phoneRE = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
@@ -229,7 +232,7 @@ func audit(ctx context.Context, tx pgx.Tx, staff, reg, action, detail string) er
 }
 func (a *App) registration(ctx context.Context, key string) (Registration, error) {
 	var r Registration
-	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL,discount_percent FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.DiscountPercent)
+	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL,discount_percent,roster_count FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.DiscountPercent, &r.RosterCount)
 	if e != nil {
 		return r, e
 	}

@@ -71,6 +71,19 @@ func (a *App) WorkOnce(ctx context.Context) error {
 		}
 		return tx.Commit(ctx)
 	}
+	// Nor should a contact be asked to fill places that are already filled, or on a registration that has ended.
+	if j.Purpose == "roster_notice" {
+		var open bool
+		if e = tx.QueryRow(ctx, "SELECT roster_count>(SELECT count(*) FROM attendees WHERE registration_id=$1) FROM registrations WHERE id=$1", j.RegistrationID).Scan(&open); e != nil {
+			return e
+		}
+		if !open || status == "rejected" || status == "cancelled" {
+			if _, e = tx.Exec(ctx, "UPDATE delivery_jobs SET status='cancelled',updated_at=now() WHERE id=$1", j.ID); e != nil {
+				return e
+			}
+			return tx.Commit(ctx)
+		}
+	}
 	if j.Purpose == "pass" || j.Purpose == "pack" {
 		valid := status == "approved"
 		if valid && j.PassID != "" {
@@ -241,6 +254,25 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 				how = "the bank account details for your transfer"
 			}
 			intro = "Your registration " + reference + " is saved, but we have not received your payment details yet. The fee payable today is " + money(payable(c, discount, a.Now())) + ".\n\nOpen your registration for " + how + ", then submit your bank reference so we can verify the payment and issue your passes. If you have already paid, submit those payment details.\n\nThis link works once and expires in 7 days. Keep it to yourself."
+		case "roster_notice":
+			var reference, label, registrationStatus string
+			var roster, filled int
+			if e = a.DB.QueryRow(ctx, "SELECT r.reference,c.label,r.status,r.roster_count,(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id) FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1", j.RegistrationID).Scan(&reference, &label, &registrationStatus, &roster, &filled); e != nil {
+				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
+			}
+			subject = "Bio Connect 4.0 - more passes for " + reference
+			heading = "Your stall now includes more passes"
+			cta = "Add attendees"
+			when := "as soon as you add them"
+			if registrationStatus != "approved" {
+				when = "once your registration is approved"
+			}
+			open := roster - filled
+			places := "passes are"
+			if open == 1 {
+				places = "pass is"
+			}
+			intro = fmt.Sprintf("Your %s registration %s now includes %d delegate passes, at no extra cost. %d %s not yet assigned to anyone.\n\nOpen your registration to add the people who will use them. Each person receives their own pass %s. Passes already issued to your team stay valid and do not change.\n\nThis link works once and expires in 7 days. Keep it to yourself.", label, reference, roster, open, places, when)
 		case "recovery":
 			subject = "Bio Connect 4.0 - recover your registration"
 			heading = "Recover your registration"

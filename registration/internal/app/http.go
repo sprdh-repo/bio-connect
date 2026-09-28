@@ -130,6 +130,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("/api/v1/registrations/{id}", a.registrationAPI)
 	m.HandleFunc("POST /api/v1/registrations/{id}/payments", a.registrationAPI)
 	m.HandleFunc("POST /api/v1/registrations/{id}/files", a.registrationAPI)
+	m.HandleFunc("POST /api/v1/registrations/{id}/attendees", a.registrationAPI)
 	m.HandleFunc("GET /api/v1/registrations/{id}/files/{file}", a.registrationAPI)
 	m.HandleFunc("/api/v1/admin/", a.adminAPI)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +205,8 @@ func (a *App) registrationAPI(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"ok": true})
 	case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/files"):
 		a.upload(w, r, rid)
+	case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/attendees"):
+		a.addAttendee(w, r, rid, "")
 	case r.Method == "GET" && r.PathValue("file") != "":
 		a.downloadFile(w, r, rid, r.PathValue("file"))
 	case r.Method == "GET":
@@ -253,6 +256,20 @@ func (a *App) details(w http.ResponseWriter, r *http.Request, rid string, staff 
 		out["bank_transfer"] = bankTransfer
 	}
 	respond(w, 200, out)
+}
+
+// addAttendee fills an open pass place for the exhibitor (staff empty) or on
+// their behalf from the console.
+func (a *App) addAttendee(w http.ResponseWriter, r *http.Request, rid, staff string) {
+	var in Attendee
+	if !decode(w, r, &in) {
+		return
+	}
+	if e := a.AddAttendee(r.Context(), rid, staff, in); e != nil {
+		fail(w, 409, publicError(e))
+		return
+	}
+	respond(w, 200, map[string]bool{"ok": true})
 }
 
 // checkCoupon lets the form show the offer price before saving. Create
@@ -485,6 +502,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(parts) == 3 && parts[2] == "files" && r.Method == "POST" {
 			a.adminUpload(w, r, rid, p)
+			return
+		}
+		if len(parts) == 3 && parts[2] == "attendees" && r.Method == "POST" {
+			a.addAttendee(w, r, rid, p.ID)
 			return
 		}
 		fail(w, 404, "not found")
