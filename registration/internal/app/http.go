@@ -72,6 +72,7 @@ func (a *App) Handler() http.Handler {
 		respond(w, 200, map[string]any{"categories": c, "registration_enabled": a.Config.RegistrationEnabled, "server_time": a.Now().In(india), "cutoff": cutoff, "sbi_url": a.Config.SBIURL})
 	})
 	m.HandleFunc("POST /api/v1/coupons", a.checkCoupon)
+	m.HandleFunc("POST /api/v1/free-registration/validate", a.validateFreeLink)
 	m.HandleFunc("POST /api/v1/registrations", func(w http.ResponseWriter, r *http.Request) {
 		if a.limited(r.Context(), "registration:"+a.clientPeer(r), 20, time.Hour) {
 			fail(w, 429, "too many submissions; try again later")
@@ -239,8 +240,13 @@ func (a *App) details(w http.ResponseWriter, r *http.Request, rid string, staff 
 	}
 	for _, c := range cats {
 		if c.ID == reg.CategoryID {
+			if reg.Free {
+				c.Label += " · Free link"
+				out["payable_paise"] = 0
+			} else {
+				out["payable_paise"] = payable(c, reg.DiscountPercent, a.Now())
+			}
 			out["category"] = c
-			out["payable_paise"] = payable(c, reg.DiscountPercent, a.Now())
 		}
 	}
 	if reg.DiscountPercent > 0 {
@@ -367,6 +373,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "registration reviewer permission required")
 		return
 	}
+	if path == "free-links" || strings.HasPrefix(path, "free-links/") {
+		a.freeLinksAPI(w, r, p, path)
+		return
+	}
 	switch {
 	case path == "registrations" && r.Method == "GET":
 		where, args, e := filter(r)
@@ -388,7 +398,7 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		args = append(args, (page-1)*25)
-		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id,r.status,r.quoted_paise,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT 25 OFFSET $7", args...)
+		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id || CASE WHEN r.free_link_id IS NOT NULL THEN ' · Free link' ELSE '' END AS category_id,r.status,r.quoted_paise,r.free_link_id IS NOT NULL AS free_registration,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT 25 OFFSET $7", args...)
 		if e != nil {
 			fail(w, 503, "listing unavailable")
 			return

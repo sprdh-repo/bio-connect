@@ -18,9 +18,6 @@ const reminderLinkLifetime = 7 * 24 * time.Hour
 const consentText = "I have permission to send this attendee their Bio Connect 4.0 pass and delivery updates by WhatsApp."
 
 func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo []byte) (string, string, error) {
-	if !a.Config.RegistrationEnabled {
-		return "", "", errors.New("registration is not open yet")
-	}
 	if len(key) < 32 || len(key) > 128 {
 		return "", "", errors.New("a 32-128 character Idempotency-Key is required")
 	}
@@ -37,6 +34,14 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	if e != nil {
 		return "", "", errors.New("unknown category")
 	}
+	if in.FreeToken != "" {
+		if c.Kind != "delegate" {
+			return "", "", errors.New("free registration links are only valid for delegates")
+		}
+		if in.CouponCode != "" {
+			return "", "", errors.New("a coupon cannot be combined with a free registration link")
+		}
+	}
 	if e = validateInput(&in, c); e != nil {
 		return "", "", e
 	}
@@ -52,7 +57,17 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	if !errors.Is(e, pgx.ErrNoRows) {
 		return "", "", e
 	}
-	if !c.Open {
+	var freeLinkID string
+	var autoApprove bool
+	if in.FreeToken != "" {
+		freeLinkID, autoApprove, e = a.validFreeLink(ctx, tx, in.FreeToken)
+		if e != nil {
+			return "", "", e
+		}
+	} else if !a.Config.RegistrationEnabled {
+		return "", "", errors.New("registration is not open yet")
+	}
+	if !c.Open && freeLinkID == "" {
 		return "", "", errors.New("this category is closed")
 	}
 	// Exhibitors must submit their logo in the same request that creates the
@@ -75,7 +90,16 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	if e != nil {
 		return "", "", e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,quoted_paise,management_hash,management_expires,roster_count,coupon_code,discount_percent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, payable(c, coupon.PercentOff, a.Now()), hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount, coupon.Code, coupon.PercentOff)
+	status, quoted := "awaiting_payment", payable(c, coupon.PercentOff, a.Now())
+	var approvedAt any
+	var freeLink any
+	if freeLinkID != "" {
+		status, quoted, freeLink = "awaiting_review", 0, freeLinkID
+		if autoApprove {
+			status, approvedAt = "approved", a.Now()
+		}
+	}
+	_, e = tx.Exec(ctx, `INSERT INTO registrations(id,reference,idempotency_hash,request_hash,category_id,institution,contact_name,email,phone,description,status,quoted_paise,management_hash,management_expires,roster_count,coupon_code,discount_percent,approved_at,free_link_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`, rid, reference, hash(key), rh, c.ID, in.Institution, in.ContactName, in.Email, in.Phone, in.Description, status, quoted, hash(token), a.Now().Add(30*24*time.Hour), c.RosterCount, coupon.Code, coupon.PercentOff, approvedAt, freeLink)
 	if e != nil {
 		return "", "", e
 	}
@@ -104,10 +128,54 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	if e = a.queue(ctx, tx, rid, "", "registration", "email", in.Email, a.Config.BaseURL+"/manage/"+rid+"#"+token, "registration:"+rid); e != nil {
 		return "", "", e
 	}
-	if e = audit(ctx, tx, "", rid, "registered", c.ID); e != nil {
+	if freeLinkID != "" && autoApprove {
+		if e = a.issuePasses(ctx, tx, rid, c.RosterCount); e != nil {
+			return "", "", e
+		}
+		if e = a.queuePasses(ctx, tx, rid, "", "initial"); e != nil {
+			return "", "", e
+		}
+	}
+	action := "registered"
+	if freeLinkID != "" {
+		action = "free_link_registered"
+	}
+	if e = audit(ctx, tx, "", rid, action, c.ID); e != nil {
 		return "", "", e
 	}
 	return rid, token, tx.Commit(ctx)
+}
+
+func (a *App) issuePasses(ctx context.Context, tx pgx.Tx, rid string, roster int) error {
+	rows, err := tx.Query(ctx, "SELECT id FROM attendees WHERE registration_id=$1 ORDER BY position", rid)
+	if err != nil {
+		return err
+	}
+	var people []string
+	for rows.Next() {
+		var aid string
+		if err = rows.Scan(&aid); err != nil {
+			rows.Close()
+			return err
+		}
+		people = append(people, aid)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if len(people) != roster {
+		return errors.New("roster is incomplete")
+	}
+	for _, aid := range people {
+		if _, err = a.newPass(ctx, tx, rid, aid); err != nil {
+			return err
+		}
+	}
+	pack := randomToken()
+	_, err = tx.Exec(ctx, "UPDATE registrations SET contact_pack_hash=$2,contact_pack_cipher=$3 WHERE id=$1", rid, hash(pack), a.seal(pack))
+	return err
 }
 
 type PaymentInput struct {
@@ -202,7 +270,8 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 	defer tx.Rollback(ctx)
 	var status, cat, email string
 	var roster, discount int
-	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count,discount_percent FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster, &discount); e != nil {
+	var free bool
+	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count,discount_percent,free_link_id IS NOT NULL FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster, &discount, &free); e != nil {
 		return e
 	}
 	if len(in.Note) > 2000 {
@@ -214,6 +283,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			return tx.Commit(ctx)
 		}
 		recordPayment := strings.HasPrefix(in.Action, "record_")
+		if free && recordPayment {
+			return ErrConflict
+		}
 		expectedStatus := "awaiting_review"
 		if recordPayment {
 			expectedStatus = "awaiting_payment"
@@ -221,84 +293,59 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if status != expectedStatus {
 			return ErrConflict
 		}
-		if !in.Successful || !in.BeneficiaryConfirmed {
-			return errors.New("confirm successful payment and beneficiary against bank records")
-		}
-		date, e := paymentDate(in.VerifiedDate, a.Now())
-		if e != nil {
-			return e
-		}
-		c, e := category(ctx, tx, cat)
-		if e != nil {
-			return e
-		}
-		if due := payable(c, discount, date); in.VerifiedAmountPaise != due {
-			return fmt.Errorf("verified payment must equal %s for the verified date", money(due))
-		}
-		ref := normalizeReference(in.VerifiedReference)
-		if !validText(ref, 100) {
-			return errors.New("verified bank reference is required")
-		}
-		if recordPayment {
-			if c.Kind == "exhibitor" {
-				var hasLogo bool
-				if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE registration_id=$1 AND kind='logo')", rid).Scan(&hasLogo); e != nil {
-					return e
-				}
-				if !hasLogo {
-					return errors.New("the exhibitor must upload the institution logo before approval")
-				}
+		if !free {
+			if !in.Successful || !in.BeneficiaryConfirmed {
+				return errors.New("confirm successful payment and beneficiary against bank records")
 			}
-			_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
+			date, e := paymentDate(in.VerifiedDate, a.Now())
+			if e != nil {
+				return e
+			}
+			c, e := category(ctx, tx, cat)
+			if e != nil {
+				return e
+			}
+			if due := payable(c, discount, date); in.VerifiedAmountPaise != due {
+				return fmt.Errorf("verified payment must equal %s for the verified date", money(due))
+			}
+			ref := normalizeReference(in.VerifiedReference)
+			if !validText(ref, 100) {
+				return errors.New("verified bank reference is required")
+			}
+			if recordPayment {
+				if c.Kind == "exhibitor" {
+					var hasLogo bool
+					if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM files WHERE registration_id=$1 AND kind='logo')", rid).Scan(&hasLogo); e != nil {
+						return e
+					}
+					if !hasLogo {
+						return errors.New("the exhibitor must upload the institution logo before approval")
+					}
+				}
+				_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
 				id,registration_id,bank_reference,payment_date,amount_paise,
 				verified_at,verified_by,verified_reference,verified_date,verified_amount_paise,beneficiary_confirmed
 			) VALUES($1,$2,$3,$4,$5,now(),$6,$3,$4,$5,true)`, id(), rid, ref, date, in.VerifiedAmountPaise, staff)
-		} else {
-			var latest string
-			if e = tx.QueryRow(ctx, "SELECT id FROM payment_submissions WHERE registration_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1", rid).Scan(&latest); e != nil {
-				return e
+			} else {
+				var latest string
+				if e = tx.QueryRow(ctx, "SELECT id FROM payment_submissions WHERE registration_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1", rid).Scan(&latest); e != nil {
+					return e
+				}
+				if latest != in.PaymentID {
+					return errors.New("review the latest payment submission")
+				}
+				_, e = tx.Exec(ctx, `UPDATE payment_submissions SET verified_at=now(),verified_by=$2,verified_reference=$3,verified_date=$4,verified_amount_paise=$5,beneficiary_confirmed=true WHERE id=$1`, latest, staff, ref, date, in.VerifiedAmountPaise)
 			}
-			if latest != in.PaymentID {
-				return errors.New("review the latest payment submission")
+			if e != nil {
+				return fmt.Errorf("bank reference is already approved or payment could not be verified: %w", e)
 			}
-			_, e = tx.Exec(ctx, `UPDATE payment_submissions SET verified_at=now(),verified_by=$2,verified_reference=$3,verified_date=$4,verified_amount_paise=$5,beneficiary_confirmed=true WHERE id=$1`, latest, staff, ref, date, in.VerifiedAmountPaise)
-		}
-		if e != nil {
-			return fmt.Errorf("bank reference is already approved or payment could not be verified: %w", e)
 		}
 		if _, e = tx.Exec(ctx, "UPDATE registrations SET status='approved',approved_at=now(),approved_by=$2,review_note=$3,updated_at=now() WHERE id=$1", rid, staff, in.Note); e != nil {
 			return e
 		}
-		rows, e := tx.Query(ctx, "SELECT id FROM attendees WHERE registration_id=$1 ORDER BY position", rid)
-		if e != nil {
-			return e
-		}
-		var people []string
-		for rows.Next() {
-			var aid string
-			if e = rows.Scan(&aid); e != nil {
-				rows.Close()
-				return e
-			}
-			people = append(people, aid)
-		}
-		e = rows.Err()
-		rows.Close()
-		if e != nil {
-			return e
-		}
 		// Against the roster recorded at registration, not the category's current
 		// allowance, so a later allowance change cannot strand an existing registration.
-		if len(people) != roster {
-			return errors.New("roster is incomplete")
-		}
-		for _, aid := range people {
-			if _, e = a.newPass(ctx, tx, rid, aid); e != nil {
-				return e
-			}
-		}
-		pack := randomToken()
-		if _, e = tx.Exec(ctx, "UPDATE registrations SET contact_pack_hash=$2,contact_pack_cipher=$3 WHERE id=$1", rid, hash(pack), a.seal(pack)); e != nil {
+		if e = a.issuePasses(ctx, tx, rid, roster); e != nil {
 			return e
 		}
 		if in.Action == "approve_send" || in.Action == "record_approve_send" {

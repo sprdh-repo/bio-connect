@@ -205,7 +205,24 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			subject = "Bio Connect 4.0 - registration saved"
 			heading = "Registration saved"
 			cta = "Open my registration"
-			intro = "Your registration is saved. Use this private link to see the payment instructions and submit your evidence.\n\nThis is not a payment approval or an admission pass - keep the link to yourself."
+			var free bool
+			var registrationStatus string
+			if e = a.DB.QueryRow(ctx, "SELECT free_link_id IS NOT NULL,status FROM registrations WHERE id=$1", j.RegistrationID).Scan(&free, &registrationStatus); e != nil {
+				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
+			}
+			if free {
+				if registrationStatus == "approved" {
+					subject = "Bio Connect 4.0 - free registration confirmed"
+					heading = "Registration confirmed"
+					intro = "Your complimentary Bio Connect 4.0 registration is confirmed. There is no fee to pay. Your admission pass is delivered separately.\n\nUse this private link to review your registration, and keep it to yourself."
+				} else {
+					subject = "Bio Connect 4.0 - free registration received"
+					heading = "Registration received"
+					intro = "Your complimentary Bio Connect 4.0 registration has been submitted for organiser review. There is no fee to pay. Your admission pass will be delivered after approval.\n\nUse this private link to review your registration, and keep it to yourself."
+				}
+			} else {
+				intro = "Your registration is saved. Use this private link to see the payment instructions and submit your evidence.\n\nThis is not a payment approval or an admission pass - keep the link to yourself."
+			}
 		case "payment_reminder":
 			var reference, catID string
 			var discount int
