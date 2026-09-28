@@ -127,6 +127,33 @@ func TestFreeLinkRegistersEveryDelegateCategory(t *testing.T) {
 	}
 }
 
+func TestGovtOfficialCategoryRequiresDelegateFreeLink(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
+	a.Now = func() time.Time { return fixed }
+
+	if _, _, err := a.Create(context.Background(), delegateInput("official"), key(810), nil); err == nil || !strings.Contains(err.Error(), "only available through a free registration link") {
+		t.Fatalf("ordinary official registration error=%v", err)
+	}
+
+	token := randomToken()
+	linkID := addFreeLink(t, a, token, fixed.Add(24*time.Hour), true, "delegate")
+	in := delegateInput("official")
+	in.FreeToken = token
+	rid, _, err := a.Create(context.Background(), in, key(811), nil)
+	if err != nil {
+		t.Fatalf("free official registration: %v", err)
+	}
+	var quoted int64
+	var storedLink string
+	if err = a.DB.QueryRow(context.Background(), "SELECT quoted_paise,free_link_id FROM registrations WHERE id=$1", rid).Scan(&quoted, &storedLink); err != nil {
+		t.Fatal(err)
+	}
+	if quoted != 0 || storedLink != linkID || status(t, a, rid) != "approved" {
+		t.Fatalf("official registration quoted=%d link=%q status=%s", quoted, storedLink, status(t, a, rid))
+	}
+}
+
 func TestFreeLinkCanRequireReviewWithoutPayment(t *testing.T) {
 	a := mustApp(t)
 	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)

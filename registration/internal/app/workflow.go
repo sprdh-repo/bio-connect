@@ -68,6 +68,9 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	} else if !a.Config.RegistrationEnabled {
 		return "", "", errors.New("registration is not open yet")
 	}
+	if c.FreeOnly && freeLinkID == "" {
+		return "", "", errors.New("this category is only available through a free registration link")
+	}
 	if !c.Open && freeLinkID == "" {
 		return "", "", errors.New("this category is closed")
 	}
