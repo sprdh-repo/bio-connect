@@ -1362,3 +1362,79 @@ func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
 		t.Fatalf("receipt_id = %v, want %s when uploaded", receipt, fid)
 	}
 }
+
+// The console pages through the list and labels its status tabs from one
+// response, so the counts have to agree with the rows under every filter.
+func TestAdminListingPagesAndCountsStatuses(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	fixed := time.Now().UTC().Truncate(time.Minute)
+	a.Now = func() time.Time { return fixed }
+	h := a.Handler()
+	_, secret := addStaff(t, a, "rev@bioconnect.test", "reviewer")
+	session, _ := staffLogin(t, h, "rev@bioconnect.test", secret, fixed)
+	for i := range 60 {
+		cat := "student"
+		if i%3 == 0 {
+			cat = "industry"
+		}
+		if _, _, err := a.Create(ctx, delegateInput(cat), key(i), nil); err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+	// 20 industry registrations; 7 of them moved on to review.
+	if _, err := a.DB.Exec(ctx, "UPDATE registrations SET status='awaiting_review' WHERE id IN (SELECT id FROM registrations WHERE category_id='industry' ORDER BY id LIMIT 7)"); err != nil {
+		t.Fatal(err)
+	}
+	type listing struct {
+		Items        []map[string]any `json:"items"`
+		Page         int              `json:"page"`
+		PageSize     int              `json:"page_size"`
+		Pages        int              `json:"pages"`
+		Total        int              `json:"total"`
+		StatusCounts map[string]int   `json:"status_counts"`
+	}
+	list := func(query string) (int, listing) {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/api/v1/admin/registrations?"+query, nil)
+		req.AddCookie(&http.Cookie{Name: "bc_session", Value: session})
+		h.ServeHTTP(rr, req)
+		var out listing
+		json.Unmarshal(rr.Body.Bytes(), &out)
+		return rr.Code, out
+	}
+
+	for _, c := range []struct {
+		query                   string
+		items, pages, total     int
+		review, awaitingPayment int
+	}{
+		{"", 25, 3, 60, 7, 53},
+		{"page=3", 10, 3, 60, 7, 53},
+		{"page_size=50&page=2", 10, 2, 60, 7, 53},
+		{"page_size=100", 60, 1, 60, 7, 53},
+		// Status narrows the rows and the total but not the tab counts.
+		{"status=awaiting_review", 7, 1, 7, 7, 53},
+		// Every other filter narrows the tab counts too.
+		{"category=industry", 20, 1, 20, 7, 13},
+		{"category=industry&status=awaiting_payment", 13, 1, 13, 7, 13},
+		// Past the end is an empty page, not an error: the console clamps.
+		{"page=9", 0, 3, 60, 7, 53},
+	} {
+		code, out := list(c.query)
+		if code != 200 {
+			t.Fatalf("%q returned %d", c.query, code)
+		}
+		if len(out.Items) != c.items || out.Pages != c.pages || out.Total != c.total || out.StatusCounts["awaiting_review"] != c.review || out.StatusCounts["awaiting_payment"] != c.awaitingPayment {
+			t.Fatalf("%q: items=%d pages=%d total=%d counts=%v", c.query, len(out.Items), out.Pages, out.Total, out.StatusCounts)
+		}
+	}
+	for _, bad := range []string{"page_size=10", "page_size=1000", "page_size=x"} {
+		if code, _ := list(bad); code != 400 {
+			t.Fatalf("%q returned %d, want 400", bad, code)
+		}
+	}
+	if code, out := list("q=nothing-matches-this"); code != 200 || out.Total != 0 || out.Pages != 0 || len(out.StatusCounts) != 0 {
+		t.Fatalf("empty search: %d %+v", code, out)
+	}
+}

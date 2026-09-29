@@ -154,7 +154,7 @@ Roles are disjoint:
 |---|---|
 | `GET /admin/me` | `{id, role}` |
 | `POST /admin/logout` | clears the session |
-| `GET /admin/registrations?q=&category=&status=&from=&to=&page=` | paginated list (25/page); `from`/`to` are `YYYY-MM-DD`. `q` matches reference, institution, contact, attendee name/email, and pass number; references and pass numbers match case-insensitively with the hyphens optional |
+| `GET /admin/registrations?q=&category=&status=&from=&to=&page=&page_size=` | `{items, page, page_size, pages, total, status_counts}`, newest first. `page_size` is 25 (default), 50 or 100. `status_counts` maps each status to its count under every filter except `status`, so it stays stable while switching status; `total` is the count under all filters. `from`/`to` are `YYYY-MM-DD`. `q` matches reference, institution, contact, attendee name/email, and pass number; references and pass numbers match case-insensitively with the hyphens optional |
 | `GET /admin/summary` | `{categories:[{id, kind, label, registered, confirmed}]}` in category order, event-wide (ignores list filters). `registered` excludes `rejected` and `cancelled`; `confirmed` counts `approved` |
 | `GET /admin/registrations/{id}` | full record: registration, category, payments, files, passes, deliveries, audit trail |
 | `POST /admin/registrations/{id}/review` | state transitions, see below |

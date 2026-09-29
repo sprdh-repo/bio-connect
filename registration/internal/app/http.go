@@ -409,18 +409,49 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "page out of range")
 			return
 		}
-		var count int
-		if e = a.DB.QueryRow(r.Context(), "SELECT count(*) FROM registrations r"+where, args...).Scan(&count); e != nil {
-			fail(w, 503, "listing unavailable")
-			return
+		size := 25
+		if v := r.URL.Query().Get("page_size"); v != "" {
+			if size, _ = strconv.Atoi(v); size != 25 && size != 50 && size != 100 {
+				fail(w, 400, "page size must be 25, 50 or 100")
+				return
+			}
 		}
-		args = append(args, (page-1)*25)
-		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id || CASE WHEN r.free_link_id IS NOT NULL THEN ' · Free link' ELSE '' END AS category_id,r.status,r.quoted_paise,r.free_link_id IS NOT NULL AS free_registration,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT 25 OFFSET $7", args...)
+		// Counted per status with the status filter itself lifted, so the
+		// console can show how many each status tab would hold under the
+		// other filters. The total is then whichever of them is selected.
+		byStatus := append([]any{}, args...)
+		byStatus[2] = ""
+		rows, e := a.DB.Query(r.Context(), "SELECT r.status,count(*) FROM registrations r"+where+" GROUP BY r.status", byStatus...)
 		if e != nil {
 			fail(w, 503, "listing unavailable")
 			return
 		}
-		respond(w, 200, map[string]any{"items": items, "page": page, "total": count, "page_size": 25})
+		statusCounts, total := map[string]int{}, 0
+		for rows.Next() {
+			var s string
+			var n int
+			if e = rows.Scan(&s, &n); e != nil {
+				rows.Close()
+				fail(w, 503, "listing unavailable")
+				return
+			}
+			statusCounts[s] = n
+			if want := r.URL.Query().Get("status"); want == "" || want == s {
+				total += n
+			}
+		}
+		rows.Close()
+		if rows.Err() != nil {
+			fail(w, 503, "listing unavailable")
+			return
+		}
+		args = append(args, (page-1)*size, size)
+		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id || CASE WHEN r.free_link_id IS NOT NULL THEN ' · Free link' ELSE '' END AS category_id,r.status,r.quoted_paise,r.free_link_id IS NOT NULL AS free_registration,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT $8 OFFSET $7", args...)
+		if e != nil {
+			fail(w, 503, "listing unavailable")
+			return
+		}
+		respond(w, 200, map[string]any{"items": items, "page": page, "total": total, "page_size": size, "pages": (total + size - 1) / size, "status_counts": statusCounts})
 	case path == "summary" && r.Method == "GET":
 		a.summary(w, r)
 	case path == "export" && r.Method == "GET":
