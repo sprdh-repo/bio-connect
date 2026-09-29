@@ -1000,6 +1000,24 @@ func TestUploadValidation(t *testing.T) {
 	if _, err := validateUpload(b.Bytes(), "logo"); err != nil {
 		t.Fatalf("rejected a valid PNG logo: %v", err)
 	}
+	if _, err := validateUpload([]byte("\x89PNG\r\n\x1a\nnot-an-image"), "logo"); err == nil || err.Error() != "this file is not a readable PNG or JPEG" {
+		t.Fatalf("unreadable PNG error = %v", err)
+	}
+	if _, err := validateUpload(b.Bytes()[:40], "logo"); err == nil || err.Error() != "this image is truncated or corrupt" {
+		t.Fatalf("truncated PNG error = %v", err)
+	}
+	for _, size := range []image.Point{{X: 6001, Y: 2}, {X: 5000, Y: 4001}} {
+		b.Reset()
+		if err := png.Encode(&b, image.NewGray(image.Rect(0, 0, size.X, size.Y))); err != nil {
+			t.Fatalf("encode %dx%d PNG: %v", size.X, size.Y, err)
+		}
+		if b.Len() > 5<<20 {
+			t.Fatalf("test PNG is %d bytes, want no more than 5 MB", b.Len())
+		}
+		if _, err := validateUpload(b.Bytes(), "logo"); err != nil {
+			t.Errorf("rejected valid %dx%d PNG below 5 MB: %v", size.X, size.Y, err)
+		}
+	}
 	// A well-formed PDF passes; a truncated / non-PDF one does not.
 	minimalPDF := []byte("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
 	if _, err := validateUpload(minimalPDF, "receipt"); err != nil {

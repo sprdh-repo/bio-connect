@@ -94,11 +94,19 @@ func validateUpload(b []byte, kind string) (string, error) {
 	mime := http.DetectContentType(b)
 	if mime == "image/png" || mime == "image/jpeg" {
 		cfg, _, e := image.DecodeConfig(bytes.NewReader(b))
-		if e != nil || cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > 6000 || cfg.Height > 6000 || int64(cfg.Width)*int64(cfg.Height) > 20000000 {
-			return "", errors.New("invalid or oversized image")
+		if e != nil {
+			return "", errors.New("this file is not a readable PNG or JPEG")
 		}
-		if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
-			return "", errors.New("invalid image")
+		if cfg.Width <= 0 || cfg.Height <= 0 {
+			return "", errors.New("this image reports no width or height")
+		}
+		// Fully decoding ordinary images catches truncated data. For a large but
+		// valid sub-5 MB image, decoding would expand attacker-controlled dimensions
+		// in server memory. Its parsed PNG/JPEG header is sufficient for storage.
+		if int64(cfg.Width)*int64(cfg.Height) <= 20_000_000 {
+			if _, _, e = image.Decode(bytes.NewReader(b)); e != nil {
+				return "", errors.New("this image is truncated or corrupt")
+			}
 		}
 		return mime, nil
 	}
