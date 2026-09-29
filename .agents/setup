@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+local_bin="$HOME/.local/bin"
+toolchains="$HOME/.local/share/bio-connect-toolchains"
+flutter_version="3.47.5"
+go_version="1.26.0"
+
+step() {
+  printf '\n==> %s\n' "$1"
+}
+
+step "Install system packages"
+packages=(ca-certificates curl xz-utils postgresql postgresql-client poppler-utils zbar-tools)
+missing=()
+for package in "${packages[@]}"; do
+  dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed' || missing+=("$package")
+done
+if ((${#missing[@]})); then
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+fi
+
+mkdir -p "$local_bin" "$toolchains"
+export PATH="$local_bin:$PATH"
+
+step "Install Go $go_version"
+go_root="$toolchains/go-$go_version"
+if [[ ! -x "$go_root/bin/go" ]]; then
+  archive="$(mktemp)"
+  trap 'rm -f "${archive:-}"' EXIT
+  curl -fsSL --retry 3 "https://go.dev/dl/go${go_version}.linux-amd64.tar.gz" -o "$archive"
+  rm -rf "$go_root"
+  mkdir -p "$go_root"
+  tar -xzf "$archive" --strip-components=1 -C "$go_root"
+  rm -f "$archive"
+  trap - EXIT
+fi
+ln -sfn "$go_root/bin/go" "$local_bin/go"
+ln -sfn "$go_root/bin/gofmt" "$local_bin/gofmt"
+
+step "Install Flutter $flutter_version"
+flutter_root="$toolchains/flutter-$flutter_version"
+if [[ ! -x "$flutter_root/bin/flutter" ]]; then
+  archive="$(mktemp)"
+  trap 'rm -f "${archive:-}"' EXIT
+  curl -fsSL --retry 3 \
+    "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${flutter_version}-stable.tar.xz" \
+    -o "$archive"
+  rm -rf "$flutter_root"
+  mkdir -p "$flutter_root"
+  tar -xJf "$archive" --strip-components=1 -C "$flutter_root"
+  rm -f "$archive"
+  trap - EXIT
+fi
+ln -sfn "$flutter_root/bin/flutter" "$local_bin/flutter"
+ln -sfn "$flutter_root/bin/dart" "$local_bin/dart"
+flutter config --no-analytics >/dev/null
+
+profile_marker="# bio-connect orb toolchains"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >> "$HOME/.bash_profile" <<'EOF'
+
+# bio-connect orb toolchains
+export PATH="$HOME/.local/bin:$PATH"
+EOF
+fi
+
+step "Configure local PostgreSQL"
+for config_dir in /etc/postgresql/*/main; do
+  [[ -d "$config_dir" ]] || continue
+  sudo mkdir -p "$config_dir/conf.d"
+  sudo tee "$config_dir/conf.d/amp-orb.conf" >/dev/null <<'EOF'
+port = 55432
+fsync = off
+synchronous_commit = off
+full_page_writes = off
+EOF
+done
+sudo service postgresql restart >/dev/null
+for _ in {1..20}; do
+  pg_isready -h 127.0.0.1 -p 55432 >/dev/null 2>&1 && break
+  sleep 0.25
+done
+pg_isready -h 127.0.0.1 -p 55432 >/dev/null
+sudo -u postgres psql --dbname postgres --set ON_ERROR_STOP=1 >/dev/null <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'bioconnect') THEN
+    CREATE ROLE bioconnect LOGIN PASSWORD 'local-development-only';
+  ELSE
+    ALTER ROLE bioconnect WITH LOGIN PASSWORD 'local-development-only';
+  END IF;
+END
+$$;
+SQL
+if ! sudo -u postgres psql --dbname postgres --tuples-only --no-align \
+  --command "SELECT 1 FROM pg_database WHERE datname='bioconnect'" | grep -qx 1; then
+  sudo -u postgres createdb --owner bioconnect bioconnect
+fi
+
+step "Install repository dependencies"
+(cd "$repo_root/registration" && go mod download)
+(cd "$repo_root/mobile" && flutter pub get)
+
+step "Orb setup complete"
+go version
+flutter --version | head -n 1
+pg_isready -h 127.0.0.1 -p 55432

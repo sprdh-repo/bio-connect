@@ -11,7 +11,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => ContentProvider(CurrentContentService())..load(),
+        create: (_) =>
+            ContentProvider(CurrentContentService(remoteContent: false))
+              ..load(),
         child: const BioConnectApp(),
       ),
     );

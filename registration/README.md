@@ -11,6 +11,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 ## What it does
 
 - Public forms at `/delegates` and `/exhibitors` matching the site's visual language, with mobile-friendly steps, a review screen, and recoverable errors.
+- Database-backed mobile guide at `/api/v1/public/app-content`, including the published speaker directory and mutable event, Product Launch, leadership, sponsor and partner content. The app keeps a bundled offline fallback.
 - Server-side price calculation in INR using `Asia/Kolkata`, with early-bird eligibility tied to the verified payment date through 30 September 2026.
 - Registration saved before payment; SBI Collect paid out of band; payment reference, date, amount, and receipt collected for manual staff review.
 - Coupon `KSUM30` gives 30% off the current fee for every category except students. The form shows the offer price once the code is applied; the discount is frozen on the registration, the registrant pays by direct bank transfer to the account shown on their registration page, and staff verify against the discounted amount.

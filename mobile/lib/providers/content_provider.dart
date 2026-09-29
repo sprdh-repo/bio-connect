@@ -19,6 +19,8 @@ class ContentProvider extends ChangeNotifier {
     notifyListeners();
     try {
       content = await _service.loadEvent();
+      notifyListeners();
+      content = await _service.refreshEvent(content!);
     } catch (_) {
       error = 'Event details could not be loaded.';
     } finally {

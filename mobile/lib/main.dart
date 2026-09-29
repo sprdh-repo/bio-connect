@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'models/event_content.dart';
 import 'providers/content_provider.dart';
+import 'screens/delegate_registration_screen.dart';
 import 'services/content_service.dart';
+import 'services/registration_service.dart';
 
 const forest = Color(0xFF0B3329);
 const deepForest = Color(0xFF051C17);
@@ -15,16 +17,43 @@ const gold = Color(0xFFE4AD54);
 const ink = Color(0xFF10201B);
 const muted = Color(0xFF616F69);
 
+const _months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+String eventDateRange(EventDetails event, {bool uppercase = false}) {
+  final sameMonth = event.startDate.month == event.endDate.month;
+  final start = sameMonth
+      ? event.startDate.day.toString().padLeft(2, '0')
+      : '${event.startDate.day.toString().padLeft(2, '0')} ${_months[event.startDate.month - 1]}';
+  final value =
+      '$start-${event.endDate.day.toString().padLeft(2, '0')} '
+      '${_months[event.endDate.month - 1]} ${event.endDate.year}';
+  return uppercase ? value.toUpperCase() : value;
+}
+
+String directionsUrl(EventDetails event) => Uri.https(
+  'www.google.com',
+  '/maps/search/',
+  {'api': '1', 'query': '${event.venue}, ${event.city}'},
+).toString();
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  const apiBaseUrl = String.fromEnvironment('BIO_CONNECT_API_BASE_URL');
   runApp(
     ChangeNotifierProvider(
-      create: (_) => ContentProvider(
-        apiBaseUrl.isEmpty
-            ? CurrentContentService()
-            : ApiContentService(baseUrl: apiBaseUrl),
-      )..load(),
+      create: (_) => ContentProvider(CurrentContentService())..load(),
       child: const BioConnectApp(),
     ),
   );
@@ -59,6 +88,20 @@ class BioConnectApp extends StatelessWidget {
       appBarTheme: const AppBarTheme(
         backgroundColor: paper,
         foregroundColor: ink,
+        centerTitle: false,
+        scrolledUnderElevation: 0,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
       ),
       textTheme: Theme.of(context).textTheme
           .apply(bodyColor: ink, displayColor: ink),
@@ -104,7 +147,7 @@ class _AppShellState extends State<AppShell> {
             ),
             ExploreScreen(content),
             SpeakersScreen(content.speakers),
-            const MoreScreen(),
+            MoreScreen(content),
           ],
         ),
       ),
@@ -208,9 +251,9 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 13),
-                const Text(
-                  'Where science\nmeets what’s next.',
-                  style: TextStyle(
+                Text(
+                  content.event.heroTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontFamily: 'Manrope',
                     fontSize: 37,
@@ -227,20 +270,19 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 23),
-                const IconText(
+                IconText(
                   Icons.calendar_month_outlined,
-                  '08-09 OCTOBER 2026',
+                  eventDateRange(content.event, uppercase: true),
                 ),
                 const SizedBox(height: 8),
-                const IconText(
-                  Icons.place_outlined,
-                  'Hyatt Regency Trivandrum',
-                ),
+                IconText(Icons.place_outlined, content.event.venue),
                 const SizedBox(height: 23),
                 FilledButton.icon(
-                  onPressed: () => openLink(
+                  onPressed: () => Navigator.push(
                     context,
-                    'https://reg.bioconnect.kerala.gov.in/delegates',
+                    MaterialPageRoute(
+                      builder: (_) => const DelegateRegistrationScreen(),
+                    ),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: gold,
@@ -321,7 +363,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-            const VisitPanel(),
+            VisitPanel(content.event),
           ],
         ),
       ),
@@ -369,7 +411,7 @@ class ExploreScreen extends StatelessWidget {
         ],
       ),
       const SizedBox(height: 24),
-      const VisitPanel(),
+      VisitPanel(content.event),
     ],
   );
 }
@@ -447,7 +489,8 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
 }
 
 class MoreScreen extends StatelessWidget {
-  const MoreScreen({super.key});
+  const MoreScreen(this.content, {super.key});
+  final EventContent content;
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
@@ -474,34 +517,28 @@ class MoreScreen extends StatelessWidget {
         'Delegate and exhibition options',
         () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const RegistrationScreen()),
+          MaterialPageRoute(builder: (_) => RegistrationScreen(content.event)),
         ),
       ),
       GuideCard(
         Icons.place_outlined,
         'Venue & directions',
-        'Hyatt Regency Trivandrum',
-        () => openLink(
-          context,
-          'https://www.google.com/maps/search/?api=1&query=Hyatt+Regency+Trivandrum',
-        ),
+        content.event.venue,
+        () => openLink(context, directionsUrl(content.event)),
       ),
       GuideCard(
         Icons.article_outlined,
         'Event brochure',
         'View the programme overview',
-        () => openLink(
-          context,
-          'https://bioconnect.kerala.gov.in/assets/bio-connect-4-brochure.pdf',
-        ),
+        () => openLink(context, content.event.brochureUrl),
       ),
       GuideCard(
         Icons.rocket_launch_outlined,
         'Product launch',
         'Kerala Startup Mission showcase',
-        () => openLink(
+        () => Navigator.push(
           context,
-          'https://bioconnect.kerala.gov.in/product-launch.html',
+          MaterialPageRoute(builder: (_) => ProductLaunchScreen(content)),
         ),
       ),
       GuideCard(
@@ -510,11 +547,11 @@ class MoreScreen extends StatelessWidget {
         'People and partners behind the event',
         () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PartnersScreen()),
+          MaterialPageRoute(builder: (_) => PartnersScreen(content)),
         ),
       ),
       const SizedBox(height: 16),
-      const VisitPanel(),
+      VisitPanel(content.event),
     ],
   );
 }
@@ -590,6 +627,17 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (e.logoUrl.isNotEmpty) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Image.network(
+                            e.logoUrl,
+                            height: 52,
+                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Text(
                         e.name,
                         style: const TextStyle(
@@ -613,8 +661,37 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
   }
 }
 
-class RegistrationScreen extends StatelessWidget {
-  const RegistrationScreen({super.key});
+class RegistrationScreen extends StatefulWidget {
+  const RegistrationScreen(this.event, {super.key, this.service});
+  final EventDetails event;
+  final RegistrationService? service;
+
+  @override
+  State<RegistrationScreen> createState() => _RegistrationScreenState();
+}
+
+class _RegistrationScreenState extends State<RegistrationScreen> {
+  late final RegistrationService _service;
+  RegistrationOptions? _options;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = widget.service ?? RegistrationService();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _error = null);
+    try {
+      final options = await _service.options();
+      if (mounted) setState(() => _options = options);
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Registration')),
@@ -624,41 +701,63 @@ class RegistrationScreen extends StatelessWidget {
         const TitleText('Three ways\nto take part.'),
         const SizedBox(height: 9),
         const Text(
-          'Registration is open. Complete your booking on the official registration site.',
+          'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
           style: TextStyle(color: muted, height: 1.5),
         ),
         const SizedBox(height: 24),
-        const Eyebrow('DELEGATE PASSES'),
-        const SizedBox(height: 9),
-        const PriceRow('Students', '₹1,000', '₹1,500'),
-        const PriceRow('Incubation / Startups', '₹3,500', '₹4,000'),
-        const PriceRow('Faculty / Scientists', '₹4,000', '₹4,500'),
-        const PriceRow('Industry', '₹6,000', '₹7,000'),
-        const SizedBox(height: 8),
-        const Text(
-          'Early bird until 30 Sep 2026 · Regular / spot 1-9 Oct 2026. Student ID required for student rate.',
-          style: TextStyle(color: muted, fontSize: 11, height: 1.4),
-        ),
+        if (_options == null && _error == null)
+          const Center(child: CircularProgressIndicator()),
+        if (_error != null)
+          StateMessage(
+            'Live registration options are unavailable. Please try again.',
+            action: 'Try again',
+            onTap: _load,
+          ),
+        if (_options case final options?) ...[
+          if (!options.enabled)
+            const StateMessage(
+              'Registration is not accepting public submissions right now. Current options are shown below.',
+            ),
+          const Eyebrow('DELEGATE PASSES'),
+          const SizedBox(height: 9),
+          for (final category in options.categories.where(
+            (category) => category.kind == 'delegate',
+          ))
+            _CategoryRow(category),
+          const SizedBox(height: 8),
+          const Text(
+            'Prices and availability update live from event registration. Invitation-only categories and private complimentary links are not shown.',
+            style: TextStyle(color: muted, fontSize: 11, height: 1.4),
+          ),
+        ],
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: () => openLink(
-            context,
-            'https://reg.bioconnect.kerala.gov.in/delegates',
-          ),
-          child: const Text('Register as a delegate'),
+          onPressed:
+              _options?.enabled == true &&
+                  _options!.categories.any(
+                    (category) => category.kind == 'delegate' && category.open,
+                  )
+              ? () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DelegateRegistrationScreen(),
+                  ),
+                )
+              : null,
+          child: const Text('Register in the app'),
         ),
         const SizedBox(height: 27),
         const Eyebrow('EXHIBITION SPACE'),
         const SizedBox(height: 9),
-        const PriceRow('Premium stall', '₹2,00,000', ''),
-        const PriceRow('Standard stall', '₹50,000', ''),
-        const PriceRow('Table space', '₹20,000', ''),
+        if (_options case final options?)
+          for (final category in options.categories.where(
+            (category) => category.kind == 'exhibitor',
+          ))
+            _CategoryRow(category),
         const SizedBox(height: 12),
         FilledButton(
-          onPressed: () => openLink(
-            context,
-            'https://reg.bioconnect.kerala.gov.in/exhibitors',
-          ),
+          onPressed: () =>
+              openLink(context, '${RegistrationService.apiBaseUrl}/exhibitors'),
           child: const Text('Book exhibition space'),
         ),
         const SizedBox(height: 27),
@@ -672,7 +771,7 @@ class RegistrationScreen extends StatelessWidget {
         OutlinedButton(
           onPressed: () => openLink(
             context,
-            'mailto:bioconnect@bio360.in?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
+            'mailto:${widget.event.sponsorshipEmail}?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
           ),
           child: const Text('Enquire about sponsorship'),
         ),
@@ -682,7 +781,8 @@ class RegistrationScreen extends StatelessWidget {
 }
 
 class PartnersScreen extends StatelessWidget {
-  const PartnersScreen({super.key});
+  const PartnersScreen(this.content, {super.key});
+  final EventContent content;
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('People & partners')),
@@ -691,11 +791,27 @@ class PartnersScreen extends StatelessWidget {
       children: [
         const TitleText('A shared vision\nfor life sciences.'),
         const SizedBox(height: 18),
-        const Text(
-          'Meet the leadership and organisations building Kerala’s life sciences ecosystem.',
+        Text(
+          content.leadership.intro,
           style: TextStyle(color: muted, height: 1.5),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
+        const Eyebrow('STATE LEADERSHIP'),
+        const SizedBox(height: 10),
+        for (final person in content.leadership.people)
+          _PersonCard(
+            name: person.name,
+            role: person.role,
+            badge: person.badge,
+          ),
+        const SizedBox(height: 20),
+        const Eyebrow('ADVISORY COMMITTEE'),
+        const SizedBox(height: 10),
+        Text(
+          content.leadership.advisoryNote,
+          style: TextStyle(color: muted, height: 1.5),
+        ),
+        const SizedBox(height: 24),
         const Eyebrow('SPONSOR'),
         const SizedBox(height: 10),
         Card(
@@ -705,36 +821,239 @@ class PartnersScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset('assets/images/kerala-rubber-logo.png', height: 66),
+                Image.network(
+                  content.sponsor.logoUrl,
+                  height: 66,
+                  errorBuilder: (_, _, _) => Image.asset(
+                    'assets/images/kerala-rubber-logo.png',
+                    height: 66,
+                  ),
+                ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Kerala Rubber Limited',
+                Text(
+                  content.sponsor.name,
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  content.sponsor.description,
+                  style: TextStyle(color: muted, height: 1.45),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        GuideCard(
-          Icons.account_balance_outlined,
-          'Event leadership',
-          'State leadership and advisory committee',
-          () => openLink(
-            context,
-            'https://bioconnect.kerala.gov.in/committee.html',
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => openLink(context, content.sponsor.websiteUrl),
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Visit sponsor website'),
+        ),
+        const SizedBox(height: 28),
+        const Eyebrow('ECOSYSTEM PARTNERS'),
+        const SizedBox(height: 10),
+        for (final partner in content.ecosystemPartners)
+          Card(
+            color: Colors.white,
+            margin: const EdgeInsets.only(bottom: 9),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 68,
+                    height: 44,
+                    child: Image.network(
+                      partner.logoUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Icon(
+                        Icons.account_balance_outlined,
+                        color: forest,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      partner.name,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class ProductLaunchScreen extends StatelessWidget {
+  const ProductLaunchScreen(this.content, {super.key});
+  final EventContent content;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Product launch')),
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      children: [
+        Eyebrow(content.productLaunch.eyebrow.toUpperCase()),
+        const SizedBox(height: 8),
+        TitleText(content.productLaunch.title),
+        const SizedBox(height: 12),
+        Text(
+          content.productLaunch.description,
+          style: TextStyle(color: muted, height: 1.5),
+        ),
+        const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: forest,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.event_available_outlined, color: lime),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'APPLICATION DEADLINE',
+                      style: TextStyle(
+                        color: lime,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      content.productLaunch.deadline,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Manrope',
+                        fontSize: 21,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        GuideCard(
-          Icons.handshake_outlined,
-          'Sponsors',
-          'Organisations supporting Bio Connect',
-          () => openLink(
-            context,
-            'https://bioconnect.kerala.gov.in/sponsors.html',
+        const SizedBox(height: 24),
+        const Eyebrow('WHO CAN APPLY'),
+        const SizedBox(height: 10),
+        for (var i = 0; i < content.productLaunch.eligibility.length; i++)
+          _InfoRow(
+            i == 0
+                ? Icons.rocket_launch_outlined
+                : Icons.business_center_outlined,
+            content.productLaunch.eligibility[i].title,
+            content.productLaunch.eligibility[i].description,
           ),
+        const SizedBox(height: 20),
+        const Eyebrow('FOCUS AREAS'),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final item in content.productLaunch.focusAreas)
+              Chip(label: Text(item), backgroundColor: cream),
+          ],
+        ),
+        const SizedBox(height: 28),
+        FilledButton.icon(
+          onPressed: () => openLink(context, content.productLaunch.applyUrl),
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Apply via Kerala Startup Mission'),
         ),
       ],
+    ),
+  );
+}
+
+class _PersonCard extends StatelessWidget {
+  const _PersonCard({
+    required this.name,
+    required this.role,
+    required this.badge,
+  });
+  final String name, role, badge;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    color: Colors.white,
+    margin: const EdgeInsets.only(bottom: 9),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const CircleAvatar(
+            backgroundColor: cream,
+            foregroundColor: forest,
+            child: Icon(Icons.account_balance_outlined),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  badge.toUpperCase(),
+                  style: const TextStyle(
+                    color: forest,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  name,
+                  style: const TextStyle(fontFamily: 'Manrope', fontSize: 17),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  role,
+                  style: const TextStyle(
+                    color: muted,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow(this.icon, this.title, this.description);
+  final IconData icon;
+  final String title, description;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    color: Colors.white,
+    margin: const EdgeInsets.only(bottom: 9),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: cream,
+        foregroundColor: forest,
+        child: Icon(icon),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: Text(description, style: const TextStyle(color: muted)),
     ),
   );
 }
@@ -749,16 +1068,7 @@ class SpeakerDetailScreen extends StatelessWidget {
       children: [
         AspectRatio(
           aspectRatio: 1.4,
-          child: speaker.image.isEmpty
-              ? const ColoredBox(
-                  color: cream,
-                  child: Icon(Icons.person, size: 70),
-                )
-              : Image.asset(
-                  speaker.image,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
+          child: SpeakerImage(speaker, width: double.infinity),
         ),
         Padding(
           padding: const EdgeInsets.all(24),
@@ -1020,17 +1330,56 @@ class SpeakerImage extends StatelessWidget {
   final Speaker speaker;
   final double? width;
   @override
-  Widget build(BuildContext context) => speaker.image.isEmpty
-      ? SizedBox(
-          width: width,
-          child: const ColoredBox(color: cream, child: Icon(Icons.person)),
-        )
-      : Image.asset(
-          speaker.image,
-          width: width,
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-        );
+  Widget build(BuildContext context) {
+    final fallback = _SpeakerFallback(speaker);
+    if (speaker.image.isEmpty) return SizedBox(width: width, child: fallback);
+    if (speaker.image.startsWith('http')) {
+      return Image.network(
+        speaker.image,
+        width: width,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    }
+    return Image.asset(
+      speaker.image,
+      width: width,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+}
+
+class _SpeakerFallback extends StatelessWidget {
+  const _SpeakerFallback(this.speaker);
+  final Speaker speaker;
+
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/images/speakers/${speaker.id}.webp',
+    fit: BoxFit.cover,
+    alignment: Alignment.topCenter,
+    errorBuilder: (_, _, _) => ColoredBox(
+      color: cream,
+      child: Center(
+        child: Text(
+          speaker.name
+              .split(' ')
+              .where((part) => part.isNotEmpty)
+              .take(2)
+              .map((part) => part[0])
+              .join(),
+          style: const TextStyle(
+            color: forest,
+            fontFamily: 'Manrope',
+            fontSize: 24,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class SpeakerRow extends StatelessWidget {
@@ -1149,7 +1498,8 @@ class GuideCard extends StatelessWidget {
 }
 
 class VisitPanel extends StatelessWidget {
-  const VisitPanel({super.key});
+  const VisitPanel(this.event, {super.key});
+  final EventDetails event;
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
@@ -1170,25 +1520,22 @@ class VisitPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 9),
-        const Text(
-          'See you in\nThiruvananthapuram.',
-          style: TextStyle(
+        Text(
+          'See you in\n${event.city.split(',').first}.',
+          style: const TextStyle(
             color: Colors.white,
             fontFamily: 'Manrope',
             fontSize: 24,
           ),
         ),
         const SizedBox(height: 13),
-        const Text(
-          '08-09 October 2026 · Hyatt Regency Trivandrum',
-          style: TextStyle(color: Colors.white70, fontSize: 11),
+        Text(
+          '${eventDateRange(event)} · ${event.venue}',
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
         ),
         const SizedBox(height: 9),
         TextButton.icon(
-          onPressed: () => openLink(
-            context,
-            'https://www.google.com/maps/search/?api=1&query=Hyatt+Regency+Trivandrum',
-          ),
+          onPressed: () => openLink(context, directionsUrl(event)),
           icon: const Icon(Icons.arrow_outward, size: 16),
           label: const Text('Get directions'),
           style: TextButton.styleFrom(foregroundColor: lime),
@@ -1198,9 +1545,24 @@ class VisitPanel extends StatelessWidget {
   );
 }
 
-class PriceRow extends StatelessWidget {
-  const PriceRow(this.name, this.early, this.regular, {super.key});
-  final String name, early, regular;
+class _CategoryRow extends StatelessWidget {
+  const _CategoryRow(this.category);
+  final RegistrationCategory category;
+
+  String _money(int paise) {
+    final digits = (paise ~/ 100).toString();
+    if (digits.length <= 3) return '₹$digits';
+    final tail = digits.substring(digits.length - 3);
+    var head = digits.substring(0, digits.length - 3);
+    final groups = <String>[];
+    while (head.length > 2) {
+      groups.insert(0, head.substring(head.length - 2));
+      head = head.substring(0, head.length - 2);
+    }
+    if (head.isNotEmpty) groups.insert(0, head);
+    return '₹${groups.join(',')},$tail';
+  }
+
   @override
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 7),
@@ -1212,24 +1574,39 @@ class PriceRow extends StatelessWidget {
     child: Row(
       children: [
         Expanded(
-          child: Text(
-            name,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                category.label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                '${category.rosterCount} ${category.rosterCount == 1 ? 'pass' : 'passes'}${category.open ? '' : ' · Closed'}',
+                style: TextStyle(
+                  color: category.open ? muted : Colors.red.shade700,
+                  fontSize: 10,
+                ),
+              ),
+            ],
           ),
         ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              early,
-              style: const TextStyle(
+              _money(category.payablePaise),
+              style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: forest,
+                color: category.open ? forest : muted,
               ),
             ),
-            if (regular.isNotEmpty)
+            if (category.earlyPaise != category.regularPaise)
               Text(
-                'Regular $regular',
+                'Early ${_money(category.earlyPaise)} · Regular ${_money(category.regularPaise)}',
                 style: const TextStyle(fontSize: 10, color: muted),
               ),
           ],

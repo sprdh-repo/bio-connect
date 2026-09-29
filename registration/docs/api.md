@@ -11,6 +11,31 @@ Amounts, roster counts, category state, and every registration state transition 
 
 ## Public
 
+### `GET /public/app-content`
+
+Returns the database-managed attendee guide used by the mobile app. The document includes `event`, `themes`, `programme_highlights`, `product_launch`, `leadership`, `sponsor`, `ecosystem_partners`, and the current published `speakers` array. Speaker rows are injected from the speaker directory at request time so both endpoints share one source of truth.
+
+The endpoint permits anonymous cross-origin reads. If the content document is unpublished, it returns 503 and the app retains its bundled offline snapshot.
+
+### `GET /public/speakers`
+
+Returns the published speaker directory in its curated display order:
+
+```json
+{
+  "speakers": [{
+    "id": "jayakrishna-ambati",
+    "name": "Dr. Jayakrishna Ambati",
+    "role": "Center Director & Professor",
+    "organization": "University of Virginia Health System",
+    "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/jayakrishna-ambati.webp",
+    "linkedin": ""
+  }]
+}
+```
+
+The endpoint permits anonymous cross-origin reads. Unpublished rows are omitted.
+
 ### `GET /categories`
 
 ```json

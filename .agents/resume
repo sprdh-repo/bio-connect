@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! pg_isready -h 127.0.0.1 -p 55432 >/dev/null 2>&1; then
+  sudo service postgresql start >/dev/null
+fi
+
+for _ in {1..20}; do
+  if pg_isready -h 127.0.0.1 -p 55432 >/dev/null 2>&1; then
+    exit 0
+  fi
+  sleep 0.25
+done
+
+echo "PostgreSQL did not become ready on port 55432" >&2
+exit 1
