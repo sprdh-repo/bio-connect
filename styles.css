@@ -535,6 +535,19 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 .partner-logo-klip img { max-height: 69px; }
 .partner-logo-government img { max-height: 76px; filter: brightness(0); }
 
+/* Follows the institutional strip on the same paper, so it borrows that strip's
+   heading and grid; the names are spelled out because the acronyms alone mean
+   little to a visitor. */
+.ecosystem-partners { padding-block: 78px; background: var(--paper); }
+.institutional-partners + .ecosystem-partners { padding-top: 0; }
+.ecosystem-logos { margin-block: 0; padding: 0; list-style: none; }
+.ecosystem-partner { padding: 34px 24px 30px; grid-template-rows: 96px auto; align-content: start; gap: 22px; }
+.ecosystem-partner-name { max-width: 26ch; color: var(--muted); font-size: 13px; font-weight: 500; line-height: 1.45; text-align: center; text-wrap: balance; }
+.ecosystem-partner-lsdc img { max-height: 58px; }
+.ecosystem-partner-ksum img { max-height: 82px; }
+.ecosystem-partner-kscste img { max-height: 90px; }
+.ecosystem-partner-kbb img { max-height: 86px; }
+
 /* Inline link for light surfaces - matches .reg-foot-link, usable inline in copy. */
 .inline-link { display: inline-block; padding-bottom: 4px; color: var(--forest); font-size: 13px; font-weight: 600; border-bottom: 1px solid rgba(11,51,41,0.3); transition: border-color 0.25s; }
 .inline-link:hover { border-color: var(--forest); }
@@ -952,6 +965,17 @@ body.dialog-open { overflow: hidden; }
   .partner-logo-bio360 img { max-height: 74px; }
   .partner-logo-klip img { max-height: 68px; }
   .partner-logo-government img { max-height: 75px; }
+  .ecosystem-partners { padding: 56px 0; }
+  /* Four compact marks read better as a 2 x 2 than as a long single column. */
+  .ecosystem-logos { grid-template-columns: 1fr 1fr; }
+  .ecosystem-logos .partner-logo:nth-child(2) { border-top: 0; }
+  .ecosystem-logos .partner-logo:nth-child(even) { border-left: 1px solid var(--line); }
+  .ecosystem-partner { padding: 24px 12px 22px; grid-template-rows: 72px auto; gap: 14px; }
+  .ecosystem-partner-name { font-size: 12px; }
+  .ecosystem-partner-lsdc img { max-height: 44px; }
+  .ecosystem-partner-ksum img { max-height: 64px; }
+  .ecosystem-partner-kscste img { max-height: 70px; }
+  .ecosystem-partner-kbb img { max-height: 66px; }
   .footer-grid { grid-template-columns: 1fr; gap: 50px; }
   .footer-bottom { margin-top: 55px; }
   .reg-panel { padding-top: 34px; }
