@@ -138,6 +138,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Save registration'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.widgetWithText(FilledButton, 'Save registration'),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save registration'));
     await tester.pump();
     expect(service.submissions, 1);
@@ -175,6 +179,10 @@ void main() {
       400,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(
+      find.widgetWithText(FilledButton, 'Save registration'),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save registration'));
     await tester.pump();
 

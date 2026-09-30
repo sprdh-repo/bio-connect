@@ -497,6 +497,15 @@ class MoreScreen extends StatelessWidget {
           MaterialPageRoute(builder: (_) => PartnersScreen(content)),
         ),
       ),
+      GuideCard(
+        Icons.privacy_tip_outlined,
+        'Privacy policy',
+        'How we use and protect your information',
+        () => openLink(
+          context,
+          'https://bioconnect.kerala.gov.in/privacy-policy',
+        ),
+      ),
       const SizedBox(height: 16),
       VisitPanel(content.event),
     ],

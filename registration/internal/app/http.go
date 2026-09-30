@@ -58,6 +58,15 @@ func (a *App) Handler() http.Handler {
 	for _, path := range []string{"/{$}", "/delegates", "/exhibitors", "/recover", "/manage/{id}", "/admin"} {
 		m.HandleFunc("GET "+path, a.page)
 	}
+	m.HandleFunc("GET /privacy-policy", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		body, err := resources.ReadFile("web/privacy-policy.html")
+		if err != nil {
+			http.Error(w, "Privacy policy unavailable", http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(body)
+	})
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if e := a.DB.Ping(r.Context()); e != nil {
 			fail(w, 503, "database unavailable")

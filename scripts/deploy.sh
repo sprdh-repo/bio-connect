@@ -17,7 +17,7 @@ for command in aws curl; do
   fi
 done
 
-for file in index.html speakers.html committee.html exhibitors.html sponsors.html product-launch.html 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
+for file in index.html speakers.html committee.html exhibitors.html sponsors.html product-launch.html privacy-policy.html privacy-policy.css 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -54,6 +54,18 @@ for page in exhibitors sponsors product-launch; do
     --cache-control "no-cache, no-store, must-revalidate" \
     --only-show-errors
 done
+
+# Publish the privacy policy at both a clean URL and its HTML file URL.
+for policy_path in privacy-policy privacy-policy.html; do
+  aws s3 cp privacy-policy.html "s3://$BUCKET/$policy_path" \
+    --content-type "text/html; charset=utf-8" \
+    --cache-control "no-cache, no-store, must-revalidate" \
+    --only-show-errors
+done
+aws s3 cp privacy-policy.css "s3://$BUCKET/privacy-policy.css" \
+  --content-type "text/css; charset=utf-8" \
+  --cache-control "public, max-age=300" \
+  --only-show-errors
 
 aws s3 cp 404.html "s3://$BUCKET/404.html" \
   --content-type "text/html; charset=utf-8" \
@@ -96,7 +108,7 @@ INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
     --paths "/" "/index.html" "/speakers.html" "/committee.html" "/exhibitors.html" "/sponsors.html" "/product-launch.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
-            "/styles.css" "/script.js" "/assets/*" \
+            "/styles.css" "/script.js" "/assets/*" "/privacy-policy" "/privacy-policy.html" "/privacy-policy.css" \
     --query 'Invalidation.Id' \
     --output text
 )"

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+<rect width="1024" height="500" fill="#F3F1E9"/>
+<g fill="none" stroke="#D7E4DB" stroke-width="2"><circle cx="904" cy="250" r="205"/><circle cx="904" cy="250" r="160"/><circle cx="904" cy="250" r="115"/></g>
+<text x="64" y="102" font-family="sans-serif" font-size="16" letter-spacing="3" fill="#45685C">CONNECTING SCIENCE TO BUSINESS</text>
+<text x="60" y="206" font-family="sans-serif" font-weight="bold" font-size="70" fill="#0B3329">Bio Connect</text>
+<text x="64" y="276" font-family="sans-serif" font-size="52" fill="#0B3329">4.0</text>
+<text x="64" y="348" font-family="sans-serif" font-size="24" fill="#425D52">Your life sciences event companion</text>
+<text x="64" y="390" font-family="sans-serif" font-size="18" fill="#425D52">Speakers · Programme · Exhibitors · Registration</text>
+<defs><linearGradient id="bio" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#39BA7A"/><stop offset="1" stop-color="#2387C5"/></linearGradient></defs>
+<g transform="translate(680 95) scale(.31)" fill="url(#bio)"><path d="M270 382C197 382 160 440 160 510s48 130 120 130c87 0 139-86 218-87 65-1 102 66 162 66 62 0 109-48 109-108S722 404 660 404c-61 0-96 66-162 66-82 0-139-88-228-88Z"/><circle cx="514" cy="330" r="57"/><circle cx="475" cy="689" r="34"/></g>
+</svg>

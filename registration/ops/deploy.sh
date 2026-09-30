@@ -37,6 +37,10 @@ SSH_KEY="$SECRETS/bioconnect-registration.pem"
 SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
 SSH="ssh -i $SSH_KEY $SSH_OPTS ${SSH_USER}@${SERVER_IP}"
 TAG="$(cd "$ROOT" && git rev-parse --short HEAD 2>/dev/null || date +%s)"
+# Keep deployments from an uncommitted checkout distinct from committed images.
+if ! git -C "$ROOT" diff --quiet HEAD -- || [ -n "$(git -C "$ROOT" ls-files --others --exclude-standard)" ]; then
+  TAG="${TAG}-dirty-$(date +%s)"
+fi
 IMAGE="bioconnect-registration:${TAG}"
 
 echo "== wait for cloud-init on ${SERVER_IP} =="

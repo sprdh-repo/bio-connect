@@ -1,4 +1,4 @@
-package com.example.bio_connect_app
+package `in`.gov.kerala.bioconnect
 
 import io.flutter.embedding.android.FlutterActivity
 

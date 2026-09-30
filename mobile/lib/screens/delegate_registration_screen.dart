@@ -360,6 +360,28 @@ class _DelegateRegistrationScreenState
                           style: TextStyle(fontSize: 11, color: _muted),
                         ),
                       ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          AppFeedback.action();
+                          final opened = await launchUrl(
+                            Uri.parse(
+                              'https://bioconnect.kerala.gov.in/privacy-policy',
+                            ),
+                            mode: LaunchMode.externalApplication,
+                          );
+                          if (!opened && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Unable to open the privacy policy. Please try again.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.privacy_tip_outlined, size: 18),
+                        label: const Text('Read our privacy policy'),
+                      ),
                       FormField<bool>(
                         initialValue: _privacyAccepted,
                         validator: (value) => value == true
