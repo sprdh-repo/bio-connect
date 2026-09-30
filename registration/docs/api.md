@@ -42,7 +42,7 @@ The endpoint permits anonymous cross-origin reads. Unpublished rows are omitted.
 {
   "categories": [
     {"id":"student","kind":"delegate","label":"Students",
-     "early_paise":100000,"regular_paise":150000,"roster_count":1,"open":true,
+     "early_paise":100000,"regular_paise":150000,"roster_count":1,"open":true,"free_only":false,"free_open":false,
      "payable_paise":100000,"coupon_eligible":false}
   ],
   "registration_enabled": false,
@@ -186,7 +186,7 @@ Roles are disjoint:
 | `GET /admin/registrations/{id}/files/{file}` | private receipt/logo download |
 | `POST /admin/registrations/{id}/attendees` | same body and rules as the registrant route; fills an unassigned pass on the exhibitor's behalf, attributed to the staff member in the audit trail |
 | `GET /admin/export?format=csv\|xlsx&sheet=&<same filters>` | CSV is one `sheet` (`Registrations`, `Attendees`, `Payments`, `Deliveries`); XLSX has all four. Cells that begin with `= + - @` are prefixed with `'`. 50,000-row cap. |
-| `POST /admin/categories` | `{id, open}` opens or closes a category |
+| `POST /admin/categories` | `{id, open, free_open}` opens or closes a category; `open` governs paid registration and `free_open` governs free registration links. Omit either to leave it unchanged |
 | `POST /admin/bulk-send` | `{ids:[...], channel:""}` runs `send` for 1-100 approved registrations; returns per-id `queued` or the error |
 | `POST /admin/bulk-remind` | `{ids:[...]}` runs `payment_reminder` for 1-100 registrations; returns per-id `queued` or the error |
 | `POST /admin/retry` | `{id, confirm_uncertain, note}` requeues a `failed` or `uncertain` delivery. `uncertain` needs `confirm_uncertain:true` and a `note`. The prior job and its provider id are kept for late webhooks. |

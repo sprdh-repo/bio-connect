@@ -74,6 +74,9 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 	if !c.Open && freeLinkID == "" {
 		return "", "", errors.New("this category is closed")
 	}
+	if !c.FreeOpen && freeLinkID != "" {
+		return "", "", errors.New("this category is closed to free registration")
+	}
 	// Exhibitors must submit their logo in the same request that creates the
 	// registration, so a registration can never exist without one: the two used
 	// to be separate calls, and a dropped connection between them left the

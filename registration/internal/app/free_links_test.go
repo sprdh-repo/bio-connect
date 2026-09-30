@@ -79,7 +79,7 @@ func TestFreeLinkRegistersEveryDelegateCategory(t *testing.T) {
 	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
 	a.Now = func() time.Time { return fixed }
 	a.Config.RegistrationEnabled = false
-	if _, err := a.DB.Exec(context.Background(), "UPDATE categories SET open=false WHERE kind='delegate'"); err != nil {
+	if _, err := a.DB.Exec(context.Background(), "UPDATE categories SET open=false,free_open=true WHERE kind='delegate'"); err != nil {
 		t.Fatal(err)
 	}
 	token := randomToken()
@@ -188,7 +188,7 @@ func TestFreeLinkCanRequireReviewWithoutPayment(t *testing.T) {
 	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass'", rid); n != 1 {
 		t.Fatalf("pass deliveries=%d, want 1", n)
 	}
-	rejectedInput := delegateInput("student")
+	rejectedInput := delegateInput("faculty")
 	rejectedInput.Email = "rejected-free@example.com"
 	rejectedInput.Attendees[0].Email = rejectedInput.Email
 	rejectedInput.FreeToken = token
@@ -391,5 +391,34 @@ func TestAdminCanReplaceAndExpireFreeLink(t *testing.T) {
 	rr = request("POST", "/api/v1/free-registration/validate", map[string]string{"token": exhibitorToken})
 	if rr.Code != 200 {
 		t.Fatalf("expiring delegate link also invalidated exhibitor link: %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestFreeLinkRespectsFreeClosedCategory(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Date(2026, 9, 28, 12, 0, 0, 0, india)
+	a.Now = func() time.Time { return fixed }
+	a.Config.RegistrationEnabled = true
+	if _, err := a.DB.Exec(context.Background(), "UPDATE categories SET open=true,free_open=false WHERE id='student'"); err != nil {
+		t.Fatal(err)
+	}
+	token := randomToken()
+	addFreeLink(t, a, token, fixed.Add(24*time.Hour), true, "delegate")
+
+	in := delegateInput("student")
+	in.FreeToken = token
+	if _, _, err := a.Create(context.Background(), in, key(840), nil); err == nil || !strings.Contains(err.Error(), "closed to free registration") {
+		t.Fatalf("free student registration err=%v, want closed to free registration", err)
+	}
+	in.FreeToken = ""
+	if _, _, err := a.Create(context.Background(), in, key(841), nil); err != nil {
+		t.Fatalf("paid student registration: %v", err)
+	}
+	in = delegateInput("faculty")
+	in.Email = "faculty-free@example.com"
+	in.Attendees[0].Email = in.Email
+	in.FreeToken = token
+	if _, _, err := a.Create(context.Background(), in, key(842), nil); err != nil {
+		t.Fatalf("free faculty registration: %v", err)
 	}
 }

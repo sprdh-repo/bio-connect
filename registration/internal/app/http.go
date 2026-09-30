@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func respond(w http.ResponseWriter, status int, v any) {
@@ -464,11 +466,17 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	case path == "export" && r.Method == "GET":
 		a.export(w, r, p)
 	case path == "categories" && r.Method == "POST":
+		// Either flag may be omitted to leave it unchanged.
 		var in struct {
-			ID   string `json:"id"`
-			Open bool   `json:"open"`
+			ID       string `json:"id"`
+			Open     *bool  `json:"open"`
+			FreeOpen *bool  `json:"free_open"`
 		}
 		if !decode(w, r, &in) {
+			return
+		}
+		if in.Open == nil && in.FreeOpen == nil {
+			fail(w, 400, "nothing to update")
 			return
 		}
 		tx, e := a.DB.Begin(r.Context())
@@ -477,12 +485,13 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer tx.Rollback(r.Context())
-		tag, e := tx.Exec(r.Context(), "UPDATE categories SET open=$2 WHERE id=$1", in.ID, in.Open)
-		if e == nil && tag.RowsAffected() != 1 {
+		var open, freeOpen bool
+		e = tx.QueryRow(r.Context(), "UPDATE categories SET open=COALESCE($2,open),free_open=COALESCE($3,free_open) WHERE id=$1 RETURNING open,free_open", in.ID, in.Open, in.FreeOpen).Scan(&open, &freeOpen)
+		if errors.Is(e, pgx.ErrNoRows) {
 			e = errors.New("unknown category")
 		}
 		if e == nil {
-			e = audit(r.Context(), tx, p.ID, "", "category_updated", in.ID+" open="+strconv.FormatBool(in.Open))
+			e = audit(r.Context(), tx, p.ID, "", "category_updated", in.ID+" open="+strconv.FormatBool(open)+" free_open="+strconv.FormatBool(freeOpen))
 		}
 		if e == nil {
 			e = tx.Commit(r.Context())
