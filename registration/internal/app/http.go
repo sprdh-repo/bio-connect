@@ -118,6 +118,7 @@ func (a *App) Handler() http.Handler {
 		respond(w, 201, out)
 	})
 	m.HandleFunc("GET /api/v1/public/app-content", a.publicAppContent)
+	m.HandleFunc("GET /api/v1/public/event-guide", a.publicEventGuide)
 	m.HandleFunc("GET /api/v1/public/speakers", a.publicSpeakers)
 	m.HandleFunc("GET /api/v1/public/exhibitors", a.publicExhibitors)
 	m.HandleFunc("GET /api/v1/public/exhibitors/logos/{file}", a.publicExhibitorLogo)
@@ -374,6 +375,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", MaxAge: -1, Secure: a.Config.Production, HttpOnly: name == "bc_session", SameSite: http.SameSiteStrictMode})
 		}
 		respond(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	if path == "event-guide" {
+		a.adminEventGuide(w, r, p)
 		return
 	}
 	if path == "staff" && (r.Method == "GET" || r.Method == "POST") {

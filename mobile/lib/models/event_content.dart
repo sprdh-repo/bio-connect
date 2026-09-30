@@ -1,6 +1,9 @@
+import 'event_guide.dart';
+
 class EventContent {
   const EventContent({
     required this.event,
+    this.guide = const EventGuide(),
     required this.themes,
     required this.programmeHighlights,
     required this.speakers,
@@ -10,6 +13,7 @@ class EventContent {
     required this.ecosystemPartners,
   });
   final EventDetails event;
+  final EventGuide guide;
   final List<EventTheme> themes;
   final List<String> programmeHighlights;
   final List<Speaker> speakers;
@@ -19,6 +23,9 @@ class EventContent {
   final List<Partner> ecosystemPartners;
 
   factory EventContent.fromJson(Map<String, dynamic> json) => EventContent(
+    guide: EventGuide.fromJson(
+      json['event_guide'] as Map<String, dynamic>? ?? {},
+    ),
     event: EventDetails.fromJson(json['event'] as Map<String, dynamic>),
     themes: (json['themes'] as List)
         .map((item) => EventTheme.fromJson(item as Map<String, dynamic>))

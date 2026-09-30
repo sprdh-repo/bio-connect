@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'widgets/interaction.dart';
+
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'models/event_content.dart';
 import 'providers/content_provider.dart';
 import 'screens/delegate_registration_screen.dart';
+import 'screens/event_guide_screens.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -60,8 +65,14 @@ void main() {
 }
 
 Future<void> openLink(BuildContext context, String url) async {
-  if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication) &&
-      context.mounted) {
+  try {
+    if (await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) {
+      return;
+    }
+  } catch (_) {
+    // The owning app may not be installed, or the platform may reject the URL.
+  }
+  if (context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Could not open this link. Please try again.'),
@@ -70,12 +81,15 @@ Future<void> openLink(BuildContext context, String url) async {
   }
 }
 
+final _navigationObserver = AppNavigationObserver();
+
 class BioConnectApp extends StatelessWidget {
   const BioConnectApp({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Bio Connect 4.0',
     debugShowCheckedModeBanner: false,
+    navigatorObservers: [_navigationObserver],
     theme: ThemeData(
       useMaterial3: true,
       fontFamily: 'DM Sans',
@@ -104,7 +118,7 @@ class BioConnectApp extends StatelessWidget {
         ),
       ),
       textTheme: Theme.of(context).textTheme
-          .apply(bodyColor: ink, displayColor: ink),
+          .apply(fontFamily: 'DM Sans', bodyColor: ink, displayColor: ink),
     ),
     home: const AppShell(),
   );
@@ -116,10 +130,98 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
-  int selected = 0;
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    for (final controller in _tabScroll) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<ContentProvider>().load();
+    }
+  }
+
+  int selected = 0;
+  final _tabScroll = List.generate(4, (_) => ScrollController());
+  bool _exitPromptOpen = false;
+
+  void _selectTab(int index) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (selected == index) {
+      final controller = _tabScroll[index];
+      if (controller.hasClients && controller.offset > 0) {
+        AppFeedback.selection();
+        controller.animateTo(
+          0,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return;
+    }
+    AppFeedback.selection();
+    setState(() => selected = index);
+  }
+
+  Future<void> _back() async {
+    if (_exitPromptOpen) return;
+    if (MediaQuery.viewInsetsOf(context).bottom > 0) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      return;
+    }
+    if (selected != 0) {
+      _selectTab(0);
+      return;
+    }
+    // iOS has no app-exit navigation. Keep native detail-page swipe gestures.
+    if (Theme.of(context).platform == TargetPlatform.iOS) return;
+    _exitPromptOpen = true;
+    final exit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit Bio Connect?'),
+        content: const Text('You can return to the event guide anytime.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    _exitPromptOpen = false;
+    if (exit == true && mounted) {
+      AppFeedback.action();
+      await SystemNavigator.pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) _back();
+    },
+    child: _buildShell(context),
+  );
+
+  Widget _buildShell(BuildContext context) {
     final state = context.watch<ContentProvider>();
     if (state.content == null) {
       return Scaffold(
@@ -139,21 +241,34 @@ class _AppShellState extends State<AppShell> {
       body: SafeArea(
         child: IndexedStack(
           index: selected,
-          children: [
-            HomeScreen(
-              content,
-              explore: () => setState(() => selected = 1),
-              speakers: () => setState(() => selected = 2),
-            ),
-            ExploreScreen(content),
-            SpeakersScreen(content.speakers),
-            MoreScreen(content),
-          ],
+          children:
+              [
+                    AttendeeHomeScreen(
+                      content,
+                      sessions: () => _selectTab(1),
+                      speakers: () => _selectTab(2),
+                    ),
+                    const SessionsScreen(),
+                    SpeakersScreen(content.speakers),
+                    MoreScreen(content),
+                  ]
+                  .asMap()
+                  .entries
+                  .map(
+                    (entry) => TickerMode(
+                      enabled: selected == entry.key,
+                      child: PrimaryScrollController(
+                        controller: _tabScroll[entry.key],
+                        child: entry.value,
+                      ),
+                    ),
+                  )
+                  .toList(),
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
-        onDestinationSelected: (index) => setState(() => selected = index),
+        onDestinationSelected: _selectTab,
         backgroundColor: paper,
         indicatorColor: lime.withValues(alpha: .42),
         destinations: const [
@@ -163,9 +278,9 @@ class _AppShellState extends State<AppShell> {
             label: 'Home',
           ),
           NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore),
-            label: 'Explore',
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Sessions',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
@@ -175,7 +290,7 @@ class _AppShellState extends State<AppShell> {
           NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),
             selectedIcon: Icon(Icons.grid_view),
-            label: 'More',
+            label: 'Guide',
           ),
         ],
       ),
@@ -183,199 +298,12 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen(
-    this.content, {
-    super.key,
-    required this.explore,
-    required this.speakers,
-  });
-  final EventContent content;
-  final VoidCallback explore, speakers;
-  @override
-  Widget build(BuildContext context) => ListView(
-    children: [
-      Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/hero-biotech.webp',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Container(
-            constraints: const BoxConstraints(minHeight: 470),
-            padding: const EdgeInsets.fromLTRB(24, 26, 24, 30),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xF0051C17),
-                  Color(0xB00B3329),
-                  Color(0xE9051C17),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Image.asset(
-                        'assets/images/bio-connect-logo.png',
-                        height: 50,
-                        alignment: Alignment.centerLeft,
-                      ),
-                    ),
-                    const Text(
-                      'KERALA 2026',
-                      style: TextStyle(
-                        color: lime,
-                        fontSize: 10,
-                        letterSpacing: 1.4,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 49),
-                const Text(
-                  'THE INTERNATIONAL LIFE SCIENCES CONCLAVE & EXPO',
-                  style: TextStyle(
-                    color: lime,
-                    fontSize: 10,
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 13),
-                Text(
-                  content.event.heroTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Manrope',
-                    fontSize: 37,
-                    height: 1.09,
-                  ),
-                ),
-                const SizedBox(height: 15),
-                Text(
-                  content.event.description,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 23),
-                IconText(
-                  Icons.calendar_month_outlined,
-                  eventDateRange(content.event, uppercase: true),
-                ),
-                const SizedBox(height: 8),
-                IconText(Icons.place_outlined, content.event.venue),
-                const SizedBox(height: 23),
-                FilledButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const DelegateRegistrationScreen(),
-                    ),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: ink,
-                    minimumSize: const Size(double.infinity, 52),
-                  ),
-                  icon: const Icon(Icons.arrow_outward, size: 18),
-                  label: const Text('Register as a delegate'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 26, 20, 30),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Eyebrow('01 / THE CONCLAVE'),
-            const SizedBox(height: 8),
-            const TitleText('A place for discovery\nand connection.'),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                const Expanded(
-                  child: Metric('2', 'days', Icons.calendar_today_outlined),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Metric(
-                    '${content.themes.length}',
-                    'themes',
-                    Icons.science_outlined,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Metric(
-                    '${content.speakers.length}',
-                    'speakers',
-                    Icons.record_voice_over_outlined,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 30),
-            SectionHeader('Five themes. One future.', 'Explore all', explore),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 182,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: content.themes.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => GestureDetector(
-                  onTap: explore,
-                  child: SizedBox(
-                    width: 150,
-                    child: ThemeTile(content.themes[i]),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            SectionHeader('Voices on stage', 'Meet all', speakers),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 200,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: content.speakers.length.clamp(0, 8),
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, i) => SizedBox(
-                  width: 135,
-                  child: SpeakerTile(content.speakers[i]),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            VisitPanel(content.event),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
 class ExploreScreen extends StatelessWidget {
   const ExploreScreen(this.content, {super.key});
   final EventContent content;
   @override
   Widget build(BuildContext context) => ListView(
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
       const Eyebrow('BIO CONNECT 4.0'),
@@ -442,6 +370,7 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
         )
         .toList();
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
       children: [
         const Eyebrow('CONCLAVE SPEAKERS'),
@@ -450,6 +379,9 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
         const SizedBox(height: 16),
         TextField(
           controller: queryController,
+          onTapOutside: (_) => FocusScope.of(context).unfocus(),
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => FocusScope.of(context).unfocus(),
           onChanged: (v) => setState(() => query = v),
           decoration: InputDecoration(
             hintText: 'Search name or organisation',
@@ -459,6 +391,7 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
                 : IconButton(
                     tooltip: 'Clear search',
                     onPressed: () {
+                      AppFeedback.selection();
                       queryController.clear();
                       setState(() => query = '');
                     },
@@ -493,12 +426,31 @@ class MoreScreen extends StatelessWidget {
   final EventContent content;
   @override
   Widget build(BuildContext context) => ListView(
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
       const Eyebrow('YOUR EVENT GUIDE'),
       const SizedBox(height: 7),
       const TitleText('Everything in\none place.'),
       const SizedBox(height: 22),
+      GuideCard(
+        Icons.place_outlined,
+        'Venue & directions',
+        content.event.venue,
+        () => showGuidePage(context, const VenueScreen()),
+      ),
+      GuideCard(
+        Icons.local_activity_outlined,
+        'Activities',
+        'Discover what is happening',
+        () => showGuidePage(context, const ActivitiesScreen()),
+      ),
+      GuideCard(
+        Icons.help_outline,
+        'FAQs',
+        'Answers and event-day help',
+        () => showGuidePage(context, const FaqScreen()),
+      ),
       GuideCard(
         Icons.storefront_outlined,
         'Exhibitors',
@@ -520,12 +472,7 @@ class MoreScreen extends StatelessWidget {
           MaterialPageRoute(builder: (_) => RegistrationScreen(content.event)),
         ),
       ),
-      GuideCard(
-        Icons.place_outlined,
-        'Venue & directions',
-        content.event.venue,
-        () => openLink(context, directionsUrl(content.event)),
-      ),
+
       GuideCard(
         Icons.article_outlined,
         'Event brochure',
@@ -577,6 +524,7 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Exhibitors')),
       body: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(20),
         children: [
           const TitleText('Meet your next\ncollaborator.'),
@@ -595,18 +543,9 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
               onTap: state.loadExhibitors,
             ),
           if (!state.exhibitorsLoading && state.exhibitorsError == null) ...[
-            TextField(
+            GuideSearchField(
+              label: 'Search organisations or expertise',
               onChanged: (v) => setState(() => query = v),
-              decoration: InputDecoration(
-                hintText: 'Search organisations or expertise',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide.none,
-                ),
-              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -696,6 +635,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Registration')),
     body: ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(20),
       children: [
         const TitleText('Three ways\nto take part.'),
@@ -787,6 +727,7 @@ class PartnersScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('People & partners')),
     body: ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(20),
       children: [
         const TitleText('A shared vision\nfor life sciences.'),
@@ -896,6 +837,7 @@ class ProductLaunchScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Product launch')),
     body: ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
         Eyebrow(content.productLaunch.eyebrow.toUpperCase()),
@@ -1065,10 +1007,25 @@ class SpeakerDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Speaker')),
     body: ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        AspectRatio(
-          aspectRatio: 1.4,
-          child: SpeakerImage(speaker, width: double.infinity),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: AspectRatio(
+                aspectRatio: 4 / 5,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: ColoredBox(
+                    color: cream,
+                    child: SpeakerImage(speaker, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
         Padding(
           padding: const EdgeInsets.all(24),
@@ -1149,12 +1106,14 @@ class IconText extends StatelessWidget {
     children: [
       Icon(icon, color: gold, size: 17),
       const SizedBox(width: 9),
-      Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+      Expanded(
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     ],
@@ -1326,18 +1285,24 @@ class SpeakerTile extends StatelessWidget {
 }
 
 class SpeakerImage extends StatelessWidget {
-  const SpeakerImage(this.speaker, {super.key, this.width});
+  const SpeakerImage(
+    this.speaker, {
+    super.key,
+    this.width,
+    this.fit = BoxFit.cover,
+  });
   final Speaker speaker;
   final double? width;
+  final BoxFit fit;
   @override
   Widget build(BuildContext context) {
-    final fallback = _SpeakerFallback(speaker);
+    final fallback = _SpeakerFallback(speaker, fit: fit);
     if (speaker.image.isEmpty) return SizedBox(width: width, child: fallback);
     if (speaker.image.startsWith('http')) {
       return Image.network(
         speaker.image,
         width: width,
-        fit: BoxFit.cover,
+        fit: fit,
         alignment: Alignment.topCenter,
         errorBuilder: (_, _, _) => fallback,
       );
@@ -1345,7 +1310,7 @@ class SpeakerImage extends StatelessWidget {
     return Image.asset(
       speaker.image,
       width: width,
-      fit: BoxFit.cover,
+      fit: fit,
       alignment: Alignment.topCenter,
       errorBuilder: (_, _, _) => fallback,
     );
@@ -1353,13 +1318,14 @@ class SpeakerImage extends StatelessWidget {
 }
 
 class _SpeakerFallback extends StatelessWidget {
-  const _SpeakerFallback(this.speaker);
+  const _SpeakerFallback(this.speaker, {required this.fit});
+  final BoxFit fit;
   final Speaker speaker;
 
   @override
   Widget build(BuildContext context) => Image.asset(
     'assets/images/speakers/${speaker.id}.webp',
-    fit: BoxFit.cover,
+    fit: fit,
     alignment: Alignment.topCenter,
     errorBuilder: (_, _, _) => ColoredBox(
       color: cream,

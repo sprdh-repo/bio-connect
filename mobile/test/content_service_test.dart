@@ -45,6 +45,23 @@ void main() {
                   'linkedin': '',
                 },
               ],
+              'event_guide': {
+                'sessions': [
+                  {
+                    'id': 's',
+                    'title': 'Published session',
+                    'starts_at': '2026-10-08T09:00:00+05:30',
+                    'ends_at': '2026-10-08T10:00:00+05:30',
+                  },
+                ],
+                'activities': [
+                  {'id': 'a', 'title': 'Networking'},
+                ],
+                'faqs': [
+                  {'id': 'f', 'question': 'Where?', 'answer': 'Foyer'},
+                ],
+                'venue': {'arrival': 'Use the main entrance'},
+              },
               'programme_highlights': ['New highlight'],
               'product_launch': {
                 'eyebrow': 'Host',
@@ -99,6 +116,10 @@ void main() {
 
       final refreshed = await service.refreshEvent(bundled);
       expect(refreshed.event.title, 'Updated event');
+      expect(refreshed.guide.sessions.single.title, 'Published session');
+      expect(refreshed.guide.activities.single.title, 'Networking');
+      expect(refreshed.guide.faqs.single.answer, 'Foyer');
+      expect(refreshed.guide.venue.arrival, 'Use the main entrance');
       expect(refreshed.speakers.single.name, 'New Speaker');
       expect(refreshed.productLaunch.title, 'New launch');
       expect(refreshed.sponsor.name, 'New sponsor');

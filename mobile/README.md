@@ -16,14 +16,17 @@ App IDs and release signing are still placeholders and must be set before store 
 
 ## Current alpha
 
-- Home: event date, venue, registration, themes and speaker preview.
-- Explore: the five website themes and programme highlights.
+- Home: attendee quick links, event dates, venue, registration and access to themes.
+- Sessions: published timetable, day filters, search and session details in India time.
 - Speakers: the backend's published profiles, search and LinkedIn links where supplied.
-- More: confirmed exhibitor directory, delegate and exhibition pricing, brochure, directions, product launch, leadership and sponsors.
+- Guide: venue details, floor plan, activities, searchable FAQs, exhibitor directory, passes, brochure and partners.
+- Backend event-guide editor with draft/published controls, public APIs and staff audit history.
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
 - Loading, retry, empty and no-match states are included for live content and directories.
 
-The website does not publish a timed session agenda, attendee tickets or meeting data, so the alpha does not invent these.
+Unpublished event-day sections show “To be announced”.
+Staff can add and publish content from the registration backend at `/admin?view=event-guide`.
+See [Event-day guide](docs/event-guide.md) for the API contract, publishing workflow and offline behavior.
 Bank payment and exhibitor registration remain on the secure official portal; maps, LinkedIn, the brochure and third-party applications open in their owning apps.
 
 ## Content and backend boundary

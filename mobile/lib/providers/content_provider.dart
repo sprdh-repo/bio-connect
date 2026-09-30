@@ -14,11 +14,12 @@ class ContentProvider extends ChangeNotifier {
   String? exhibitorsError;
 
   Future<void> load() async {
+    if (loading) return;
     loading = true;
     error = null;
     notifyListeners();
     try {
-      content = await _service.loadEvent();
+      content ??= await _service.loadEvent();
       notifyListeners();
       content = await _service.refreshEvent(content!);
     } catch (_) {

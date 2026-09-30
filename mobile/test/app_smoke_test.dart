@@ -19,7 +19,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Where science\nmeets what’s next.'), findsOneWidget);
+    expect(find.text('Make the most\nof Bio Connect.'), findsOneWidget);
     await tester.tap(find.text('Speakers').last);
     await tester.pumpAndSettle();
     expect(find.text('The voices\ntaking the stage.'), findsOneWidget);

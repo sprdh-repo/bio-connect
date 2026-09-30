@@ -22,6 +22,12 @@ func (a *App) publicAppContent(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "app content unavailable; please retry")
 		return
 	}
+	guide, err := a.loadEventGuide(r.Context())
+	if err != nil {
+		fail(w, http.StatusServiceUnavailable, "event guide unavailable; please retry")
+		return
+	}
+	content["event_guide"] = guide.public()
 	content["speakers"] = speakers
 	respond(w, http.StatusOK, content)
 }

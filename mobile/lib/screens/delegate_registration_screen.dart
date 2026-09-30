@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/registration_service.dart';
+import '../widgets/interaction.dart';
 
 const _forest = Color(0xFF0B3329);
 const _cream = Color(0xFFF3F1E9);
@@ -32,6 +33,58 @@ class _DelegateRegistrationScreenState
   bool _whatsapp = false;
   bool _privacyAccepted = false;
   bool _submitting = false;
+  bool _saved = false;
+  bool _dirty = false;
+  bool _allowPop = false;
+  bool _leavePromptOpen = false;
+
+  void _markDirty() {
+    if (!_dirty) setState(() => _dirty = true);
+  }
+
+  Future<void> _leave() async {
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _requestBack() async {
+    if (_leavePromptOpen) return;
+    if (_submitting) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saving your registration. Please wait.')),
+      );
+      return;
+    }
+    if (_saved || !_dirty) {
+      await _leave();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    _leavePromptOpen = true;
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard registration details?'),
+        content: const Text('Your unsaved details will be lost.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep editing'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    _leavePromptOpen = false;
+    if (discard == true && mounted) {
+      AppFeedback.action();
+      await _leave();
+    }
+  }
 
   @override
   void initState() {
@@ -55,6 +108,7 @@ class _DelegateRegistrationScreenState
   }
 
   Future<void> _loadCategories() async {
+    setState(() => _error = null);
     try {
       final categories = await _service.delegateCategories();
       if (!mounted) return;
@@ -79,7 +133,13 @@ class _DelegateRegistrationScreenState
       value == null || value.trim().isEmpty ? 'This field is required' : null;
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _category == null) return;
+    if (_submitting || _saved) return;
+    if (!_formKey.currentState!.validate() || _category == null) {
+      AppFeedback.selection();
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    AppFeedback.action();
     setState(() {
       _submitting = true;
       _error = null;
@@ -95,12 +155,17 @@ class _DelegateRegistrationScreenState
         whatsappConsent: _whatsapp,
       );
       if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _saved = true;
+      });
+      AppFeedback.success();
       await showModalBottomSheet<void>(
         context: context,
-        isDismissible: false,
-        enableDrag: false,
+        isScrollControlled: true,
+        showDragHandle: true,
         builder: (context) => SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -127,16 +192,33 @@ class _DelegateRegistrationScreenState
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
-                  onPressed: () => launchUrl(
-                    Uri.parse(result.referenceUrl),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  onPressed: () async {
+                    AppFeedback.action();
+                    try {
+                      if (await launchUrl(
+                        Uri.parse(result.referenceUrl),
+                        mode: LaunchMode.externalApplication,
+                      )) {
+                        return;
+                      }
+                    } catch (_) {
+                      /* Fall through to the recoverable message. */
+                    }
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Could not open payment. Use the private link emailed to you, or try again.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
                   icon: const Icon(Icons.lock_outline),
                   label: const Text('Continue securely to payment'),
                 ),
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context);
                     Navigator.pop(context);
                   },
                   child: const Text('Finish for now'),
@@ -146,7 +228,9 @@ class _DelegateRegistrationScreenState
           ),
         ),
       );
+      if (mounted) await _leave();
     } catch (error) {
+      AppFeedback.action();
       if (mounted) setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -154,173 +238,205 @@ class _DelegateRegistrationScreenState
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Delegate registration')),
-    body: _categories == null && _error == null
-        ? const Center(child: CircularProgressIndicator())
-        : Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-              children: [
-                const Text(
-                  'Join the room where\nlife sciences moves forward.',
-                  style: TextStyle(
-                    fontFamily: 'Manrope',
-                    fontSize: 28,
-                    height: 1.15,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Choose your pass and enter the attendee details. It takes about two minutes.',
-                  style: TextStyle(color: _muted, height: 1.45),
-                ),
-                const SizedBox(height: 24),
-                if (_categories != null && _categories!.isNotEmpty) ...[
-                  const _SectionLabel('CHOOSE YOUR PASS'),
-                  const SizedBox(height: 10),
-                  for (final category in _categories!)
-                    _PassOption(
-                      category: category,
-                      selected: category == _category,
-                      onTap: () => setState(() => _category = category),
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: _allowPop || (!_dirty && !_submitting),
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) _requestBack();
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('Delegate registration'),
+        leading: Navigator.canPop(context)
+            ? BackButton(onPressed: _requestBack)
+            : null,
+      ),
+      body: _categories == null && _error == null
+          ? const Center(child: CircularProgressIndicator())
+          : AbsorbPointer(
+              absorbing: _submitting || _saved,
+              child: Form(
+                key: _formKey,
+                onChanged: _markDirty,
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    const Text(
+                      'Join the room where\nlife sciences moves forward.',
+                      style: TextStyle(
+                        fontFamily: 'Manrope',
+                        fontSize: 28,
+                        height: 1.15,
+                        color: _ink,
+                      ),
                     ),
-                  const SizedBox(height: 22),
-                  const _SectionLabel('ATTENDEE DETAILS'),
-                  const SizedBox(height: 10),
-                  _Field(
-                    controller: _name,
-                    label: 'Full name',
-                    icon: Icons.person_outline,
-                    validator: _required,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  _Field(
-                    controller: _designation,
-                    label: 'Designation',
-                    icon: Icons.badge_outlined,
-                    validator: _required,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  _Field(
-                    controller: _institution,
-                    label: 'Institution / organisation',
-                    icon: Icons.business_outlined,
-                    validator: _required,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  _Field(
-                    controller: _email,
-                    label: 'Email',
-                    icon: Icons.mail_outline,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      final error = _required(value);
-                      if (error != null) return error;
-                      return value!.contains('@')
-                          ? null
-                          : 'Enter a valid email';
-                    },
-                    textInputAction: TextInputAction.next,
-                  ),
-                  _Field(
-                    controller: _phone,
-                    label: 'Phone with country code',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    validator: (value) =>
-                        RegExp(r'^\+[1-9][0-9]{7,14}$')
-                            .hasMatch(value?.trim() ?? '')
-                        ? null
-                        : 'Use international format, e.g. +919876543210',
-                    textInputAction: TextInputAction.done,
-                  ),
-                  CheckboxListTile(
-                    value: _whatsapp,
-                    onChanged: (value) =>
-                        setState(() => _whatsapp = value ?? false),
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    title: const Text(
-                      'Send my pass and event updates on WhatsApp',
-                      style: TextStyle(fontSize: 13),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Choose your pass and enter the attendee details. It takes about two minutes.',
+                      style: TextStyle(color: _muted, height: 1.45),
                     ),
-                    subtitle: const Text(
-                      'Optional. Your pass is always sent by email.',
-                      style: TextStyle(fontSize: 11, color: _muted),
-                    ),
-                  ),
-                  FormField<bool>(
-                    initialValue: _privacyAccepted,
-                    validator: (value) => value == true
-                        ? null
-                        : 'Confirm permission to register this attendee.',
-                    builder: (field) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CheckboxListTile(
-                          value: _privacyAccepted,
-                          onChanged: (value) {
-                            final accepted = value ?? false;
-                            setState(() => _privacyAccepted = accepted);
-                            field.didChange(accepted);
+                    const SizedBox(height: 24),
+                    if (_categories != null && _categories!.isNotEmpty) ...[
+                      const _SectionLabel('CHOOSE YOUR PASS'),
+                      const SizedBox(height: 10),
+                      for (final category in _categories!)
+                        _PassOption(
+                          category: category,
+                          selected: category == _category,
+                          onTap: () {
+                            if (_category != category) {
+                              AppFeedback.selection();
+                              _markDirty();
+                              setState(() => _category = category);
+                            }
                           },
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: const Text(
-                            'I have checked these details and have permission to provide them for registration and pass delivery.',
-                            style: TextStyle(fontSize: 13),
-                          ),
                         ),
-                        if (field.hasError)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Text(
-                              field.errorText!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontSize: 12,
+                      const SizedBox(height: 22),
+                      const _SectionLabel('ATTENDEE DETAILS'),
+                      const SizedBox(height: 10),
+                      _Field(
+                        controller: _name,
+                        label: 'Full name',
+                        icon: Icons.person_outline,
+                        validator: _required,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      _Field(
+                        controller: _designation,
+                        label: 'Designation',
+                        icon: Icons.badge_outlined,
+                        validator: _required,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      _Field(
+                        controller: _institution,
+                        label: 'Institution / organisation',
+                        icon: Icons.business_outlined,
+                        validator: _required,
+                        textInputAction: TextInputAction.next,
+                      ),
+                      _Field(
+                        controller: _email,
+                        label: 'Email',
+                        icon: Icons.mail_outline,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          final error = _required(value);
+                          if (error != null) return error;
+                          return value!.contains('@')
+                              ? null
+                              : 'Enter a valid email';
+                        },
+                        textInputAction: TextInputAction.next,
+                      ),
+                      _Field(
+                        controller: _phone,
+                        label: 'Phone with country code',
+                        icon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                        validator: (value) =>
+                            RegExp(r'^\+[1-9][0-9]{7,14}$')
+                                .hasMatch(value?.trim() ?? '')
+                            ? null
+                            : 'Use international format, e.g. +919876543210',
+                        textInputAction: TextInputAction.done,
+                      ),
+                      CheckboxListTile(
+                        value: _whatsapp,
+                        onChanged: (value) {
+                          AppFeedback.selection();
+                          _markDirty();
+                          setState(() => _whatsapp = value ?? false);
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: const Text(
+                          'Send my pass and event updates on WhatsApp',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        subtitle: const Text(
+                          'Optional. Your pass is always sent by email.',
+                          style: TextStyle(fontSize: 11, color: _muted),
+                        ),
+                      ),
+                      FormField<bool>(
+                        initialValue: _privacyAccepted,
+                        validator: (value) => value == true
+                            ? null
+                            : 'Confirm permission to register this attendee.',
+                        builder: (field) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CheckboxListTile(
+                              value: _privacyAccepted,
+                              onChanged: (value) {
+                                AppFeedback.selection();
+                                final accepted = value ?? false;
+                                setState(() => _privacyAccepted = accepted);
+                                field.didChange(accepted);
+                              },
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: const Text(
+                                'I have checked these details and have permission to provide them for registration and pass delivery.',
+                                style: TextStyle(fontSize: 13),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-                if (_error != null)
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFECE8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(_error!, style: const TextStyle(height: 1.4)),
-                  ),
-                const SizedBox(height: 18),
-                if (_categories != null && _categories!.isNotEmpty)
-                  FilledButton(
-                    onPressed: _submitting ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(54),
-                    ),
-                    child: _submitting
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Save registration'),
-                  )
-                else
-                  OutlinedButton(
-                    onPressed: _loadCategories,
-                    child: const Text('Try again'),
-                  ),
-              ],
+                            if (field.hasError)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 12),
+                                child: Text(
+                                  field.errorText!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_error != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFECE8),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(height: 1.4),
+                        ),
+                      ),
+                    const SizedBox(height: 18),
+                    if (_categories != null && _categories!.isNotEmpty)
+                      FilledButton(
+                        onPressed: _submitting || _saved ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                        ),
+                        child: _submitting
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(_saved ? 'Saved' : 'Save registration'),
+                      )
+                    else
+                      OutlinedButton(
+                        onPressed: _loadCategories,
+                        child: const Text('Try again'),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
+    ),
   );
 }
 

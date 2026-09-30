@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="bio" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#39BA7A"/><stop offset="1" stop-color="#2387C5"/></linearGradient></defs>
+  <g fill="url(#bio)">
+    <path d="M270 382C197 382 160 440 160 510s48 130 120 130c87 0 139-86 218-87 65-1 102 66 162 66 62 0 109-48 109-108S722 404 660 404c-61 0-96 66-162 66-82 0-139-88-228-88Z" transform="translate(72 0) scale(.88 1)"/>
+    <circle cx="514" cy="330" r="57"/>
+    <circle cx="475" cy="689" r="34"/>
+  </g>
+</svg>

@@ -3,3 +3,4 @@
 var
 coverage.out
 bioconnect
+ops/secrets/
