@@ -18,6 +18,7 @@ type Coupon struct {
 
 var coupons = map[string]Coupon{
 	"KSUM30": {Code: "KSUM30", PercentOff: 30, Excluded: map[string]bool{"student": true}},
+	"KMTC30": {Code: "KMTC30", PercentOff: 30, Excluded: map[string]bool{"student": true}},
 }
 
 // BankAccount is where coupon registrations transfer their fee. It is the same
