@@ -19,8 +19,8 @@ func TestPublicSpeakers(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Speakers) != 40 {
-		t.Fatalf("got %d speakers, want 40", len(out.Speakers))
+	if len(out.Speakers) != 49 {
+		t.Fatalf("got %d speakers, want 49", len(out.Speakers))
 	}
 	first := out.Speakers[0]
 	if first.ID != "jayakrishna-ambati" || first.Name != "Dr. Jayakrishna Ambati" || first.ImageURL == "" {
@@ -37,7 +37,7 @@ func TestPublicSpeakers(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Speakers) != 39 || out.Speakers[0].ID == "jayakrishna-ambati" {
+	if len(out.Speakers) != 48 || out.Speakers[0].ID == "jayakrishna-ambati" {
 		t.Fatalf("unpublished speaker remains visible: %s", rr.Body.String())
 	}
 }

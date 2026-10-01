@@ -350,6 +350,86 @@
       "organization": "Vaidyaratnam Group",
       "image": "assets/images/speakers/ashish-g-r.webp",
       "linkedin": ""
+    },
+    {
+      "id": "satheesan-b",
+      "name": "Dr. Satheesan B.",
+      "role": "Director",
+      "organization": "Malabar Cancer Centre, Thalassery",
+      "image": "assets/images/speakers/satheesan-b.webp",
+      "linkedin": "https://www.linkedin.com/in/satheesan-balasubramanian-832b8810/"
+    },
+    {
+      "id": "philip-mathew",
+      "name": "Dr. Philip Mathew",
+      "role": "Head of Department, Adult Critical Care Services",
+      "organization": "Believers Church Medical College Hospital",
+      "image": "assets/images/speakers/philip-mathew.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-philip-mathew-15148bb7/"
+    },
+    {
+      "id": "sreeja-narayanan",
+      "name": "Dr. Sreeja Narayanan",
+      "role": "Principal Investigator, Nano-Bioengineering",
+      "organization": "CVJ Centre for Synthetic Biology and Biomanufacturing, CUSAT",
+      "image": "",
+      "linkedin": ""
+    },
+    {
+      "id": "m-i-sahadulla",
+      "name": "Dr. M. I. Sahadulla",
+      "role": "Chairman & Managing Director",
+      "organization": "KIMS Health Care Management Ltd.",
+      "image": "assets/images/speakers/m-i-sahadulla.webp",
+      "linkedin": ""
+    },
+    {
+      "id": "c-balagopal",
+      "name": "C. Balagopal",
+      "role": "Chairman",
+      "organization": "Kerala State Industrial Development Corporation (KSIDC)",
+      "image": "assets/images/speakers/c-balagopal.webp",
+      "linkedin": "https://www.linkedin.com/in/balagopal-chandrasekhar-12848653/"
+    },
+    {
+      "id": "milind-pappu",
+      "name": "Milind Pappu",
+      "role": "CEO & Board Member",
+      "organization": "Nipro India Group",
+      "image": "assets/images/speakers/milind-pappu.webp",
+      "linkedin": "https://www.linkedin.com/in/milindpappu/"
+    },
+    {
+      "id": "r-mukund",
+      "name": "R. Mukund",
+      "role": "Vice President (Strategic Planning)",
+      "organization": "HLL Lifecare Limited",
+      "image": "assets/images/speakers/r-mukund.webp",
+      "linkedin": "https://www.linkedin.com/in/mukund-r-pillai-47972013/"
+    },
+    {
+      "id": "praveen-sagar",
+      "name": "Praveen Sagar",
+      "role": "Co-founder & Technical Director",
+      "organization": "OxDevice Ltd, UK",
+      "image": "assets/images/speakers/praveen-sagar.webp",
+      "linkedin": ""
+    },
+    {
+      "id": "sathish-kumar-g",
+      "name": "Sathish Kumar G.",
+      "role": "Managing Director",
+      "organization": "Terumo Penpol",
+      "image": "assets/images/speakers/sathish-kumar-g.webp",
+      "linkedin": "https://www.linkedin.com/in/sathishkrao-blr/"
+    },
+    {
+      "id": "jay-krishnan",
+      "name": "Jay Krishnan",
+      "role": "Partner & Head of Investments",
+      "organization": "Beyond Next Ventures India",
+      "image": "assets/images/speakers/jay-krishnan.webp",
+      "linkedin": "https://www.linkedin.com/in/thejaykrishnan/"
     }
   ],
   "programme_highlights": [
