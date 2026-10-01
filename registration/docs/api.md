@@ -95,7 +95,7 @@ Reusing the key with a different body is rejected.
   The allowance is recorded on the registration as `roster_count`. It rose from 3 / 2 / 2 in migration 009, which granted it to existing registrations too, so an older registration can hold fewer attendees than its allowance until the places are filled (see `POST /registrations/{id}/attendees`).
 - `phone` must be `+` and 8 to 15 digits. `whatsapp_consent` records messaging permission; without it WhatsApp is skipped for that person.
 - `coupon_code` is optional. A valid code freezes its discount on the registration (`coupon_code`, `discount_percent`); an invalid one fails with 400 and saves nothing.
-  `KSUM30` and `KMTC30` each give 30% off every category except students, applied to whichever fee (early-bird or regular) is current on the verified payment date, rounded to the nearest rupee.
+  `KSUM30` gives 30% and `KMTC25` gives 25% off every category except students, applied to whichever fee (early-bird or regular) is current on the verified payment date, rounded to the nearest rupee.
   A coupon registration pays by direct bank transfer instead of SBI Collect.
 - Fails with 400 if registration is closed or the category is closed.
 

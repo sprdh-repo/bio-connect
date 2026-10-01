@@ -37,12 +37,12 @@ func TestCouponValidity(t *testing.T) {
 		{"KSUM30", "premium", true},
 		{"KSUM30", "table", true},
 		{"KSUM30", "student", false},
-		{"KMTC30", "industry", true},
-		{"KMTC30", "startup", true},
-		{"KMTC30", "faculty", true},
-		{"KMTC30", "premium", true},
-		{"KMTC30", "table", true},
-		{"KMTC30", "student", false},
+		{"KMTC25", "industry", true},
+		{"KMTC25", "startup", true},
+		{"KMTC25", "faculty", true},
+		{"KMTC25", "premium", true},
+		{"KMTC25", "table", true},
+		{"KMTC25", "student", false},
 		{"KSUM40", "industry", false},
 	} {
 		_, err := lookupCoupon(tc.code, tc.cat)
