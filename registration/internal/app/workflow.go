@@ -154,7 +154,7 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 }
 
 func (a *App) issuePasses(ctx context.Context, tx pgx.Tx, rid string, roster int) error {
-	rows, err := tx.Query(ctx, "SELECT id FROM attendees WHERE registration_id=$1 ORDER BY position", rid)
+	rows, err := tx.Query(ctx, "SELECT id FROM attendees WHERE registration_id=$1 AND removed_at IS NULL ORDER BY position", rid)
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		return errors.New("note is too long")
 	}
 	switch in.Action {
-	case "approve_send", "approve_only", "record_approve_send", "record_approve_only":
+	case "approve_send", "approve_only", "record_approve_send", "record_approve_only", "reinstate":
 		if status == "approved" {
 			return tx.Commit(ctx)
 		}
@@ -295,9 +295,14 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if free && recordPayment {
 			return ErrConflict
 		}
+		// reinstate approves a rejected registration with the same payment
+		// verification as approve_only, and like it sends nothing: staff send
+		// the passes once they are ready.
 		expectedStatus := "awaiting_review"
 		if recordPayment {
 			expectedStatus = "awaiting_payment"
+		} else if in.Action == "reinstate" {
+			expectedStatus = "rejected"
 		}
 		if status != expectedStatus {
 			return ErrConflict
@@ -402,7 +407,21 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			}
 			key = "resend:" + hash(in.RequestID)
 		}
-		if e = a.queuePasses(ctx, tx, rid, in.Channel, key); e != nil {
+		// With a pass_id only that holder is sent their pass, and the
+		// contact's pack is not; "send" still goes out at most once per pass.
+		if in.PassID != "" {
+			var email, phone string
+			var consent bool
+			if e = tx.QueryRow(ctx, "SELECT a.email,a.phone,a.whatsapp_consent FROM passes p JOIN attendees a ON a.id=p.attendee_id WHERE p.id=$1 AND p.registration_id=$2 AND p.revoked_at IS NULL AND a.removed_at IS NULL", in.PassID, rid).Scan(&email, &phone, &consent); e != nil {
+				return errors.New("pass not found or revoked")
+			}
+			if in.Channel == "whatsapp" && !consent {
+				return errors.New("this attendee has not permitted WhatsApp delivery")
+			}
+			if e = a.queuePass(ctx, tx, rid, in.PassID, email, phone, consent, in.Channel, key); e != nil {
+				return e
+			}
+		} else if e = a.queuePasses(ctx, tx, rid, in.Channel, key); e != nil {
 			return e
 		}
 	case "payment_reminder":
@@ -441,10 +460,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		if _, e = tx.Exec(ctx, "UPDATE delivery_jobs SET status='cancelled',updated_at=now() WHERE pass_id=$1 AND status='queued'", in.PassID); e != nil {
 			return e
 		}
+		// The replacement is not sent: staff send it from the console when
+		// ready, as with every pass change made there.
 		if _, e = a.newPass(ctx, tx, rid, aid); e != nil {
-			return e
-		}
-		if e = a.queuePasses(ctx, tx, rid, "", "reissue:"+in.PassID); e != nil {
 			return e
 		}
 	default:

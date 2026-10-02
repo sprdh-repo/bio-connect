@@ -74,7 +74,7 @@ func (a *App) WorkOnce(ctx context.Context) error {
 	// Nor should a contact be asked to fill places that are already filled, or on a registration that has ended.
 	if j.Purpose == "roster_notice" {
 		var open bool
-		if e = tx.QueryRow(ctx, "SELECT roster_count>(SELECT count(*) FROM attendees WHERE registration_id=$1) FROM registrations WHERE id=$1", j.RegistrationID).Scan(&open); e != nil {
+		if e = tx.QueryRow(ctx, "SELECT roster_count>(SELECT count(*) FROM attendees WHERE registration_id=$1 AND removed_at IS NULL) FROM registrations WHERE id=$1", j.RegistrationID).Scan(&open); e != nil {
 			return e
 		}
 		if !open || status == "rejected" || status == "cancelled" {
@@ -257,7 +257,7 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 		case "roster_notice":
 			var reference, label, registrationStatus string
 			var roster, filled int
-			if e = a.DB.QueryRow(ctx, "SELECT r.reference,c.label,r.status,r.roster_count,(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id) FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1", j.RegistrationID).Scan(&reference, &label, &registrationStatus, &roster, &filled); e != nil {
+			if e = a.DB.QueryRow(ctx, "SELECT r.reference,c.label,r.status,r.roster_count,(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id AND a.removed_at IS NULL) FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1", j.RegistrationID).Scan(&reference, &label, &registrationStatus, &roster, &filled); e != nil {
 				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
 			}
 			subject = "Bio Connect 4.0 - more passes for " + reference

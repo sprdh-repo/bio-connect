@@ -175,6 +175,8 @@ th { background: var(--cream); font-family: var(--display); font-size: 12px; let
 tr:last-child td { border-bottom: 0; }
 td { overflow-wrap: anywhere; }
 td button, td .button { min-height: 32px; padding: 0 12px; font-size: 11px; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.inline-form { margin: 22px 0; padding-top: 18px; border-top: 1px solid var(--line); }
 
 .review-list { display: grid; grid-template-columns: 160px 1fr; gap: 10px 16px; margin: 0; }
 .review-list dt { color: var(--muted); font-size: 14px; }

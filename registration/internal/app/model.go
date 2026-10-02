@@ -242,7 +242,7 @@ func (a *App) registration(ctx context.Context, key string) (Registration, error
 	if e != nil {
 		return r, e
 	}
-	rows, e := a.DB.Query(ctx, "SELECT id,name,email,phone,designation,whatsapp_consent FROM attendees WHERE registration_id=$1 ORDER BY position", key)
+	rows, e := a.DB.Query(ctx, "SELECT id,name,email,phone,designation,whatsapp_consent FROM attendees WHERE registration_id=$1 AND removed_at IS NULL ORDER BY position", key)
 	if e != nil {
 		return r, e
 	}

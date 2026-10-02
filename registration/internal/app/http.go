@@ -362,7 +362,7 @@ func filter(r *http.Request) (string, []any, error) {
 			args[3+i] = t
 		}
 	}
-	return ` WHERE (r.reference ILIKE $1 OR r.institution ILIKE $1 OR r.email ILIKE $1 OR r.contact_name ILIKE $1 OR EXISTS(SELECT 1 FROM attendees a WHERE a.registration_id=r.id AND (a.name ILIKE $1 OR a.email ILIKE $1)) OR ($6<>'' AND (replace(r.reference,'-','') ILIKE '%'||$6::text||'%' OR EXISTS(SELECT 1 FROM passes pn WHERE pn.registration_id=r.id AND replace(pn.number,'-','') ILIKE '%'||$6::text||'%')))) AND ($2='' OR r.category_id=$2) AND ($3='' OR r.status=$3) AND ($4::timestamptz IS NULL OR r.created_at >= $4) AND ($5::timestamptz IS NULL OR r.created_at < $5)`, args, nil
+	return ` WHERE (r.reference ILIKE $1 OR r.institution ILIKE $1 OR r.email ILIKE $1 OR r.contact_name ILIKE $1 OR EXISTS(SELECT 1 FROM attendees a WHERE a.registration_id=r.id AND a.removed_at IS NULL AND (a.name ILIKE $1 OR a.email ILIKE $1)) OR ($6<>'' AND (replace(r.reference,'-','') ILIKE '%'||$6::text||'%' OR EXISTS(SELECT 1 FROM passes pn WHERE pn.registration_id=r.id AND replace(pn.number,'-','') ILIKE '%'||$6::text||'%')))) AND ($2='' OR r.category_id=$2) AND ($3='' OR r.status=$3) AND ($4::timestamptz IS NULL OR r.created_at >= $4) AND ($5::timestamptz IS NULL OR r.created_at < $5)`, args, nil
 }
 func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	p, e := a.staff(r)
@@ -562,6 +562,62 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(parts) == 3 && parts[2] == "attendees" && r.Method == "POST" {
 			a.addAttendee(w, r, rid, p.ID)
+			return
+		}
+		if len(parts) == 4 && parts[2] == "attendees" && r.Method == "POST" {
+			var in Attendee
+			if !decode(w, r, &in) {
+				return
+			}
+			if e = a.UpdateAttendee(r.Context(), rid, parts[3], p.ID, in); e != nil {
+				fail(w, 409, publicError(e))
+				return
+			}
+			respond(w, 200, map[string]bool{"ok": true})
+			return
+		}
+		if len(parts) == 5 && parts[2] == "attendees" && parts[4] == "remove" && r.Method == "POST" {
+			var in struct {
+				Note string `json:"note"`
+			}
+			if !decode(w, r, &in) {
+				return
+			}
+			if e = a.RemoveAttendee(r.Context(), rid, parts[3], p.ID, in.Note); e != nil {
+				fail(w, 409, publicError(e))
+				return
+			}
+			respond(w, 200, map[string]bool{"ok": true})
+			return
+		}
+		if len(parts) == 3 && parts[2] == "allowance" && r.Method == "POST" {
+			var in struct {
+				RosterCount int    `json:"roster_count"`
+				Note        string `json:"note"`
+			}
+			if !decode(w, r, &in) {
+				return
+			}
+			if e = a.SetAllowance(r.Context(), rid, p.ID, in.RosterCount, in.Note); e != nil {
+				fail(w, 409, publicError(e))
+				return
+			}
+			respond(w, 200, map[string]bool{"ok": true})
+			return
+		}
+		if len(parts) == 3 && parts[2] == "category" && r.Method == "POST" {
+			var in struct {
+				CategoryID string `json:"category_id"`
+				Note       string `json:"note"`
+			}
+			if !decode(w, r, &in) {
+				return
+			}
+			if e = a.ChangeCategory(r.Context(), rid, p.ID, in.CategoryID, in.Note); e != nil {
+				fail(w, 409, publicError(e))
+				return
+			}
+			respond(w, 200, map[string]bool{"ok": true})
 			return
 		}
 		fail(w, 404, "not found")

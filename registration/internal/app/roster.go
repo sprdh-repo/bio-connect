@@ -18,9 +18,11 @@ var errRosterFull = errors.New("every pass on this registration is already assig
 
 // AddAttendee fills one open place. Before approval the person simply joins
 // the roster and approval issues their pass with the rest. After approval
-// their pass is issued at once, at the next free pass number, and delivered to
-// them alone plus a refreshed pack for the contact; the existing passes are
-// untouched. staff is empty when the exhibitor adds the person themselves.
+// their pass is issued at once, at the next free pass number; the existing
+// passes are untouched. When the exhibitor adds the person themselves (staff
+// empty) and the team's passes have gone out, the new pass is delivered to
+// them alone plus a refreshed pack for the contact. A pass staff add from the
+// console is not sent: they send it when ready.
 func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) error {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
@@ -36,7 +38,7 @@ func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) er
 	// another add, so two requests can never take the same place.
 	var status, kind string
 	var roster, have int
-	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind,r.roster_count,(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id) FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &roster, &have); e != nil {
+	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind,r.roster_count,(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id AND a.removed_at IS NULL) FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &roster, &have); e != nil {
 		return e
 	}
 	if kind != "exhibitor" {
@@ -49,7 +51,7 @@ func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) er
 		return errRosterFull
 	}
 	var dup bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM attendees WHERE registration_id=$1 AND lower(email)=$2)", rid, p.Email).Scan(&dup); e != nil {
+	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM attendees WHERE registration_id=$1 AND removed_at IS NULL AND lower(email)=$2)", rid, p.Email).Scan(&dup); e != nil {
 		return e
 	}
 	if dup {
@@ -73,9 +75,11 @@ func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) er
 		}
 		// After approve_only nothing has gone out yet; the team's first "send"
 		// then delivers this pass with the others.
-		var sent bool
-		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass')", rid).Scan(&sent); e != nil {
-			return e
+		sent := false
+		if staff == "" {
+			if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass')", rid).Scan(&sent); e != nil {
+				return e
+			}
 		}
 		if sent {
 			if e = a.queuePass(ctx, tx, rid, pid, p.Email, p.Phone, p.WhatsAppConsent, "", "initial"); e != nil {
@@ -111,7 +115,7 @@ func (a *App) rosterNotice(ctx context.Context, tx pgx.Tx, rid, status, cat, ema
 		return errors.New("only exhibitor registrations have additional passes")
 	}
 	var open bool
-	if e = tx.QueryRow(ctx, "SELECT roster_count>(SELECT count(*) FROM attendees WHERE registration_id=$1) FROM registrations WHERE id=$1", rid).Scan(&open); e != nil {
+	if e = tx.QueryRow(ctx, "SELECT roster_count>(SELECT count(*) FROM attendees WHERE registration_id=$1 AND removed_at IS NULL) FROM registrations WHERE id=$1", rid).Scan(&open); e != nil {
 		return e
 	}
 	if !open {
@@ -142,7 +146,7 @@ type NotifyResult struct {
 func (a *App) NotifyOpenPlaces(ctx context.Context) ([]NotifyResult, error) {
 	rows, e := a.DB.Query(ctx, `SELECT r.id,r.reference,r.institution FROM registrations r JOIN categories c ON c.id=r.category_id
 	 WHERE c.kind='exhibitor' AND r.status NOT IN ('rejected','cancelled')
-	  AND r.roster_count>(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id)
+	  AND r.roster_count>(SELECT count(*) FROM attendees a WHERE a.registration_id=r.id AND a.removed_at IS NULL)
 	  AND NOT EXISTS(SELECT 1 FROM delivery_jobs j WHERE j.registration_id=r.id AND j.purpose='roster_notice')
 	 ORDER BY r.reference`)
 	if e != nil {

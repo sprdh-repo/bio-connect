@@ -130,9 +130,10 @@ func TestAddAttendeeAfterDeliveryIssuesOnlyTheNewPass(t *testing.T) {
 			t.Fatalf("added pass %d numbered %q, want %q", i+1, n, reference+want)
 		}
 	}
-	// Two new holders, each by email and (consented) WhatsApp.
-	if n := count(t, a, passJobs, rid) - before; n != 4 {
-		t.Fatalf("%d new pass deliveries, want 4", n)
+	// Only the self-served holder is sent their pass, by email and (consented)
+	// WhatsApp; the pass staff added waits for staff to send it.
+	if n := count(t, a, passJobs, rid) - before; n != 2 {
+		t.Fatalf("%d new pass deliveries, want 2", n)
 	}
 	for pid := range old {
 		if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE pass_id=$1 AND dedupe_key NOT LIKE 'initial:%'", pid); n != 0 {
@@ -142,15 +143,18 @@ func TestAddAttendeeAfterDeliveryIssuesOnlyTheNewPass(t *testing.T) {
 			t.Fatalf("existing pass %s was revoked", old[pid])
 		}
 	}
-	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pack'", rid); n != 3 {
-		t.Fatalf("%d pack emails, want the original plus one per added attendee", n)
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pack'", rid); n != 2 {
+		t.Fatalf("%d pack emails, want the original plus one for the self-served attendee", n)
 	}
-	// A later "send" does not deliver the added passes a second time.
-	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "send"}); err != nil {
-		t.Fatal(err)
-	}
-	if n := count(t, a, passJobs, rid) - before; n != 4 {
-		t.Fatalf("send after adding re-queued passes: %d new deliveries, want 4", n)
+	// A later "send" delivers the staff-added pass once and nobody else's
+	// a second time, however often it is repeated.
+	for i := 0; i < 2; i++ {
+		if err := a.Review(ctx, rid, sid, ReviewInput{Action: "send"}); err != nil {
+			t.Fatal(err)
+		}
+		if n := count(t, a, passJobs, rid) - before; n != 4 {
+			t.Fatalf("send %d after adding: %d new deliveries, want 4", i, n)
+		}
 	}
 	if err := a.AddAttendee(ctx, rid, "", extra(3)); err != errRosterFull {
 		t.Fatalf("add beyond the allowance: %v, want errRosterFull", err)
