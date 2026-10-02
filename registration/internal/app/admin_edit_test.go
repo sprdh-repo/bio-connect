@@ -7,29 +7,6 @@ import (
 	"testing"
 )
 
-// dueNow is the fee a registration owes for a payment made today, so these
-// tests hold on either side of the early-bird cutoff.
-func dueNow(t *testing.T, a *App, rid string) int64 {
-	t.Helper()
-	ctx := context.Background()
-	var catID string
-	var discount int
-	if err := a.DB.QueryRow(ctx, "SELECT category_id,discount_percent FROM registrations WHERE id=$1", rid).Scan(&catID, &discount); err != nil {
-		t.Fatal(err)
-	}
-	cats, err := a.categories(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range cats {
-		if c.ID == catID {
-			return payable(c, discount, a.Now())
-		}
-	}
-	t.Fatalf("category %s not found", catID)
-	return 0
-}
-
 func rosterOf(t *testing.T, a *App, cat string) int {
 	return count(t, a, "SELECT roster_count FROM categories WHERE id=$1", cat)
 }

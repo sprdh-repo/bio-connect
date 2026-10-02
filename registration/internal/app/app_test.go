@@ -148,14 +148,27 @@ func addStaff(t *testing.T, a *App, email, role string) (staffID, secret string)
 	return
 }
 
-func earlyPaise(t *testing.T, a *App, rid string) int64 {
+// dueNow is the fee a registration owes for a payment made today, so these
+// tests hold on either side of the early-bird cutoff.
+func dueNow(t *testing.T, a *App, rid string) int64 {
 	t.Helper()
-	var p int64
-	if err := a.DB.QueryRow(context.Background(),
-		"SELECT c.early_paise FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1", rid).Scan(&p); err != nil {
+	ctx := context.Background()
+	var catID string
+	var discount int
+	if err := a.DB.QueryRow(ctx, "SELECT category_id,discount_percent FROM registrations WHERE id=$1", rid).Scan(&catID, &discount); err != nil {
 		t.Fatal(err)
 	}
-	return p
+	cats, err := a.categories(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cats {
+		if c.ID == catID {
+			return payable(c, discount, a.Now())
+		}
+	}
+	t.Fatalf("category %s not found", catID)
+	return 0
 }
 
 func latestPayment(a *App, rid string) string {
@@ -208,11 +221,11 @@ func TestDelegateJourneyEveryCategory(t *testing.T) {
 		if status(t, a, rid) != "awaiting_payment" {
 			t.Fatalf("%s: unexpected initial status", cat)
 		}
-		payDelegate(t, a, rid, earlyPaise(t, a, rid))
+		payDelegate(t, a, rid, dueNow(t, a, rid))
 		if status(t, a, rid) != "awaiting_review" {
 			t.Fatalf("%s: status after payment %s", cat, status(t, a, rid))
 		}
-		if err := tryApprove(a, rid, sid, "approve_send", "SBIN"+cat, earlyPaise(t, a, rid)); err != nil {
+		if err := tryApprove(a, rid, sid, "approve_send", "SBIN"+cat, dueNow(t, a, rid)); err != nil {
 			t.Fatalf("%s approve: %v", cat, err)
 		}
 		if status(t, a, rid) != "approved" {
@@ -249,8 +262,8 @@ func TestExhibitorRosterCountsEnforced(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: exact roster rejected: %v", c.cat, err)
 		}
-		payExhibitor(t, a, rid, earlyPaise(t, a, rid))
-		if err := tryApprove(a, rid, sid, "approve_send", "SBIX"+c.cat, earlyPaise(t, a, rid)); err != nil {
+		payExhibitor(t, a, rid, dueNow(t, a, rid))
+		if err := tryApprove(a, rid, sid, "approve_send", "SBIX"+c.cat, dueNow(t, a, rid)); err != nil {
 			t.Fatalf("%s approve: %v", c.cat, err)
 		}
 		if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != c.want {
@@ -279,8 +292,8 @@ func TestRosterChangeLeavesExistingRegistrationsAlone(t *testing.T) {
 	if _, err := a.DB.Exec(ctx, "UPDATE categories SET roster_count=3 WHERE id='premium'"); err != nil {
 		t.Fatal(err)
 	}
-	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
-	if err := tryApprove(a, rid, sid, "approve_send", "SBILEGACY", earlyPaise(t, a, rid)); err != nil {
+	payExhibitor(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_send", "SBILEGACY", dueNow(t, a, rid)); err != nil {
 		t.Fatalf("approve a registration made under the old allowance: %v", err)
 	}
 	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 6 {
@@ -298,7 +311,7 @@ func TestPaymentBeforeSbiIsAllowedButNotAutoApproved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payDelegate(t, a, rid, earlyPaise(t, a, rid))
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 	// Submitting reference + date moves the registration to review, never to approved.
 	if status(t, a, rid) != "awaiting_review" {
 		t.Fatalf("status %s, want awaiting_review", status(t, a, rid))
@@ -330,7 +343,7 @@ func TestClosedCategoryBlocksNewButNotExisting(t *testing.T) {
 		t.Fatal("Create succeeded for closed category")
 	}
 	// The already-saved registration can still submit payment evidence.
-	payDelegate(t, a, rid, earlyPaise(t, a, rid))
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 }
 
 // --- idempotency & interrupted submissions --------------------------------
@@ -419,6 +432,7 @@ func TestQuoteAndDisplayedFeeFollowServerClock(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	// Before the cutoff the displayed fee is the early-bird amount.
+	a.Now = func() time.Time { return time.Date(2026, 9, 20, 9, 0, 0, 0, india) }
 	cats, err := a.categories(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -462,10 +476,11 @@ func TestReviewerCanRecordAndApproveUnsubmittedPayment(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1), nil)
+	due := dueNow(t, a, rid)
 
 	err := a.Review(ctx, rid, sid, ReviewInput{
 		Action: "record_approve_only", VerifiedReference: "  sbi manual 123  ",
-		VerifiedDate: today(a), VerifiedAmountPaise: 400000,
+		VerifiedDate: today(a), VerifiedAmountPaise: due,
 		Successful: true, BeneficiaryConfirmed: true, Note: "found in SBI Collect",
 	})
 	if err != nil {
@@ -484,7 +499,7 @@ func TestReviewerCanRecordAndApproveUnsubmittedPayment(t *testing.T) {
 	if reportedRef != "SBIMANUAL123" || verifiedRef != reportedRef {
 		t.Fatalf("reported/verified references = %q/%q", reportedRef, verifiedRef)
 	}
-	if reportedAmount != 400000 || verifiedAmount != reportedAmount || verifiedBy != sid {
+	if reportedAmount != due || verifiedAmount != reportedAmount || verifiedBy != sid {
 		t.Fatalf("payment record = reported %d, verified %d by %q", reportedAmount, verifiedAmount, verifiedBy)
 	}
 	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND staff_id=$2 AND action='record_approve_only'", rid, sid); n != 1 {
@@ -508,7 +523,7 @@ func TestReviewerRecordedExhibitorPaymentRequiresLogo(t *testing.T) {
 
 	in := ReviewInput{
 		Action: "record_approve_send", VerifiedReference: "SBIEXHIBITOR",
-		VerifiedDate: today(a), VerifiedAmountPaise: earlyPaise(t, a, rid),
+		VerifiedDate: today(a), VerifiedAmountPaise: dueNow(t, a, rid),
 		Successful: true, BeneficiaryConfirmed: true,
 	}
 	err := a.Review(ctx, rid, sid, in)
@@ -542,14 +557,14 @@ func TestApprovalRejectsMismatchedAmount(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
-	payDelegate(t, a, rid, 600000)
-	if err := tryApprove(a, rid, sid, "approve_send", "SBIWRONG", 500000); err == nil {
+	payDelegate(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIWRONG", dueNow(t, a, rid)-100000); err == nil {
 		t.Fatal("approval accepted an amount below the category fee")
 	}
 	if status(t, a, rid) != "awaiting_review" {
 		t.Fatalf("status changed after failed approval: %s", status(t, a, rid))
 	}
-	if err := tryApprove(a, rid, sid, "approve_send", "SBIRIGHT", 600000); err != nil {
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIRIGHT", dueNow(t, a, rid)); err != nil {
 		t.Fatalf("correct amount rejected: %v", err)
 	}
 }
@@ -559,10 +574,10 @@ func TestApprovalRequiresBankConfirmationFlags(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(1), nil)
-	payDelegate(t, a, rid, 400000)
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 	err := a.Review(ctx, rid, sid, ReviewInput{
 		Action: "approve_send", PaymentID: latestPayment(a, rid),
-		VerifiedReference: "SBIX", VerifiedDate: today(a), VerifiedAmountPaise: 400000,
+		VerifiedReference: "SBIX", VerifiedDate: today(a), VerifiedAmountPaise: dueNow(t, a, rid),
 		Successful: false, BeneficiaryConfirmed: true,
 	})
 	if err == nil {
@@ -575,7 +590,7 @@ func TestCorrectionRequestedThenResubmit(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	rid, _, _ := a.Create(ctx, delegateInput("startup"), key(1), nil)
-	payDelegate(t, a, rid, 350000)
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "correction_requested", Note: "reference does not match bank record"}); err != nil {
 		t.Fatal(err)
 	}
@@ -583,11 +598,11 @@ func TestCorrectionRequestedThenResubmit(t *testing.T) {
 		t.Fatal("not in correction_requested")
 	}
 	// Registrant resubmits; history is preserved.
-	payDelegate(t, a, rid, 350000)
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE registration_id=$1", rid); n != 2 {
 		t.Fatalf("payment history not preserved: %d rows", n)
 	}
-	if err := tryApprove(a, rid, sid, "approve_send", "SBIFIXED", 350000); err != nil {
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIFIXED", dueNow(t, a, rid)); err != nil {
 		t.Fatalf("approve after correction: %v", err)
 	}
 }
@@ -597,16 +612,16 @@ func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	ridA, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
-	payDelegate(t, a, ridA, 600000)
-	if err := tryApprove(a, ridA, sid, "approve_send", "SBISHARED", 600000); err != nil {
+	payDelegate(t, a, ridA, dueNow(t, a, ridA))
+	if err := tryApprove(a, ridA, sid, "approve_send", "SBISHARED", dueNow(t, a, ridA)); err != nil {
 		t.Fatal(err)
 	}
 	inB := delegateInput("industry")
 	inB.Attendees[0].Email = "second@example.com"
 	inB.Email = "second@example.com"
 	ridB, _, _ := a.Create(ctx, inB, key(2), nil)
-	payDelegate(t, a, ridB, 600000)
-	if err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", 600000); err == nil {
+	payDelegate(t, a, ridB, dueNow(t, a, ridB))
+	if err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", dueNow(t, a, ridB)); err == nil {
 		t.Fatal("reused an already-approved bank transaction reference")
 	}
 	if status(t, a, ridB) != "awaiting_review" {
@@ -621,7 +636,7 @@ func TestConcurrentApprovalCreatesNoExtraPasses(t *testing.T) {
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 3), key(1), tinyPNG(t))
-	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
+	payExhibitor(t, a, rid, dueNow(t, a, rid))
 
 	var wg sync.WaitGroup
 	errs := make([]error, 10)
@@ -629,7 +644,7 @@ func TestConcurrentApprovalCreatesNoExtraPasses(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			errs[i] = tryApprove(a, rid, sid, "approve_send", "SBICONCURRENT", earlyPaise(t, a, rid))
+			errs[i] = tryApprove(a, rid, sid, "approve_send", "SBICONCURRENT", dueNow(t, a, rid))
 		}(i)
 	}
 	wg.Wait()
@@ -656,8 +671,8 @@ func approvedDelegate(t *testing.T, a *App, k int, action string) (rid, sid stri
 	ctx := context.Background()
 	sid, _ = addStaff(t, a, fmt.Sprintf("rev%d@bioconnect.test", k), "reviewer")
 	rid, _, _ = a.Create(ctx, delegateInput("industry"), key(k), nil)
-	payDelegate(t, a, rid, 600000)
-	if err := tryApprove(a, rid, sid, action, fmt.Sprintf("SBI%d", k), 600000); err != nil {
+	payDelegate(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, action, fmt.Sprintf("SBI%d", k), dueNow(t, a, rid)); err != nil {
 		t.Fatalf("approve: %v", err)
 	}
 	return
@@ -788,13 +803,15 @@ func TestBulkSendReportsPerRegistration(t *testing.T) {
 	var approved, notApproved string
 	{
 		rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
-		payDelegate(t, a, rid, 600000)
-		tryApprove(a, rid, sid, "approve_only", "SBIBULK1", 600000)
+		payDelegate(t, a, rid, dueNow(t, a, rid))
+		if err := tryApprove(a, rid, sid, "approve_only", "SBIBULK1", dueNow(t, a, rid)); err != nil {
+			t.Fatalf("approve: %v", err)
+		}
 		approved = rid
 	}
 	{
 		rid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
-		payDelegate(t, a, rid, 400000)
+		payDelegate(t, a, rid, dueNow(t, a, rid))
 		notApproved = rid
 	}
 	results := map[string]string{}
@@ -854,7 +871,7 @@ func TestPaymentReminderOnlyForAwaitingPaymentAndRateLimited(t *testing.T) {
 	}
 
 	paid, _, _ := a.Create(ctx, delegateInput("faculty"), key(2), nil)
-	payDelegate(t, a, paid, 400000)
+	payDelegate(t, a, paid, dueNow(t, a, paid))
 	if err := remind(paid); !errors.Is(err, ErrConflict) {
 		t.Fatalf("reminder for awaiting review: %v, want conflict", err)
 	}
@@ -874,7 +891,7 @@ func TestQueuedPaymentReminderIsDroppedOncePaid(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	payDelegate(t, a, paid, 400000)
+	payDelegate(t, a, paid, dueNow(t, a, paid))
 	for count(t, a, "SELECT count(*) FROM delivery_jobs WHERE status='queued'") > 0 {
 		if err := a.WorkOnce(ctx); err != nil {
 			t.Fatalf("WorkOnce: %v", err)
@@ -1044,8 +1061,10 @@ func TestExportContentsAndFormulaInjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payDelegate(t, a, rid, 600000)
-	tryApprove(a, rid, sid, "approve_send", "SBIEXPORT", 600000)
+	payDelegate(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIEXPORT", dueNow(t, a, rid)); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/api/v1/admin/export?format=csv&sheet=Registrations", nil)
@@ -1160,8 +1179,8 @@ func TestPassNumbersFollowTheRegistrationReference(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
-	if err := tryApprove(a, rid, sid, "approve_send", "SBIROSTER", earlyPaise(t, a, rid)); err != nil {
+	payExhibitor(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIROSTER", dueNow(t, a, rid)); err != nil {
 		t.Fatal(err)
 	}
 	var reference string
@@ -1333,7 +1352,7 @@ func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	payDelegate(t, a, rid, earlyPaise(t, a, rid))
+	payDelegate(t, a, rid, dueNow(t, a, rid))
 	var receipt *string
 	if err := a.DB.QueryRow(ctx, "SELECT receipt_id FROM payment_submissions WHERE registration_id=$1", rid).Scan(&receipt); err != nil {
 		t.Fatal(err)
@@ -1351,7 +1370,7 @@ func TestPaymentEvidenceReceiptIsOptional(t *testing.T) {
 	}
 	fid := addFile(t, a, rid2, "receipt", tinyPNG(t))
 	if err := a.SubmitPayment(ctx, rid2, PaymentInput{
-		Reference: "UTR2", Date: today(a), AmountPaise: earlyPaise(t, a, rid2), ReceiptID: fid,
+		Reference: "UTR2", Date: today(a), AmountPaise: dueNow(t, a, rid2), ReceiptID: fid,
 	}); err != nil {
 		t.Fatal(err)
 	}

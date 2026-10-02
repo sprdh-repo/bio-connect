@@ -62,8 +62,8 @@ func TestUpgradeGrantsLiveExhibitorsTheNewAllowance(t *testing.T) {
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	preUpgrade(t, a)
 	approved, _, _ := a.Create(ctx, exhibitorInput("premium", 3), key(1), tinyPNG(t))
-	payExhibitor(t, a, approved, earlyPaise(t, a, approved))
-	if err := tryApprove(a, approved, sid, "approve_send", "SBIUP1", earlyPaise(t, a, approved)); err != nil {
+	payExhibitor(t, a, approved, dueNow(t, a, approved))
+	if err := tryApprove(a, approved, sid, "approve_send", "SBIUP1", dueNow(t, a, approved)); err != nil {
 		t.Fatal(err)
 	}
 	before := passNumbers(t, a, approved)
@@ -108,8 +108,8 @@ func TestAddAttendeeAfterDeliveryIssuesOnlyTheNewPass(t *testing.T) {
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
 	preUpgrade(t, a)
 	rid, _, _ := a.Create(ctx, exhibitorInput("premium", 3), key(1), tinyPNG(t))
-	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
-	if err := tryApprove(a, rid, sid, "approve_send", "SBIADD", earlyPaise(t, a, rid)); err != nil {
+	payExhibitor(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_send", "SBIADD", dueNow(t, a, rid)); err != nil {
 		t.Fatal(err)
 	}
 	upgrade(t, a)
@@ -176,8 +176,8 @@ func TestApprovalWithOpenPlacesThenAdd(t *testing.T) {
 	preUpgrade(t, a)
 	rid, _, _ := a.Create(ctx, exhibitorInput("standard", 2), key(1), tinyPNG(t))
 	upgrade(t, a)
-	payExhibitor(t, a, rid, earlyPaise(t, a, rid))
-	if err := tryApprove(a, rid, sid, "approve_only", "SBIOPEN", earlyPaise(t, a, rid)); err != nil {
+	payExhibitor(t, a, rid, dueNow(t, a, rid))
+	if err := tryApprove(a, rid, sid, "approve_only", "SBIOPEN", dueNow(t, a, rid)); err != nil {
 		t.Fatalf("approve with an open place: %v", err)
 	}
 	if n := count(t, a, "SELECT count(*) FROM passes WHERE registration_id=$1", rid); n != 2 {
