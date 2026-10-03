@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1077,7 +1078,7 @@ func TestExportContentsAndFormulaInjection(t *testing.T) {
 		t.Fatalf("csv parse: %v", err)
 	}
 	head := strings.Join(records[0], ",")
-	for _, col := range []string{"reference", "status", "quoted_paise", "approved_by", "delivery_summary"} {
+	for _, col := range []string{"reference", "status", "quoted_rupees", "approved_by", "delivery_summary"} {
 		if !strings.Contains(head, col) {
 			t.Fatalf("export missing column %q; header=%s", col, head)
 		}
@@ -1093,6 +1094,31 @@ func TestExportContentsAndFormulaInjection(t *testing.T) {
 	}
 	if got := records[1][instCol]; !strings.HasPrefix(got, "'") {
 		t.Fatalf("formula-injection cell not neutralised: %q", got)
+	}
+	// Money is exported in rupees, not the paise it is stored in.
+	var quoted int64
+	if err := a.DB.QueryRow(ctx, "SELECT quoted_paise FROM registrations WHERE id=$1", rid).Scan(&quoted); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := records[1][slices.Index(records[0], "quoted_rupees")], fmt.Sprintf("%d.%02d", quoted/100, quoted%100); got != want {
+		t.Fatalf("quoted_rupees = %q, want %q", got, want)
+	}
+
+	// Attendees leave out the consent timestamp and wording; only the
+	// WhatsApp opt-in itself is exported.
+	ar := httptest.NewRecorder()
+	a.export(ar, httptest.NewRequest("GET", "/api/v1/admin/export?format=csv&sheet=Attendees", nil), principal{ID: sid, Role: "reviewer"})
+	attendees, err := csv.NewReader(bytes.NewReader(ar.Body.Bytes())).ReadAll()
+	if err != nil || len(attendees) < 2 {
+		t.Fatalf("attendees csv: code=%d err=%v rows=%d", ar.Code, err, len(attendees))
+	}
+	for _, col := range []string{"consent_at", "consent_text"} {
+		if slices.Contains(attendees[0], col) {
+			t.Fatalf("attendees export still has %q; header=%v", col, attendees[0])
+		}
+	}
+	if !slices.Contains(attendees[0], "whatsapp_consent") {
+		t.Fatalf("attendees export lost whatsapp_consent; header=%v", attendees[0])
 	}
 
 	xr := httptest.NewRecorder()
