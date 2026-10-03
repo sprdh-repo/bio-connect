@@ -422,3 +422,25 @@ func TestFreeLinkRespectsFreeClosedCategory(t *testing.T) {
 		t.Fatalf("free faculty registration: %v", err)
 	}
 }
+
+// Organisers, sponsors and volunteers, like officials, register only through a free link
+// and get one pass in their own reference series.
+func TestOrganiserSponsorVolunteerAreFreeOnly(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "links@bioconnect.test", "reviewer")
+	for i, cat := range []string{"organiser", "sponsor", "volunteer"} {
+		if _, _, err := a.Create(ctx, delegateInput(cat), key(900+i), nil); err == nil || !strings.Contains(err.Error(), "only available through a free registration link") {
+			t.Fatalf("%s paid registration error=%v", cat, err)
+		}
+		if _, err := a.StaffCreate(ctx, staffInput(delegateInput(cat), "complimentary"), key(910+i), nil, sid); err != nil {
+			t.Fatalf("%s staff registration: %v", cat, err)
+		}
+	}
+	want := map[string]string{"organiser": "BC4-OR-0001", "sponsor": "BC4-SP-0001", "volunteer": "BC4-VO-0001"}
+	for cat, ref := range want {
+		if n := count(t, a, "SELECT count(*) FROM registrations r JOIN passes p ON p.registration_id=r.id WHERE r.category_id=$1 AND r.reference=$2 AND p.number=$2||'-1'", cat, ref); n != 1 {
+			t.Fatalf("%s: want reference %s with one pass", cat, ref)
+		}
+	}
+}

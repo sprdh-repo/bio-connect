@@ -43,6 +43,12 @@ func categoryCode(catID string) string {
 		return "IN"
 	case "official":
 		return "GO"
+	case "organiser":
+		return "OR"
+	case "sponsor":
+		return "SP"
+	case "volunteer":
+		return "VO"
 	default:
 		return "EX"
 	}
@@ -249,7 +255,7 @@ func (a *App) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) categories(ctx context.Context) ([]Category, error) {
-	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 ELSE 6 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
+	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 WHEN 'organiser' THEN 6 WHEN 'sponsor' THEN 7 WHEN 'volunteer' THEN 8 ELSE 9 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
 	if e != nil {
 		return nil, e
 	}

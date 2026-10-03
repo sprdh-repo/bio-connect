@@ -39,6 +39,7 @@ type passStyle struct {
 func passStyleFor(catID string) passStyle {
 	forest, deep, lime, gold := [3]int{11, 51, 41}, [3]int{5, 28, 23}, [3]int{185, 220, 114}, [3]int{228, 173, 84}
 	teal, aqua := [3]int{15, 96, 118}, [3]int{190, 227, 236}
+	brick, navy, plum, paper := [3]int{140, 45, 32}, [3]int{23, 43, 77}, [3]int{86, 52, 120}, [3]int{247, 245, 239}
 	switch catID {
 	case "student":
 		return passStyle{lime, forest, "STUDENT", "Student", false}
@@ -48,6 +49,14 @@ func passStyleFor(catID string) passStyle {
 		return passStyle{teal, aqua, "FACULTY", "Faculty", false}
 	case "industry":
 		return passStyle{deep, gold, "INDUSTRY", "Industry", false}
+	case "official":
+		return passStyle{navy, gold, "OFFICIAL", "Govt. Official", false}
+	case "organiser":
+		return passStyle{brick, paper, "ORGANISER", "Organiser", false}
+	case "sponsor":
+		return passStyle{aqua, forest, "SPONSOR", "Sponsor", false}
+	case "volunteer":
+		return passStyle{plum, lime, "VOLUNTEER", "Volunteer", false}
 	default: // premium / standard / table
 		return passStyle{forest, lime, "EXHIBITOR", "Exhibitor", true}
 	}
@@ -161,7 +170,7 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	textColor(forest)
 	drawPassText(p, name, "D", left, nameBaseline, contentW, 123, 25)
 	orgLabel, roleLabel := "INSTITUTION", "DESIGNATION"
-	if st.exhibitor || catID == "industry" || catID == "startup" {
+	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" {
 		orgLabel = "ORGANISATION"
 	}
 	if st.exhibitor {

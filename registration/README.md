@@ -84,7 +84,7 @@ To eyeball a rendered pass:
 DUMP_PASS_DIR=/tmp go test -run TestDumpSamplePasses ./internal/app/
 ```
 
-This generates Exhibitor, Faculty, Industry, Startup, and Student samples on the same A5 grid, including a long attendee name.
+This generates Exhibitor, Faculty, Industry, Startup, Student, Govt. Official, Organiser, Sponsor, and Volunteer samples on the same A5 grid, including a long attendee name.
 The Industry sample keeps the pre-shortening 32-character pass number, so the footer can be checked against passes issued before short numbers.
 The pass uses "Bio Connect 4.0 · Kerala's international life sciences summit" and "Building Kerala's / Global Life Sciences Hub".
 Booth allocation is handled separately, so exhibitor passes show the representative's role.
