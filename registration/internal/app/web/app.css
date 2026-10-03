@@ -107,7 +107,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { border-color: var(--forest); }
 textarea { min-height: 104px; resize: vertical; }
 input[type=file] { padding: 9px; font-size: 13px; background: var(--cream); }
-input[type=checkbox] { width: 18px; height: 18px; margin: 0 9px 0 0; display: inline-block; vertical-align: -3px; accent-color: var(--forest); }
+input[type=checkbox], input[type=radio] { width: 18px; height: 18px; margin: 0 9px 0 0; display: inline-block; vertical-align: -3px; accent-color: var(--forest); }
 .check { display: block; margin-top: 15px; font-size: 14px; font-weight: 400; }
 .help { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 .coupon { display: flex; gap: 12px; align-items: flex-end; }

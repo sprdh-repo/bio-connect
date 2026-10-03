@@ -39,7 +39,7 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 			return "", "", errors.New("a coupon cannot be combined with a free registration link")
 		}
 	}
-	if e = validateInput(&in, c); e != nil {
+	if e = validateInput(&in, c, false); e != nil {
 		return "", "", e
 	}
 	rh := requestHash(in)
@@ -280,7 +280,7 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 	var status, cat, email string
 	var roster, discount int
 	var free bool
-	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count,discount_percent,free_link_id IS NOT NULL FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster, &discount, &free); e != nil {
+	if e = tx.QueryRow(ctx, "SELECT status,category_id,email,roster_count,discount_percent,free_link_id IS NOT NULL OR complimentary FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status, &cat, &email, &roster, &discount, &free); e != nil {
 		return e
 	}
 	if len(in.Note) > 2000 {

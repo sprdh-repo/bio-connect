@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/mail"
 	"regexp"
 	"strconv"
@@ -97,7 +98,10 @@ type Registration struct {
 	CreatedAt   time.Time `json:"created_at"`
 	ReviewNote  string    `json:"review_note"`
 	CouponCode  string    `json:"coupon_code"`
-	Free        bool      `json:"free_registration"`
+	// Free covers both free-link and complimentary staff registrations;
+	// Complimentary is the staff kind alone.
+	Free          bool `json:"free_registration"`
+	Complimentary bool `json:"complimentary"`
 	// DiscountPercent is frozen when the registration is saved; non-zero means
 	// the fee is paid by direct bank transfer.
 	DiscountPercent int `json:"discount_percent"`
@@ -116,17 +120,54 @@ func validEmail(s string) bool {
 	m, e := mail.ParseAddress(s)
 	return e == nil && m.Address == s && len(s) <= 254
 }
-func validateInput(in *RegistrationInput, c Category) error {
+
+// validPhone accepts an international number, or no number at all when staff
+// enter the registration and the phone is optional.
+func validPhone(s string, optional bool) bool {
+	return phoneRE.MatchString(s) || (optional && s == "")
+}
+
+// attendeeOK normalises one attendee and reports whether their details are
+// complete. Staff entry may leave the phone out, but WhatsApp delivery still
+// needs one.
+func attendeeOK(p *Attendee, phoneOptional bool) bool {
+	p.Name = strings.TrimSpace(p.Name)
+	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
+	p.Phone = strings.TrimSpace(p.Phone)
+	return validText(p.Name, 120) && validText(p.Designation, 180) && validEmail(p.Email) &&
+		validPhone(p.Phone, phoneOptional) && (p.Phone != "" || !p.WhatsAppConsent)
+}
+
+// attendeeError describes what attendeeOK requires.
+func attendeeError(phoneOptional bool) error {
+	if phoneOptional {
+		return errors.New("each attendee needs name, designation and valid email; a phone is optional but must be international (+country code), and WhatsApp delivery needs one")
+	}
+	return errors.New("each attendee needs name, designation, valid email and international phone")
+}
+
+// validateInput checks a registration. staff marks one entered from the
+// console: the phones are optional, and an exhibitor may be saved with fewer
+// attendees than its passes, leaving the rest to be filled later.
+func validateInput(in *RegistrationInput, c Category, staff bool) error {
 	in.Institution = strings.TrimSpace(in.Institution)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
+	in.Phone = strings.TrimSpace(in.Phone)
 	in.CouponCode = normalizeCoupon(in.CouponCode)
 	if _, e := lookupCoupon(in.CouponCode, c.ID); e != nil {
 		return e
 	}
-	if !validText(in.Institution, 180) || !validText(in.ContactName, 120) || !validEmail(in.Email) || !phoneRE.MatchString(in.Phone) {
+	if !validText(in.Institution, 180) || !validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff) {
+		if staff {
+			return errors.New("provide institution, contact name and valid email; a contact phone is optional but must be international (+country code)")
+		}
 		return errors.New("provide institution, contact name, valid email and international phone number")
 	}
-	if len(in.Attendees) != c.RosterCount {
+	if staff && c.Kind == "exhibitor" {
+		if len(in.Attendees) < 1 || len(in.Attendees) > c.RosterCount {
+			return fmt.Errorf("add between 1 and %d attendees", c.RosterCount)
+		}
+	} else if len(in.Attendees) != c.RosterCount {
 		return errors.New("attendee count must exactly match this category")
 	}
 	if len([]rune(in.Description)) > 3000 || (c.Kind == "exhibitor" && strings.TrimSpace(in.Description) == "") {
@@ -135,10 +176,8 @@ func validateInput(in *RegistrationInput, c Category) error {
 	seen := map[string]bool{}
 	for i := range in.Attendees {
 		p := &in.Attendees[i]
-		p.Name = strings.TrimSpace(p.Name)
-		p.Email = strings.ToLower(strings.TrimSpace(p.Email))
-		if !validText(p.Name, 120) || !validText(p.Designation, 180) || !validEmail(p.Email) || !phoneRE.MatchString(p.Phone) {
-			return errors.New("each attendee needs name, designation, valid email and international phone")
+		if !attendeeOK(p, staff) {
+			return attendeeError(staff)
 		}
 		if seen[p.Email] {
 			return errors.New("attendee emails must be unique within a registration")
@@ -238,7 +277,7 @@ func audit(ctx context.Context, tx pgx.Tx, staff, reg, action, detail string) er
 }
 func (a *App) registration(ctx context.Context, key string) (Registration, error) {
 	var r Registration
-	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL,discount_percent,roster_count FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.DiscountPercent, &r.RosterCount)
+	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL OR complimentary,complimentary,discount_percent,roster_count FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.Complimentary, &r.DiscountPercent, &r.RosterCount)
 	if e != nil {
 		return r, e
 	}

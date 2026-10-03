@@ -21,11 +21,10 @@ import (
 // rendered onto it the next time it is downloaded, and queued deliveries to a
 // changed email or phone are cancelled so they cannot reach the old address.
 func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Attendee) error {
-	p.Name = strings.TrimSpace(p.Name)
-	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Designation = strings.TrimSpace(p.Designation)
-	if !validText(p.Name, 120) || !validText(p.Designation, 180) || !validEmail(p.Email) || !phoneRE.MatchString(p.Phone) {
-		return errors.New("the attendee needs name, designation, valid email and international phone")
+	// Only staff correct attendees, so the phone is optional here.
+	if !attendeeOK(&p, true) {
+		return attendeeError(true)
 	}
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {

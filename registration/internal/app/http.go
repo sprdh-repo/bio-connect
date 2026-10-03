@@ -90,31 +90,8 @@ func (a *App) Handler() http.Handler {
 			return
 		}
 		var in RegistrationInput
-		var logo []byte
-		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-			// Exhibitors submit their logo alongside the registration in one request
-			// (see Create) so the two can never be split by a dropped connection.
-			r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
-			if e := r.ParseMultipartForm(6 << 20); e != nil {
-				fail(w, 400, "could not read submission")
-				return
-			}
-			if e := json.Unmarshal([]byte(r.FormValue("payload")), &in); e != nil {
-				fail(w, 400, "invalid request fields or JSON")
-				return
-			}
-			if f, hdr, e := r.FormFile("logo"); e == nil {
-				defer f.Close()
-				if hdr.Size > 5<<20 {
-					fail(w, 413, "file exceeds 5 MB")
-					return
-				}
-				if logo, e = io.ReadAll(f); e != nil {
-					fail(w, 400, "could not read submission")
-					return
-				}
-			}
-		} else if !decode(w, r, &in) {
+		logo, ok := readSubmission(w, r, &in)
+		if !ok {
 			return
 		}
 		rid, t, e := a.Create(r.Context(), in, r.Header.Get("Idempotency-Key"), logo)
@@ -172,6 +149,41 @@ func (a *App) Handler() http.Handler {
 		m.ServeHTTP(w, r)
 	})
 }
+
+// readSubmission reads a registration body: JSON, or multipart with the JSON
+// in "payload" and an optional "logo" file. Exhibitors submit their logo
+// alongside the registration in one request (see Create) so the two can never
+// be split by a dropped connection.
+func readSubmission(w http.ResponseWriter, r *http.Request, in any) ([]byte, bool) {
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		return nil, decode(w, r, in)
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 6<<20)
+	if e := r.ParseMultipartForm(6 << 20); e != nil {
+		fail(w, 400, "could not read submission")
+		return nil, false
+	}
+	if e := json.Unmarshal([]byte(r.FormValue("payload")), in); e != nil {
+		fail(w, 400, "invalid request fields or JSON")
+		return nil, false
+	}
+	f, hdr, e := r.FormFile("logo")
+	if e != nil {
+		return nil, true
+	}
+	defer f.Close()
+	if hdr.Size > 5<<20 {
+		fail(w, 413, "file exceeds 5 MB")
+		return nil, false
+	}
+	logo, e := io.ReadAll(f)
+	if e != nil {
+		fail(w, 400, "could not read submission")
+		return nil, false
+	}
+	return logo, true
+}
+
 func publicError(e error) string {
 	if errors.Is(e, ErrConflict) {
 		return ErrConflict.Error()
@@ -258,7 +270,11 @@ func (a *App) details(w http.ResponseWriter, r *http.Request, rid string, staff 
 	for _, c := range cats {
 		if c.ID == reg.CategoryID {
 			if reg.Free {
-				c.Label += " · Free link"
+				if reg.Complimentary {
+					c.Label += " · Complimentary"
+				} else {
+					c.Label += " · Free link"
+				}
 				out["payable_paise"] = 0
 			} else {
 				out["payable_paise"] = payable(c, reg.DiscountPercent, a.Now())
@@ -464,12 +480,24 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		args = append(args, (page-1)*size, size)
-		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id || CASE WHEN r.free_link_id IS NOT NULL THEN ' · Free link' ELSE '' END AS category_id,r.status,r.quoted_paise,r.free_link_id IS NOT NULL AS free_registration,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT $8 OFFSET $7", args...)
+		items, e := a.queryMaps(r, "SELECT r.id,r.reference,r.institution,r.contact_name,r.email,r.category_id || CASE WHEN r.free_link_id IS NOT NULL THEN ' · Free link' WHEN r.complimentary THEN ' · Complimentary' ELSE '' END AS category_id,r.status,r.quoted_paise,r.free_link_id IS NOT NULL OR r.complimentary AS free_registration,r.created_at FROM registrations r"+where+" ORDER BY r.created_at DESC,r.id LIMIT $8 OFFSET $7", args...)
 		if e != nil {
 			fail(w, 503, "listing unavailable")
 			return
 		}
 		respond(w, 200, map[string]any{"items": items, "page": page, "total": total, "page_size": size, "pages": (total + size - 1) / size, "status_counts": statusCounts})
+	case path == "registrations" && r.Method == "POST":
+		var in StaffRegistrationInput
+		logo, ok := readSubmission(w, r, &in)
+		if !ok {
+			return
+		}
+		rid, e := a.StaffCreate(r.Context(), in, r.Header.Get("Idempotency-Key"), logo, p.ID)
+		if e != nil {
+			fail(w, 400, publicError(e))
+			return
+		}
+		respond(w, 201, map[string]string{"id": rid})
 	case path == "summary" && r.Method == "GET":
 		a.summary(w, r)
 	case path == "export" && r.Method == "GET":

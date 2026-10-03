@@ -220,7 +220,7 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			cta = "Open my registration"
 			var free bool
 			var registrationStatus string
-			if e = a.DB.QueryRow(ctx, "SELECT free_link_id IS NOT NULL,status FROM registrations WHERE id=$1", j.RegistrationID).Scan(&free, &registrationStatus); e != nil {
+			if e = a.DB.QueryRow(ctx, "SELECT free_link_id IS NOT NULL OR complimentary,status FROM registrations WHERE id=$1", j.RegistrationID).Scan(&free, &registrationStatus); e != nil {
 				return sendResult{Status: "failed", Code: "registration_unavailable", Retry: true}
 			}
 			if free {

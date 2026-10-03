@@ -18,6 +18,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 - Registration states: `awaiting_payment`, `awaiting_review`, `correction_requested`, `approved`, `rejected`, `cancelled`.
 - Staff console at `/admin` with individual accounts, mandatory TOTP, server sessions, CSRF protection, and login throttling. Account-management and registration-review permissions are separate roles (`manager`, `reviewer`).
 - Reviewers can record and approve a payment found directly in SBI when the registrant did not submit payment evidence; the verified payment and staff action are retained in the payment history and audit trail.
+- Reviewers can register any delegate or exhibitor directly from the console in one form, confirmed on save as paid (against a verified bank payment) or complimentary, with optional phones and logo, and choose to confirm only or confirm and send the passes.
 - Approval atomically creates one pass per attendee plus the delivery jobs. Concurrent approvals and repeated clicks never create extra passes.
 - Staff can correct a registration after the fact: approve a rejected one, move an exhibitor to another stall type, give a stall extra passes beyond what its type includes, and edit or remove attendees (a removed attendee's pass is revoked).
 Console changes never deliver anything on their own: staff send each pass from the attendee list, or all of them with Send passes. Only the normal review buttons (Approve and send) send on approval.

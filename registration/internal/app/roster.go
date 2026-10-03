@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,10 +23,9 @@ var errRosterFull = errors.New("every pass on this registration is already assig
 // them alone plus a refreshed pack for the contact. A pass staff add from the
 // console is not sent: they send it when ready.
 func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) error {
-	p.Name = strings.TrimSpace(p.Name)
-	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
-	if !validText(p.Name, 120) || !validText(p.Designation, 180) || !validEmail(p.Email) || !phoneRE.MatchString(p.Phone) {
-		return errors.New("the attendee needs name, designation, valid email and international phone")
+	// Staff may leave the phone out; an exhibitor adding their own team may not.
+	if !attendeeOK(&p, staff != "") {
+		return attendeeError(staff != "")
 	}
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
