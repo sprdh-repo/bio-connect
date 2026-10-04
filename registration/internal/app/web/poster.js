@@ -394,6 +394,7 @@ async function uploadAsset(kind, file, label) {
     headers: { 'X-CSRF-Token': csrf(), 'Content-Type': 'application/octet-stream' },
     body: file,
   });
+  await checkStaffResponse(res, url.replace('/api/v1', ''));
   const out = await res.json();
   if (!res.ok) throw Error(out.error || 'Upload failed. Please retry.');
   return out;

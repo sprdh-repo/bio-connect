@@ -17,6 +17,8 @@ import (
 
 type principal struct{ ID, Role string }
 
+const staffSessionLifetime = 3 * 24 * time.Hour
+
 func (a *App) limited(ctx context.Context, key string, limit int, window time.Duration) bool {
 	var n int
 	e := a.DB.QueryRow(ctx, `INSERT INTO rate_limits(key,attempts,expires_at) VALUES($1,1,$2) ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN rate_limits.expires_at<now() THEN 1 ELSE rate_limits.attempts+1 END,expires_at=CASE WHEN rate_limits.expires_at<now() THEN EXCLUDED.expires_at ELSE rate_limits.expires_at END RETURNING attempts`, hash(key), a.Now().Add(window)).Scan(&n)
@@ -127,7 +129,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token, csrf := randomToken(), randomToken()
-	_, e = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,staff_id,csrf_hash,expires_at) VALUES($1,$2,$3,$4)", hash(token), sid, hash(csrf), a.Now().Add(8*time.Hour))
+	_, e = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,staff_id,csrf_hash,expires_at) VALUES($1,$2,$3,$4)", hash(token), sid, hash(csrf), a.Now().Add(staffSessionLifetime))
 	if e == nil {
 		e = audit(r.Context(), tx, sid, "", "login", "")
 	}
@@ -138,8 +140,8 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "sign in unavailable")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: "bc_session", Value: token, Path: "/", HttpOnly: true, Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: 28800})
-	http.SetCookie(w, &http.Cookie{Name: "bc_csrf", Value: csrf, Path: "/", Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: 28800})
+	http.SetCookie(w, &http.Cookie{Name: "bc_session", Value: token, Path: "/", HttpOnly: true, Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: int(staffSessionLifetime / time.Second)})
+	http.SetCookie(w, &http.Cookie{Name: "bc_csrf", Value: csrf, Path: "/", Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: int(staffSessionLifetime / time.Second)})
 	respond(w, 200, map[string]string{"csrf": csrf})
 }
 func (a *App) recover(w http.ResponseWriter, r *http.Request) {

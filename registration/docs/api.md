@@ -165,6 +165,7 @@ Revoked passes and non-approved registrations return 404.
 ## Staff console (`/api/v1/admin`)
 
 Authentication is a server session cookie (`bc_session`) set by `POST /api/v1/auth/login` with `{email, password, code}` (TOTP).
+Staff sessions and both authentication cookies expire 3 days (72 hours) after sign-in, without automatic extension.
 A TOTP code cannot be replayed within its 30-second window.
 Non-GET requests must send `X-CSRF-Token` matching the `bc_csrf` cookie.
 Login is throttled per IP and per email.
