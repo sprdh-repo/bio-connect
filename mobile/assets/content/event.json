@@ -131,7 +131,7 @@
       "id": "jayashankar-das",
       "name": "Dr. Jayashankar Das",
       "role": "Founder & CEO",
-      "organization": "ELEMENTOZ RESEARCH",
+      "organization": "ELMENTOZ RESEARCH",
       "image": "assets/images/speakers/jayashankar-das.webp",
       "linkedin": "https://www.linkedin.com/in/dr-jayashankar-das-/"
     },
@@ -251,7 +251,7 @@
       "id": "siddharth-m-joshi",
       "name": "Dr. Siddharth M. Joshi",
       "role": "Associate Vice President",
-      "organization": "LTM, Mumbai",
+      "organization": "LTM",
       "image": "assets/images/speakers/siddharth-m-joshi.webp",
       "linkedin": ""
     },
@@ -370,9 +370,9 @@
     {
       "id": "sreeja-narayanan",
       "name": "Dr. Sreeja Narayanan",
-      "role": "Principal Investigator, Nano-Bioengineering",
+      "role": "Faculty and Principal Investigator, Nano-Bioengineering",
       "organization": "CVJ Centre for Synthetic Biology and Biomanufacturing, CUSAT",
-      "image": "",
+      "image": "assets/images/speakers/sreeja-narayanan.webp",
       "linkedin": ""
     },
     {
@@ -430,6 +430,54 @@
       "organization": "Beyond Next Ventures India",
       "image": "assets/images/speakers/jay-krishnan.webp",
       "linkedin": "https://www.linkedin.com/in/thejaykrishnan/"
+    },
+    {
+      "id": "balakrishnan-t-p",
+      "name": "Balakrishnan T. P.",
+      "role": "Founder & CEO",
+      "organization": "I2R Labs",
+      "image": "",
+      "linkedin": "https://www.linkedin.com/in/balakrishnan-tp-34565b1b/"
+    },
+    {
+      "id": "binu-augustin",
+      "name": "Binu Augustin",
+      "role": "Director",
+      "organization": "Heka Medicals India Pvt. Ltd.",
+      "image": "",
+      "linkedin": "https://www.linkedin.com/in/binu-augustin-31034424/"
+    },
+    {
+      "id": "c-padmakumar",
+      "name": "C. Padmakumar",
+      "role": "Special Officer",
+      "organization": "Kerala Medical Technology Consortium (KMTC)",
+      "image": "",
+      "linkedin": "https://www.linkedin.com/in/padmakumar-advisory/"
+    },
+    {
+      "id": "joseph-jose",
+      "name": "Joseph Jose",
+      "role": "Managing Director",
+      "organization": "Mariya Healthcare Pvt. Ltd.",
+      "image": "",
+      "linkedin": "https://www.linkedin.com/in/joseph-jose-12063696/"
+    },
+    {
+      "id": "t-c-jayasankar",
+      "name": "T. C. Jayasankar",
+      "role": "Managing Director",
+      "organization": "Jayon Implants Pvt. Ltd.",
+      "image": "",
+      "linkedin": ""
+    },
+    {
+      "id": "piyush-das",
+      "name": "Dr. Piyush Das",
+      "role": "Country Director & General Manager, India and South Asia",
+      "organization": "Haier Biomedical",
+      "image": "assets/images/speakers/piyush-das.webp",
+      "linkedin": ""
     }
   ],
   "programme_highlights": [
