@@ -383,6 +383,36 @@ func TestOpsReportsExposeFilterableActivityAudit(t *testing.T) {
 	}
 }
 
+func TestOpsMobileHeaderHasCompactAccessibleEndShiftControl(t *testing.T) {
+	html, err := resources.ReadFile("web/ops.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	markup := string(html)
+	for _, want := range []string{`id="station-button"`, `aria-label="End shift"`, `class="station-exit-icon"`} {
+		if !strings.Contains(markup, want) {
+			t.Errorf("mobile shift control does not contain %q", want)
+		}
+	}
+	javascript, err := resources.ReadFile("web/ops.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(javascript), "setAttribute('aria-label',`End shift for ${state.station}`)") {
+		t.Error("shift control does not expose the current station in its accessible name")
+	}
+	css, err := resources.ReadFile("web/ops.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	styles := string(css)
+	for _, want := range []string{".station-button{display:grid;width:44px;height:44px", ".station-button .station-exit-icon{display:block}", "@media(max-width:360px)"} {
+		if !strings.Contains(styles, want) {
+			t.Errorf("mobile header stylesheet does not contain %q", want)
+		}
+	}
+}
+
 func TestOpsCameraScannerUsesEmbeddedCrossBrowserFallback(t *testing.T) {
 	rr := httptest.NewRecorder()
 	(&App{}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/ops", nil))
