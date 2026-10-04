@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#08271f">
+<title>On-site operations · Bio Connect 4.0</title>
+<link rel="icon" href="/static/favicon.png" type="image/png">
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/ops.css">
+<script src="/static/vendor/html5-qrcode-2.3.8.min.js" defer></script>
+<script src="/static/ops.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#workspace">Skip to workspace</a>
+<div id="login" class="login-shell">
+  <section class="login-card" aria-labelledby="login-title">
+    <div class="login-brand"><img src="/static/bio-connect-logo.png" alt="Bio Connect 4.0"><span>On-site operations</span></div>
+    <div class="login-copy"><p class="kicker">Hyatt Regency · 08–09 October 2026</p><h1 id="login-title">Open your station.</h1><p>Check in delegates, print badges and run access gates from one live workspace.</p></div>
+    <form id="login-form">
+      <label>Station name<input name="station" required maxlength="60" autocomplete="organization-title" placeholder="Example: Badge desk 2"></label>
+      <label>Operations passcode<input name="passcode" required type="password" autocomplete="current-password" placeholder="Enter shared passcode"></label>
+      <button>Start shift <span aria-hidden="true">→</span></button>
+      <p id="login-error" class="form-error" role="alert"></p>
+    </form>
+    <p class="login-foot">Private staff system · Every action is attributed to this station.</p>
+  </section>
+  <aside class="login-art" aria-hidden="true"><div class="orb orb-a"></div><div class="orb orb-b"></div><strong>4.0</strong><p>Biotech<br>in motion.</p></aside>
+</div>
+
+<div id="portal" class="portal" hidden>
+  <header class="topbar">
+    <a class="brand" href="#checkin" data-nav="checkin"><img src="/static/bio-connect-logo.png" alt="Bio Connect 4.0"></a>
+    <div class="event-label"><span class="live-dot"></span><strong>Live operations</strong><span>Hyatt Regency</span></div>
+    <div class="top-actions"><label class="day-switch"><span>Event day</span><select id="day"></select></label><button id="station-button" class="station-button" title="End shift"><span id="station-name"></span><small>End shift</small></button></div>
+  </header>
+  <div class="app-shell">
+    <nav class="rail" aria-label="Operations">
+      <button data-view="checkin" class="active"><span class="nav-icon">⌁</span><span>Check-in</span></button>
+      <button data-view="roster"><span class="nav-icon">◎</span><span>Roster</span></button>
+      <button data-view="gates"><span class="nav-icon">⇥</span><span>Gates</span></button>
+      <button data-view="checkout"><span class="nav-icon">↗</span><span>Checkout</span></button>
+      <button data-view="register"><span class="nav-icon">＋</span><span>Register</span></button>
+      <button data-view="reports"><span class="nav-icon">▥</span><span>Reports</span></button>
+    </nav>
+    <main id="workspace" tabindex="-1"></main>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="camera-dialog" aria-labelledby="camera-title"><div class="dialog-head"><div><p class="kicker">Camera scanner</p><h2 id="camera-title">Point at the badge QR</h2></div><button id="camera-close" class="icon-button" aria-label="Close camera">×</button></div><div class="camera-frame"><div id="camera-reader"></div><span class="scan-reticle" aria-hidden="true"><span class="scan-line"></span></span></div><div class="camera-footer"><button id="camera-torch" type="button" hidden><span aria-hidden="true">☀</span><span>Light</span></button><p id="camera-note" role="status">Keep the code inside the frame.</p><article id="camera-result" class="camera-result" hidden><div><p id="camera-result-label" class="kicker"></p><h3 id="camera-result-name"></h3><p id="camera-result-meta"></p></div><strong id="camera-result-ref"></strong></article></div></dialog>
+</body>
+</html>

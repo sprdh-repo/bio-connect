@@ -19,7 +19,7 @@ import (
 )
 
 type Config struct {
-	DatabaseURL, BaseURL, Listen, StorageDir, S3Bucket, AWSRegion, TrustedProxyCIDR                              string
+	DatabaseURL, BaseURL, Listen, StorageDir, S3Bucket, AWSRegion, TrustedProxyCIDR, OpsKey                      string
 	RegistrationEnabled, LiveDelivery, Production                                                                bool
 	EncryptionKey, SBIURL, PostmarkToken, SenderAddress, SenderName, PostmarkStream, PostmarkAPIBase             string
 	MetaToken, MetaPhoneID, MetaAppSecret, MetaVerifyToken, MetaTemplate, MetaLanguage, MetaVersion, MetaAPIBase string
@@ -35,6 +35,7 @@ func env(k, d string) string {
 func FromEnv() Config {
 	return Config{
 		TrustedProxyCIDR: os.Getenv("TRUSTED_PROXY_CIDR"), DatabaseURL: os.Getenv("DATABASE_URL"), BaseURL: env("BASE_URL", "http://localhost:8080"), Listen: env("LISTEN_ADDR", ":8080"),
+		OpsKey:     os.Getenv("OPS_KEY"),
 		StorageDir: env("STORAGE_DIR", "./var/files"), S3Bucket: os.Getenv("S3_BUCKET"), AWSRegion: env("AWS_REGION", "ap-south-1"),
 		RegistrationEnabled: os.Getenv("REGISTRATION_ENABLED") == "true", LiveDelivery: os.Getenv("LIVE_DELIVERY") == "true", Production: os.Getenv("APP_ENV") == "production",
 		EncryptionKey: os.Getenv("ENCRYPTION_KEY"), SBIURL: os.Getenv("SBI_COLLECT_URL"), PostmarkToken: os.Getenv("POSTMARK_SERVER_TOKEN"),

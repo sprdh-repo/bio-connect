@@ -25,6 +25,8 @@ Deployment and any live message test are gated on readiness (see the checklist a
 All of `/etc/bioconnect/*.env` is rendered from `registration/ops/secrets/bioconnect-infra.env` by `ops/deploy.sh`.
 That master file also holds the SSH key path and every resource id; safe-keep it privately.
 Losing `ENCRYPTION_KEY` makes stored TOTP secrets and pass tokens unrecoverable.
+`OPS_KEY` controls the separate on-site portal at `/ops` and must be a strong shared multi-word passcode that is not used for an admin account.
+Rotate it by changing the master environment and deploying; existing 12-hour on-site sessions remain valid until they expire or staff end the shift.
 
 `REGISTRATION_ENABLED` stays `false` until launch.
 `LIVE_DELIVERY` stays `false` until the Zinvos senders, webhook credentials, and WhatsApp template are confirmed; the app refuses to start with `LIVE_DELIVERY=true` unless every provider and webhook value is set, and refuses live registration unless the SBI URL is set too.
@@ -41,6 +43,21 @@ ops/deploy.sh          # build image, ship to the host, render env files, compos
 `deploy.sh` builds `bioconnect-registration:<git-sha>` locally, `docker save`s it to the host (no registry), pushes `/etc/bioconnect/*.env`, syncs the compose file and ops scripts, runs `docker compose up -d`, enables the backup/monitor timers, and checks `/healthz` at the origin and through CloudFront.
 Migrations are additive and run once under a Postgres advisory lock, so re-running is safe.
 First-time only, after `deploy.sh`: `ops/cloudfront-origin.sh` repoints CloudFront from the placeholder bucket to the box.
+
+## On-site portal
+
+Open `/ops` on each desk or gate device, enter its physical station name, and use the shared `OPS_KEY` passcode.
+The session lasts 12 hours and all writes carry CSRF protection.
+
+- Select the event day before scanning. Attendance is unique per attendee per day, while repeated scans are retained in the activity audit.
+- A first check-in opens the browser print dialog for a landscape 76.2 × 50.8 mm thermal badge, with attendee details above the QR. Configure the printer driver for that exact label size, landscape orientation, 100% scale, zero margins and no browser headers or footers.
+- Checkout requires a check-in for the selected day. Both check-in and checkout can be undone with a required reason.
+- Spot registration uses the same server-side category fee and verified bank-reference checks as the staff console, then checks in and prints immediately.
+- Access gates can enforce or only log category, day, prior check-in, capacity and single-entry rules. An attendee already recorded inside is always permitted to exit even if gate rules subsequently change.
+- Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
+
+Before doors open, run one real pass through check-in, print, gate entry, gate exit and checkout on each device and printer.
+Keep a USB scanner available because browser camera scanning depends on `BarcodeDetector` support and camera permission.
 
 ### Rollback
 

@@ -17,13 +17,14 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 - Coupons `KSUM30` (30%) and `KMTC25` (25%) give their discount off the current fee for every category except students. The form shows the offer price once the code is applied; the discount is frozen on the registration, the registrant pays by direct bank transfer to the account shown on their registration page, and staff verify against the discounted amount.
 - Registration states: `awaiting_payment`, `awaiting_review`, `correction_requested`, `approved`, `rejected`, `cancelled`.
 - Staff console at `/admin` with individual accounts, mandatory TOTP, server sessions, CSRF protection, and login throttling. Account-management and registration-review permissions are separate roles (`manager`, `reviewer`).
+- On-site operations portal at `/ops` with a shared passcode and named station attribution. It provides day-specific check-in and checkout, QR or pass-number scanning, thermal badge printing, spot registration, configurable access gates, live occupancy and attendance reporting with CSV export.
 - Reviewers can record and approve a payment found directly in SBI when the registrant did not submit payment evidence; the verified payment and staff action are retained in the payment history and audit trail.
 - Reviewers can register any delegate or exhibitor directly from the console in one form, confirmed on save as paid (against a verified bank payment) or complimentary, with optional phones and logo, and choose to confirm only or confirm and send the passes.
 - Approval atomically creates one pass per attendee plus the delivery jobs. Concurrent approvals and repeated clicks never create extra passes.
 - Staff can correct a registration after the fact: approve a rejected one, move an exhibitor to another stall type, give a stall extra passes beyond what its type includes, and edit or remove attendees (a removed attendee's pass is revoked).
 Console changes never deliver anything on their own: staff send each pass from the attendee list, or all of them with Send passes. Only the normal review buttons (Approve and send) send on approval.
 - Exhibitor stalls include 5 (premium), 3 (standard) or 2 (table space) passes. The allowance rose from 3 / 2 / 2 at no extra fee, and existing registrations were given it too: the exhibitor, or staff on their behalf, adds the extra people later, and each new pass is issued and delivered to that person alone. `bioconnect roster-notice` emails affected exhibitors a link to do it (see [operations](docs/operations.md#exhibitor-pass-upgrade-migration-009)).
-- Branded A5 PDF passes with an opaque QR (no contact information). Attendance scanning is deferred.
+- Branded A5 PDF passes with an opaque QR (no contact information). The same opaque QR drives check-in, badge printing and access control without exposing attendee details in the code.
 - Short human identifiers in one series per category: a registration is `BC4-EX-0007` (the 7th exhibitor), and each of its passes is that reference plus the holder's place in it, `BC4-EX-0007-3`, printed large on the pass and repeated in the pass email.
 The two letters are the word already printed on the pass (`EX`, `FC`, `IN`, `SP`, `ST`), so a code and a badge can never disagree.
 Staff search matches either, with or without the hyphens.
@@ -54,6 +55,8 @@ go run ./cmd/bioconnect
 The app migrates the database on start.
 Registration is disabled by default (`REGISTRATION_ENABLED=false`); the forms and fees are still viewable.
 With `LIVE_DELIVERY=false` the delivery worker uses a fake provider that marks every job delivered, so nothing leaves the machine.
+Set `OPS_KEY` to a strong shared multi-word passcode to use the on-site portal at `/ops`.
+Each device or desk also enters a station name, which is recorded against attendance and gate activity.
 
 Create the first staff account (prints the `otpauth://` URI to enrol in an authenticator):
 

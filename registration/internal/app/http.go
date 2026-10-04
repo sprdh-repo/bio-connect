@@ -46,7 +46,9 @@ func (a *App) Handler() http.Handler {
 	fileSrv := http.StripPrefix("/static/", http.FileServer(http.FS(static)))
 	m.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// CloudFront does not cache (dynamic app), so let the browser hold static assets.
-		if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") || strings.HasSuffix(r.URL.Path, ".svg") {
+		if strings.HasSuffix(r.URL.Path, "/ops.js") || strings.HasSuffix(r.URL.Path, "/ops.css") {
+			w.Header().Set("Cache-Control", "no-cache")
+		} else if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") || strings.HasSuffix(r.URL.Path, ".svg") {
 			w.Header().Set("Cache-Control", "public, max-age=2592000")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=300")
@@ -58,6 +60,7 @@ func (a *App) Handler() http.Handler {
 	for _, path := range []string{"/{$}", "/delegates", "/exhibitors", "/recover", "/manage/{id}", "/admin"} {
 		m.HandleFunc("GET "+path, a.page)
 	}
+	m.HandleFunc("GET /ops", a.opsPage)
 	m.HandleFunc("GET /privacy-policy", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		body, err := resources.ReadFile("web/privacy-policy.html")
@@ -113,6 +116,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/recovery", a.recover)
 	m.HandleFunc("POST /api/v1/recovery/exchange", a.exchange)
 	m.HandleFunc("POST /api/v1/auth/login", a.login)
+	m.HandleFunc("/api/v1/ops/", a.opsAPI)
 	m.HandleFunc("GET /passes/{token}", a.passDownload)
 	m.HandleFunc("GET /passes/pack/{token}", a.packDownload)
 	m.HandleFunc("GET /api/v1/webhooks/meta", a.metaVerify)
@@ -129,7 +133,11 @@ func (a *App) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		permissionsPolicy := "camera=(), microphone=(), geolocation=()"
+		if r.URL.Path == "/ops" {
+			permissionsPolicy = "camera=(self), microphone=(), geolocation=()"
+		}
+		w.Header().Set("Permissions-Policy", permissionsPolicy)
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		if a.Config.Production {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
