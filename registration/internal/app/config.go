@@ -24,6 +24,7 @@ type Config struct {
 	EncryptionKey, SBIURL, PostmarkToken, SenderAddress, SenderName, PostmarkStream, PostmarkAPIBase             string
 	MetaToken, MetaPhoneID, MetaAppSecret, MetaVerifyToken, MetaTemplate, MetaLanguage, MetaVersion, MetaAPIBase string
 	WebhookUser, WebhookPassword                                                                                 string
+	MetaOTPTemplate, MetaOTPLanguage                                                                             string
 }
 
 func env(k, d string) string {
@@ -42,6 +43,7 @@ func FromEnv() Config {
 		SenderAddress: os.Getenv("POSTMARK_FROM_ADDRESS"), SenderName: os.Getenv("POSTMARK_FROM_NAME"), PostmarkStream: env("POSTMARK_STREAM", "outbound"), PostmarkAPIBase: env("POSTMARK_API_BASE", "https://api.postmarkapp.com"),
 		MetaToken: os.Getenv("META_ACCESS_TOKEN"), MetaPhoneID: os.Getenv("META_PHONE_NUMBER_ID"), MetaAppSecret: os.Getenv("META_APP_SECRET"), MetaVerifyToken: os.Getenv("META_VERIFY_TOKEN"), MetaTemplate: os.Getenv("META_TEMPLATE"), MetaLanguage: env("META_TEMPLATE_LANGUAGE", "en"), MetaVersion: os.Getenv("META_API_VERSION"), MetaAPIBase: env("META_API_BASE", "https://graph.facebook.com"),
 		WebhookUser: os.Getenv("POSTMARK_WEBHOOK_USER"), WebhookPassword: os.Getenv("POSTMARK_WEBHOOK_PASSWORD"),
+		MetaOTPTemplate: os.Getenv("META_OTP_TEMPLATE"), MetaOTPLanguage: env("META_OTP_TEMPLATE_LANGUAGE", "en_US"),
 	}
 }
 func (c Config) Validate() error {

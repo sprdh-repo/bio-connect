@@ -101,6 +101,21 @@ func (a *App) WorkOnce(ctx context.Context) error {
 		}
 	}
 	// PDF generation uses a separate transaction; no registration row lock is taken there.
+	if j.Purpose == "pass_otp" {
+		var valid bool
+		// Hold the challenge lock through provider dispatch. Resend and verify
+		// must not consume or supersede an OTP between this check and sending it.
+		e = tx.QueryRow(ctx, "SELECT used_at IS NULL AND expires_at>$2 AND attempts<5 FROM mobile_pass_challenges WHERE delivery_id=$1 FOR UPDATE", j.ID, a.Now()).Scan(&valid)
+		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+			return e
+		}
+		if !valid {
+			if _, e = tx.Exec(ctx, "UPDATE delivery_jobs SET status='cancelled',updated_at=now() WHERE id=$1", j.ID); e != nil {
+				return e
+			}
+			return tx.Commit(ctx)
+		}
+	}
 	result := a.send(ctx, j)
 	next := a.Now()
 	if result.Retry && j.Attempts < 5 {
@@ -134,6 +149,9 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 		return sendResult{Status: "failed", Code: "payload_decryption"}
 	}
 	var attachments []map[string]string
+	if j.Purpose == "pass_otp" {
+		return a.sendPassOTP(ctx, j, link)
+	}
 	var number, waDocID string
 	if j.Purpose == "pass" {
 		var cipher string

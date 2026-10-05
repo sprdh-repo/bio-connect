@@ -22,11 +22,13 @@ App IDs and release signing are still placeholders and must be set before store 
 - Guide: venue details, floor plan, activities, searchable FAQs, exhibitor directory, passes, brochure and partners.
 - Backend event-guide editor with draft/published controls, public APIs and staff audit history.
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
+- My passes: email or WhatsApp OTP, optional admission QR scanning, secure saved passes and on-phone admission QR display.
 - Loading, retry, empty and no-match states are included for live content and directories.
 
 Unpublished event-day sections show “To be announced”.
 Staff can add and publish content from the registration backend at `/admin?view=event-guide`.
 See [Event-day guide](docs/event-guide.md) for the API contract, publishing workflow and offline behavior.
+See [My passes](docs/my-passes.md) for attendee verification, WhatsApp template setup and saved pass behavior.
 Bank payment and exhibitor registration remain on the secure official portal; maps, LinkedIn, the brochure and third-party applications open in their owning apps.
 
 ## Content and backend boundary

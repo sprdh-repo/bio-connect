@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
+import 'my_passes_screen.dart';
 import '../widgets/interaction.dart';
 import '../models/event_content.dart';
 import '../models/event_guide.dart';
@@ -28,16 +29,6 @@ class AttendeeHomeScreen extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Image.asset(
-            'assets/images/bio-connect-logo.png',
-            width: 220,
-            height: 65,
-            fit: BoxFit.contain,
-          ),
-        ),
-        const SizedBox(height: 22),
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -158,6 +149,12 @@ class AttendeeHomeScreen extends StatelessWidget {
           icon: Icons.campaign_outlined,
         ),
         const SizedBox(height: 16),
+        GuideCard(
+          Icons.confirmation_number_outlined,
+          'My passes',
+          'View your admission QR on this phone',
+          () => showGuidePage(context, const MyPassesScreen()),
+        ),
         GuideCard(
           Icons.confirmation_number_outlined,
           'Registration & passes',

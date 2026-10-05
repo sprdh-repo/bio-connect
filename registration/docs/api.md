@@ -9,6 +9,12 @@ State-changing `/api/v1` requests with a foreign `Origin` header are rejected wi
 
 Amounts, roster counts, category state, and every registration state transition are enforced on the server; the client cannot override them.
 
+## Mobile attendee passes
+
+Email and WhatsApp OTP, optional admission QR matching, and identity-scoped pass retrieval are documented in [My passes](../../mobile/docs/my-passes.md).
+The endpoints are `POST /mobile/pass-access/challenges`, `POST /mobile/pass-access/verify`, and authenticated `GET`/`DELETE /mobile/passes`.
+These sessions are separate from staff and registration-management access.
+
 ## Public
 
 ### `GET /public/app-content`

@@ -10,6 +10,7 @@ import 'models/event_content.dart';
 import 'providers/content_provider.dart';
 import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
+import 'screens/my_passes_screen.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -223,8 +224,35 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Widget _buildShell(BuildContext context) {
     final state = context.watch<ContentProvider>();
+    final header = AppBar(
+      backgroundColor: cream,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 76,
+      titleSpacing: 20,
+      title: Image.asset(
+        'assets/images/bio-connect-logo.png',
+        width: 180,
+        height: 54,
+        fit: BoxFit.contain,
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: IconButton(
+            tooltip: 'My passes',
+            color: forest,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyPassesScreen()),
+            ),
+            icon: const Icon(Icons.confirmation_number_outlined),
+          ),
+        ),
+      ],
+    );
     if (state.content == null) {
       return Scaffold(
+        appBar: header,
         body: Center(
           child: state.loading
               ? const CircularProgressIndicator()
@@ -238,6 +266,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
     final content = state.content!;
     return Scaffold(
+      appBar: header,
       body: SafeArea(
         child: IndexedStack(
           index: selected,
@@ -462,6 +491,15 @@ class MoreScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const ExhibitorsScreen()),
           );
         },
+      ),
+      GuideCard(
+        Icons.confirmation_number_outlined,
+        'My passes',
+        'View your admission QR on this phone',
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MyPassesScreen()),
+        ),
       ),
       GuideCard(
         Icons.confirmation_number_outlined,
