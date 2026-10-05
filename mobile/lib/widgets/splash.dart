@@ -27,9 +27,9 @@ class SplashGate extends StatefulWidget {
 class _SplashGateState extends State<SplashGate> with TickerProviderStateMixin {
   late final _intro = AnimationController(
     vsync: this,
-    // The build-up takes 1.8 seconds; the remaining 0.7 seconds hold the
+    // The build-up takes 1.8 seconds; the remaining 0.6 seconds hold the
     // finished splash so the dates and venue can be read before it leaves.
-    duration: const Duration(milliseconds: 2500),
+    duration: const Duration(milliseconds: 2400),
   );
   late final _spin = AnimationController(
     vsync: this,
@@ -165,11 +165,11 @@ class _SplashArt extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([intro, spin, drift]),
     builder: (context, _) {
-      final settle = _at(0, .314, Curves.easeInOutCubic);
-      final helix = _at(.224, .571);
-      final word = _at(.37, .616);
-      final details = _at(.448, .683);
-      final place = _at(.515, .717);
+      final settle = _at(0, .327, Curves.easeInOutCubic);
+      final helix = _at(.233, .595);
+      final word = _at(.385, .642);
+      final details = _at(.467, .712);
+      final place = _at(.537, .747);
       Widget rise(double t, Widget child, {double by = 14}) => Opacity(
         opacity: t,
         child: Transform.translate(
@@ -197,14 +197,14 @@ class _SplashArt extends StatelessWidget {
             ),
           ),
           CustomPaint(
-            painter: _ParticlePainter(drift.value, fade: _at(.146, .526)),
+            painter: _ParticlePainter(drift.value, fade: _at(.152, .548)),
           ),
           // Two rings pulse out from the mark as it settles.
           at(
             -86 * settle,
             CustomPaint(
               size: const Size.square(markBox * 2),
-              painter: _RingPainter([_at(.045, .526), _at(.168, .672)]),
+              painter: _RingPainter([_at(.047, .548), _at(.175, .7)]),
             ),
           ),
           at(
