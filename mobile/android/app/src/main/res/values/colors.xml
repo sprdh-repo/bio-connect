@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#F3F1E9</color>
+    <!-- Cream, matching the first frame of the animated splash in the app. -->
+    <color name="splash_background">#F3F1E9</color>
+    <!-- The app's own background, behind Flutter once it is running. -->
+    <color name="app_background">#FBFAF5</color>
 </resources>

@@ -25,6 +25,7 @@ import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
 import 'screens/my_passes_screen.dart';
 import 'widgets/saving.dart';
+import 'widgets/splash.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -74,7 +75,7 @@ void main() {
   runApp(
     ChangeNotifierProvider(
       create: (_) => ContentProvider(CurrentContentService())..load(),
-      child: const BioConnectApp(),
+      child: const BioConnectApp(showSplash: true),
     ),
   );
 }
@@ -113,11 +114,15 @@ class BioConnectApp extends StatelessWidget {
   const BioConnectApp({
     super.key,
     this.checkForUpdates = kReleaseMode,
+    this.showSplash = false,
     this.agenda,
     this.contacts,
     this.feedback,
   });
   final bool checkForUpdates;
+
+  /// Plays the animated splash on launch; off in tests.
+  final bool showSplash;
 
   /// The attendee's own data on this phone; tests pass in-memory copies.
   final Agenda? agenda;
@@ -244,17 +249,19 @@ class BioConnectApp extends StatelessWidget {
       textTheme: Theme.of(context).textTheme
           .apply(fontFamily: 'DM Sans', bodyColor: ink, displayColor: ink),
     ),
-    home: checkForUpdates
-        ? UpgradeAlert(
-            upgrader: _upgrader,
-            showIgnore: false,
-            dialogStyle: defaultTargetPlatform == TargetPlatform.iOS
-                ? UpgradeDialogStyle.cupertino
-                : UpgradeDialogStyle.material,
-            child: const AppShell(),
-          )
-        : const AppShell(),
+    home: showSplash ? SplashGate(child: _home()) : _home(),
   );
+
+  Widget _home() => checkForUpdates
+      ? UpgradeAlert(
+          upgrader: _upgrader,
+          showIgnore: false,
+          dialogStyle: defaultTargetPlatform == TargetPlatform.iOS
+              ? UpgradeDialogStyle.cupertino
+              : UpgradeDialogStyle.material,
+          child: const AppShell(),
+        )
+      : const AppShell();
 }
 
 class AppShell extends StatefulWidget {
