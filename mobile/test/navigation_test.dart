@@ -109,8 +109,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    // Home, Sessions, Speakers, My agenda, Guide.
-    expect(tester.widget<BioNavBar>(find.byType(BioNavBar)).selectedIndex, 4);
+    // Home, Sessions, Speakers, Guide.
+    expect(tester.widget<BioNavBar>(find.byType(BioNavBar)).selectedIndex, 3);
     await tester.tap(find.text('Speakers').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'nonexistent');

@@ -9,6 +9,14 @@ import (
 	"testing"
 )
 
+func menuKeys(items []menuItem) string {
+	keys := make([]string, len(items))
+	for i, item := range items {
+		keys[i] = item.Key
+	}
+	return strings.Join(keys, " ")
+}
+
 // staffRequester signs in a staff account of the given role and returns a
 // request helper that carries its session and CSRF token.
 func staffRequester(t *testing.T, a *App, email, role string) func(method, path string, body any) *httptest.ResponseRecorder {

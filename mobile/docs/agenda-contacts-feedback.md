@@ -29,8 +29,9 @@ Sessions saved before staff link speakers still match by name, as the speaker pa
 - **Sessions**: link each session to its speakers with **Link a speaker…**.
   Linked speakers show the session on their profile and in the agenda of attendees who saved them.
   New speakers need a save before they can be linked; removing a speaker unlinks them on save.
-- **Menus**: My agenda can be a bottom tab, beside Sessions and Speakers.
-  Migration `033` adds it as a tab, a Home shortcut and the first Guide entry, with Contacts beside it.
+- **Menus**: My agenda and Contacts are Home tiles and the first Guide entries.
+  Home's tiles are Speakers, Exhibitors, Venue, My agenda, Contacts and Moments (migration `035`), and the Home list ends with Sponsors.
+  My agenda can also be made a bottom tab from the console, though five tabs crowd the bar.
 
 ## Contacts
 

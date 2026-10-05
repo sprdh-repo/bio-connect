@@ -841,33 +841,15 @@
         "subtitle": "Themes, ideas and programme highlights",
         "title": "Explore Bio Connect",
         "url": ""
+      },
+      {
+        "key": "sponsors",
+        "subtitle": "",
+        "title": "Sponsors",
+        "url": ""
       }
     ],
     "home_shortcuts": [
-      {
-        "key": "sessions",
-        "subtitle": "Programme & timings",
-        "title": "Sessions",
-        "url": ""
-      },
-      {
-        "key": "venue",
-        "subtitle": "Directions & arrival",
-        "title": "Venue",
-        "url": ""
-      },
-      {
-        "key": "activities",
-        "subtitle": "Discover & connect",
-        "title": "Activities",
-        "url": ""
-      },
-      {
-        "key": "faqs",
-        "subtitle": "Event-day answers",
-        "title": "FAQs",
-        "url": ""
-      },
       {
         "key": "speakers",
         "subtitle": "Meet the voices",
@@ -881,6 +863,12 @@
         "url": ""
       },
       {
+        "key": "venue",
+        "subtitle": "Directions & arrival",
+        "title": "Venue",
+        "url": ""
+      },
+      {
         "key": "agenda",
         "subtitle": "Your day plan",
         "title": "My agenda",
@@ -890,6 +878,12 @@
         "key": "contacts",
         "subtitle": "Scan a badge",
         "title": "Contacts",
+        "url": ""
+      },
+      {
+        "key": "moments",
+        "subtitle": "Find your event photos",
+        "title": "Moments",
         "url": ""
       }
     ],
@@ -904,12 +898,6 @@
         "key": "speakers",
         "subtitle": "",
         "title": "Speakers",
-        "url": ""
-      },
-      {
-        "key": "agenda",
-        "subtitle": "",
-        "title": "My agenda",
         "url": ""
       }
     ]

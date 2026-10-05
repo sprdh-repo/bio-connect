@@ -182,17 +182,14 @@ const defaultMenus = <String, List<MenuEntry>>{
   'tabs': [
     MenuEntry('sessions', 'Sessions'),
     MenuEntry('speakers', 'Speakers'),
-    MenuEntry('agenda', 'My agenda'),
   ],
   'home_shortcuts': [
-    MenuEntry('sessions', 'Sessions', 'Programme & timings'),
-    MenuEntry('venue', 'Venue', 'Directions & arrival'),
-    MenuEntry('activities', 'Activities', 'Discover & connect'),
-    MenuEntry('faqs', 'FAQs', 'Event-day answers'),
     MenuEntry('speakers', 'Speakers', 'Meet the voices'),
     MenuEntry('exhibitors', 'Exhibitors', 'Explore the expo'),
+    MenuEntry('venue', 'Venue', 'Directions & arrival'),
     MenuEntry('agenda', 'My agenda', 'Your day plan'),
     MenuEntry('contacts', 'Contacts', 'Scan a badge'),
+    MenuEntry('moments', 'Moments', 'Find your event photos'),
   ],
   'home_links': [
     MenuEntry('my_passes', 'My passes', 'View your admission QR on this phone'),
@@ -206,6 +203,7 @@ const defaultMenus = <String, List<MenuEntry>>{
       'Explore Bio Connect',
       'Themes, ideas and programme highlights',
     ),
+    MenuEntry('sponsors', 'Sponsors'),
   ],
   'guide': [
     MenuEntry('agenda', 'My agenda', 'Saved sessions, speakers and exhibitors'),

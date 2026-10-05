@@ -264,7 +264,10 @@ void main() {
       expect(find.text('Saved. It overlaps “Session a”.'), findsOneWidget);
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
-      await tester.tap(find.text('My agenda').last);
+      // My agenda opens from the top of the Guide.
+      await tester.tap(find.text('Guide').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('My agenda'));
       await tester.pumpAndSettle();
       expect(find.text('UP NEXT'), findsOneWidget);
       expect(find.text('Overlaps “Session b”'), findsOneWidget);
