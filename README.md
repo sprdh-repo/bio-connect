@@ -26,8 +26,8 @@ Then open <http://localhost:4173>.
 - `exhibitors.html` - searchable confirmed exhibitor profiles loaded from the registration backend at `/api/v1/public/exhibitors`.
   Only approved exhibitors are included; company names, descriptions and logos update without editing the site.
   Loading, empty, error/retry, search and logo fallback states are handled in `script.js`.
-- `sponsors.html` - sponsor profiles, currently Kerala Rubber Limited.
-  The supplied logo is preserved in `assets/kerala-rubber-logo.png`; profile information comes from [Kerala Rubber's official website](https://krl.kerala.gov.in/about.php).
+- `sponsors.html` - equal-weight sponsor cards for CSIR-NIIST, Federal Bank, HLL Lifecare, Kerala Rubber, KMTC, the MEA States Division and SBI, in alphabetical order.
+  Logos are the organisers' supplied files, trimmed into `assets/*-logo.png`; profile copy comes from each sponsor's official website.
 - `product-launch.html` - Kerala Startup Mission's Product Launch application details, eligibility, focus areas, deadline and application link.
 - `404.html` - served by CloudFront for any unknown path.
   The domain previously hosted Bio Connect 3.0, so search engines still request old
