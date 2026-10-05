@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 )
@@ -41,7 +40,10 @@ type guideVenue struct {
 	FloorPlanURL  string `json:"floor_plan_url"`
 	HelpEmail     string `json:"help_email"`
 	HelpPhone     string `json:"help_phone"`
+	HelpWhatsApp  string `json:"help_whatsapp"`
 	Published     bool   `json:"published"`
+	// Hidden names fields kept in the console but withheld from the app.
+	Hidden []string `json:"hidden"`
 }
 type eventGuide struct {
 	Revision   int             `json:"revision"`
@@ -122,26 +124,36 @@ func (g eventGuide) validate() error {
 		}
 	}
 	v := g.Venue
-	for _, s := range []string{v.Address, v.Arrival, v.Accessibility, v.HelpEmail, v.HelpPhone, v.FloorPlanURL} {
+	for _, s := range []string{v.Address, v.Arrival, v.Accessibility, v.HelpEmail, v.HelpPhone, v.HelpWhatsApp, v.FloorPlanURL} {
 		if len(s) > 6000 {
 			return fmt.Errorf("venue text exceeds 6000 characters")
 		}
 	}
-	if v.FloorPlanURL != "" {
-		u, err := url.Parse(v.FloorPlanURL)
-		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil {
-			return fmt.Errorf("floor plan must be a public HTTPS URL")
-		}
+	if !optionalHTTPS(v.FloorPlanURL) {
+		return fmt.Errorf("floor plan must be a public HTTPS URL")
 	}
 	if v.HelpEmail != "" && !validEmail(v.HelpEmail) {
 		return fmt.Errorf("enter a valid help email")
 	}
-	for _, c := range v.HelpPhone {
+	if !helpPhone(v.HelpPhone) {
+		return fmt.Errorf("enter a valid help phone")
+	}
+	if !helpPhone(v.HelpWhatsApp) {
+		return fmt.Errorf("enter a valid WhatsApp number")
+	}
+	return checkHidden("venue", v.Hidden, venueHideable)
+}
+
+var venueHideable = []string{"address", "arrival", "accessibility", "floor_plan_url", "help_email", "help_phone", "help_whatsapp"}
+
+// helpPhone accepts a blank value or a loosely formatted contact number.
+func helpPhone(s string) bool {
+	for _, c := range s {
 		if !strings.ContainsRune("+0123456789 ()-", c) {
-			return fmt.Errorf("enter a valid help phone")
+			return false
 		}
 	}
-	return nil
+	return true
 }
 func (a *App) loadEventGuide(ctx context.Context) (eventGuide, error) {
 	var g eventGuide
@@ -162,69 +174,10 @@ func (a *App) publicEventGuide(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "event guide unavailable; please retry")
 		return
 	}
-	respond(w, 200, g.public())
-}
-func (a *App) adminEventGuide(w http.ResponseWriter, r *http.Request, p principal) {
-	if r.Method == "GET" {
-		g, err := a.loadEventGuide(r.Context())
-		if err != nil {
-			fail(w, 503, "event guide unavailable")
-			return
-		}
-		respond(w, 200, g)
-		return
-	}
-	if r.Method != "PUT" {
-		w.Header().Set("Allow", "GET, PUT")
-		fail(w, 405, "method not allowed")
-		return
-	}
-	var g eventGuide
-	if !decode(w, r, &g) {
-		return
-	}
-	if err := g.validate(); err != nil {
-		fail(w, 400, err.Error())
-		return
-	}
-	// Always return JSON arrays, including for a newly emptied section.
-	if g.Sessions == nil {
-		g.Sessions = []guideSession{}
-	}
-	if g.Activities == nil {
-		g.Activities = []guideActivity{}
-	}
-	if g.FAQs == nil {
-		g.FAQs = []guideFAQ{}
-	}
-	raw, err := json.Marshal(g)
+	out, err := toJSONMap(g.public())
 	if err != nil {
-		fail(w, 400, "invalid guide")
+		fail(w, 503, "event guide unavailable; please retry")
 		return
 	}
-	tx, err := a.DB.Begin(r.Context())
-	if err != nil {
-		fail(w, 503, "could not save guide")
-		return
-	}
-	defer tx.Rollback(r.Context())
-	result, err := tx.Exec(r.Context(), "UPDATE event_guide SET document=$1,revision=revision+1,updated_at=now() WHERE id='mobile' AND revision=$2", raw, g.Revision)
-	if err != nil {
-		fail(w, 503, "could not save guide")
-		return
-	}
-	if result.RowsAffected() != 1 {
-		fail(w, 409, "guide changed in another window; reload before editing again")
-		return
-	}
-	if err = audit(r.Context(), tx, p.ID, "", "event_guide.update", fmt.Sprintf("revision %d", g.Revision+1)); err != nil {
-		fail(w, 503, "could not save guide")
-		return
-	}
-	if err = tx.Commit(r.Context()); err != nil {
-		fail(w, 503, "could not save guide")
-		return
-	}
-	g.Revision++
-	respond(w, 200, g)
+	respond(w, 200, publicView(out))
 }

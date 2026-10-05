@@ -24,11 +24,14 @@ func fail(w http.ResponseWriter, status int, message string) {
 	respond(w, status, map[string]string{"error": message})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
+	return decodeLimit(w, r, v, 128<<10)
+}
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 		fail(w, 415, "send application/json")
 		return false
 	}
-	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 128<<10))
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
 	d.DisallowUnknownFields()
 	if e := d.Decode(v); e != nil {
 		fail(w, 400, "invalid request fields or JSON")
@@ -416,8 +419,8 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	if path == "event-guide" {
-		a.adminEventGuide(w, r, p)
+	if path == "mobile-content" {
+		a.adminMobileContent(w, r, p)
 		return
 	}
 	if path == "staff" && (r.Method == "GET" || r.Method == "POST") {

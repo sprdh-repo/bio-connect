@@ -25,7 +25,7 @@ func (a *App) publicSpeakers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) loadPublicSpeakers(ctx context.Context) ([]publicSpeaker, error) {
-	rows, err := a.DB.Query(ctx, `SELECT id,name,role,organization,image_slug,linkedin
+	rows, err := a.DB.Query(ctx, `SELECT id,name,role,organization,image_url,linkedin
  FROM speakers WHERE published ORDER BY position,id`)
 	if err != nil {
 		return nil, err
@@ -34,12 +34,8 @@ func (a *App) loadPublicSpeakers(ctx context.Context) ([]publicSpeaker, error) {
 	speakers := make([]publicSpeaker, 0)
 	for rows.Next() {
 		var item publicSpeaker
-		var imageSlug string
-		if err := rows.Scan(&item.ID, &item.Name, &item.Role, &item.Organization, &imageSlug, &item.LinkedIn); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Role, &item.Organization, &item.ImageURL, &item.LinkedIn); err != nil {
 			return nil, err
-		}
-		if imageSlug != "" {
-			item.ImageURL = "https://bioconnect.kerala.gov.in/assets/speakers/" + imageSlug + ".webp"
 		}
 		speakers = append(speakers, item)
 	}

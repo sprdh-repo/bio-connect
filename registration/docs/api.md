@@ -19,9 +19,18 @@ These sessions are separate from staff and registration-management access.
 
 ### `GET /public/app-content`
 
-Returns the database-managed attendee guide used by the mobile app. The document includes `event`, `themes`, `programme_highlights`, `product_launch`, `leadership`, `sponsors_intro`, `sponsors`, `sponsor`, `ecosystem_partners`, and the current published `speakers` array.
-`sponsors` lists every sponsor as `{name, category, description, logo_url, website_url}`; `sponsor` is the original single sponsor, kept for app versions released before the list.
-`leadership` holds `intro`, `advisory_note`, `convened_by {name, note}`, `people` (`name`, `role`, `badge`, optional `image_url`, `image_credit`, `image_credit_url`) and `committee {title, order_note, members[{role, name, organization}]}`. Speaker rows are injected from the speaker directory at request time so both endpoints share one source of truth.
+Returns everything the mobile app shows, as staff publish it from the console's Mobile app editor (`/admin?view=mobile`).
+The document includes `event`, `themes`, `programme_highlights`, `product_launch`, `leadership`, `sponsors_intro`, `sponsors`, `sponsor`, `ecosystem_partners`, `menus`, `copy`, `event_guide`, and the published `speakers` array.
+
+- `event` adds `privacy_url`; `product_launch` adds `apply_label`; partners add an optional `website_url`; `event_guide.venue` adds `help_whatsapp`.
+- `sponsors` lists every visible sponsor as `{name, category, description, logo_url, website_url}`. `sponsor` repeats the first one (or blank strings) for app versions released before the list.
+- `leadership` holds `intro`, `advisory_note`, `convened_by {name, note}` (or `null`), `people` (`name`, `role`, `badge`, optional `image_url`, `image_credit`, `image_credit_url`) and `committee {title, order_note, members[{role, name, organization}]}`.
+- `menus` maps `tabs`, `home_shortcuts`, `home_links` and `guide` to ordered `[{key, title, subtitle, url}]`. `key` is an app destination (`sessions`, `speakers`, `venue`, `activities`, `faqs`, `exhibitors`, `my_passes`, `registration`, `brochure`, `product_launch`, `sponsors`, `leadership`, `explore`, `privacy`) or `link`, which opens `url` (`https:`, `mailto:` or `tel:`). Only `sessions` and `speakers` can be tabs; Home and Guide always are. A blank title keeps the app's label.
+- `copy` maps keys such as `sessions.title` to staff wording for the app's headings. A missing key keeps the built-in text.
+
+Staff visibility controls never reach the app: list entries switched off are omitted, and fields staff hide are sent as an empty string (an empty list, or `null` for `convened_by`), so released app versions still find every key they require.
+The app leaves empty values out instead of showing "to be announced", and drops menu entries whose page would be empty.
+Speaker rows are injected from the speaker directory at request time so both endpoints share one source of truth.
 
 The endpoint permits anonymous cross-origin reads. If the content document is unpublished, it returns 503 and the app retains its bundled offline snapshot.
 
@@ -201,11 +210,12 @@ Roles are disjoint:
 
 - `manager`: `GET/POST /admin/staff` only. Creating an account returns `201 {"totp_uri":"otpauth://..."}`. Editing (`{id, role, active}`) revokes that account's sessions.
 - `reviewer`: everything else below, except the poster routes.
-- Both roles reach `/admin/posters/*`. A poster is neither registration data nor account data, and the person making a speaker reveal is as likely to hold either account. Saves are still attributed to the staff id in the audit trail.
+- Both roles reach `/admin/mobile-content` and `/admin/posters/*`. A poster is neither registration data nor account data, and the person making a speaker reveal is as likely to hold either account. Saves are still attributed to the staff id in the audit trail.
 
 | Route | Purpose |
 |---|---|
 | `GET /admin/me` | `{id, role}` |
+| `GET/PUT /admin/mobile-content` | Both roles. The mobile app editor: `{revision, content, guide, speakers}`, where `content` is the stored app document (list entries carry `published`; `event`, `product_launch` and `leadership` carry `hidden`, the field names withheld from the app), `guide` is the event guide (`sessions`, `activities`, `faqs`, `venue`, the venue also with `hidden`), and `speakers` is the ordered directory `[{id, name, role, organization, image_url, linkedin, published}]`. `PUT` replaces all three atomically, returns the saved editor, and answers 409 when `revision` is stale. Links must be public HTTPS; up to 2 MB. Audited as `mobile_content.update` |
 | `POST /admin/logout` | clears the session |
 | `GET /admin/registrations?q=&category=&status=&from=&to=&page=&page_size=` | `{items, page, page_size, pages, total, status_counts}`, newest first. `page_size` is 25 (default), 50 or 100. `status_counts` maps each status to its count under every filter except `status`, so it stays stable while switching status; `total` is the count under all filters. `from`/`to` are `YYYY-MM-DD`. `q` matches reference, institution, contact, attendee name/email, and pass number; references and pass numbers match case-insensitively with the hyphens optional |
 | `GET /admin/summary` | `{categories:[{id, kind, label, registered, confirmed}]}` in category order, event-wide (ignores list filters). `registered` excludes `rejected` and `cancelled`; `confirmed` counts `approved` |
