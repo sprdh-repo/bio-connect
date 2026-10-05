@@ -164,6 +164,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Use gate 2.'), findsOneWidget);
     expect(find.text('Accessibility'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('WhatsApp +91 98470 00000'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('WhatsApp +91 98470 00000'), findsOneWidget);
     expect(find.byIcon(Icons.phone_outlined), findsNothing);
     await tester.pageBack();

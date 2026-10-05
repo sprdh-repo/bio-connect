@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
 import '../widgets/destinations.dart';
+import '../widgets/detail_header.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
@@ -450,13 +453,26 @@ class SessionDetailScreen extends StatelessWidget {
                         _DetailBlock(
                           'When',
                           '${sessionDay(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
+                          icon: Icons.schedule_rounded,
                         ),
                       if (s.location.isNotEmpty)
-                        _DetailBlock('Where', s.location),
+                        _DetailBlock(
+                          'Where',
+                          s.location,
+                          icon: Icons.place_outlined,
+                        ),
                       if (s.speakers.isNotEmpty)
-                        _DetailBlock('Speakers', s.speakers),
+                        _DetailBlock(
+                          'Speakers',
+                          s.speakers,
+                          icon: Icons.people_outline_rounded,
+                        ),
                       if (s.description.isNotEmpty)
-                        _DetailBlock('About the session', s.description),
+                        _DetailBlock(
+                          'About the session',
+                          s.description,
+                          icon: Icons.notes_rounded,
+                        ),
                     ],
                   );
                 },
@@ -474,46 +490,109 @@ class VenueScreen extends StatelessWidget {
     final content = state.content!;
     final event = content.event, venue = content.guide.venue;
     final address = venue.address.isNotEmpty ? venue.address : event.city;
+    // Wide enough to show the venue, but never most of a short screen.
+    final screen = MediaQuery.sizeOf(context);
+    final photoHeight = math.min(
+      (screen.width * .62).clamp(200.0, 340.0),
+      screen.height * .34,
+    );
     return Scaffold(
-      appBar: AppBar(title: const Text('Venue & directions')),
       body: LiveRefresh(
         onRefresh: state.load,
-        child: ListView(
+        child: CustomScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
-          children: [
-            Eyebrow(content.text('venue.eyebrow', 'GETTING HERE')),
-            const SizedBox(height: 8),
-            TitleText(event.venue.isEmpty ? 'The venue' : event.venue),
-            if (address.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              SelectableText(address),
-            ],
-            if (event.venue.isNotEmpty || event.city.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () => openLink(context, directionsUrl(event)),
-                icon: const Icon(Icons.directions_outlined),
-                label: Text(
-                  content.text('venue.directions', 'Open directions'),
-                ),
+          slivers: [
+            DetailHeader(
+              title: 'Venue & directions',
+              childHeight: photoHeight,
+              photo: const AssetImage('assets/images/venue.webp'),
+              // Keep the hotel building, not just the pool, in view.
+              photoAlignment: const Alignment(-.75, -.3),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    content.text('venue.eyebrow', 'GETTING HERE'),
+                    style: const TextStyle(
+                      color: lime,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    event.venue.isEmpty ? 'The venue' : event.venue,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Manrope',
+                      fontSize: 28,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
               ),
-            ],
-            const SizedBox(height: 24),
-            if (venue.arrival.isNotEmpty)
-              _DetailBlock('Arrival & check-in', venue.arrival),
-            if (venue.accessibility.isNotEmpty)
-              _DetailBlock('Accessibility', venue.accessibility),
-            // Shown only once the organisers publish a floor plan.
-            if (venue.floorPlanUrl.isNotEmpty)
-              OutlinedButton.icon(
-                onPressed: () => openLink(context, venue.floorPlanUrl),
-                icon: const Icon(Icons.map_outlined),
-                label: const Text('Open venue floor plan'),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 36),
+              sliver: SliverList.list(
+                children: [
+                  Reveal(
+                    child: DetailPanel(
+                      children: [
+                        DetailFact(
+                          Icons.calendar_today_outlined,
+                          'Dates',
+                          eventDateRange(event),
+                        ),
+                        if (address.isNotEmpty) ...[
+                          const Divider(height: 1, indent: 62, color: cream),
+                          DetailFact(Icons.place_outlined, 'Address', address),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (event.venue.isNotEmpty || event.city.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Reveal(
+                      order: 1,
+                      child: FilledButton.icon(
+                        onPressed: () =>
+                            openLink(context, directionsUrl(event)),
+                        icon: const Icon(Icons.directions_outlined),
+                        label: Text(
+                          content.text('venue.directions', 'Open directions'),
+                        ),
+                      ),
+                    ),
+                  ],
+                  // Shown only once the organisers publish a floor plan.
+                  if (venue.floorPlanUrl.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => openLink(context, venue.floorPlanUrl),
+                      icon: const Icon(Icons.map_outlined),
+                      label: const Text('Open venue floor plan'),
+                    ),
+                  ],
+                  if (venue.arrival.isNotEmpty)
+                    _DetailBlock(
+                      'Arrival & check-in',
+                      venue.arrival,
+                      icon: Icons.login_rounded,
+                    ),
+                  if (venue.accessibility.isNotEmpty)
+                    _DetailBlock(
+                      'Accessibility',
+                      venue.accessibility,
+                      icon: Icons.accessible_rounded,
+                    ),
+                  _HelpDesk(venue, content.text('help.title', 'Need a hand?')),
+                ],
               ),
-            const SizedBox(height: 20),
-            _HelpDesk(venue, content.text('help.title', 'Need a hand?')),
+            ),
           ],
         ),
       ),
@@ -680,20 +759,31 @@ class _FaqScreenState extends State<FaqScreen> {
 }
 
 class _DetailBlock extends StatelessWidget {
-  const _DetailBlock(this.title, this.body);
+  const _DetailBlock(this.title, this.body, {this.icon});
+  final IconData? icon;
   final String title, body;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 24),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    padding: const EdgeInsets.only(top: 14),
+    child: DetailPanel(
+      padding: 18,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontFamily: 'Manrope', fontSize: 18),
+        Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: forest, size: 20),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontFamily: 'Manrope', fontSize: 17),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(body, style: const TextStyle(color: muted, height: 1.5)),
+        const SizedBox(height: 10),
+        Text(body, style: const TextStyle(color: muted, height: 1.55)),
       ],
     ),
   );
@@ -708,42 +798,73 @@ class _HelpDesk extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!venue.hasHelp) return const SizedBox.shrink();
     final whatsapp = venue.helpWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontFamily: 'Manrope', fontSize: 18),
-        ),
-        const SizedBox(height: 8),
-        if (venue.helpPhone.isNotEmpty)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.phone_outlined),
-            title: Text(venue.helpPhone),
-            onTap: () => openLink(
-              context,
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: DetailPanel(
+        padding: 8,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+            child: Text(
+              title,
+              style: const TextStyle(fontFamily: 'Manrope', fontSize: 17),
+            ),
+          ),
+          if (venue.helpPhone.isNotEmpty)
+            _HelpRow(
+              Icons.phone_outlined,
+              venue.helpPhone,
               Uri(scheme: 'tel', path: venue.helpPhone).toString(),
             ),
-          ),
-        if (whatsapp.isNotEmpty)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.chat_outlined),
-            title: Text('WhatsApp ${venue.helpWhatsApp}'),
-            onTap: () => openLink(context, 'https://wa.me/$whatsapp'),
-          ),
-        if (venue.helpEmail.isNotEmpty)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.mail_outline),
-            title: Text(venue.helpEmail),
-            onTap: () => openLink(
-              context,
+          if (whatsapp.isNotEmpty)
+            _HelpRow(
+              Icons.chat_outlined,
+              'WhatsApp ${venue.helpWhatsApp}',
+              'https://wa.me/$whatsapp',
+            ),
+          if (venue.helpEmail.isNotEmpty)
+            _HelpRow(
+              Icons.mail_outline,
+              venue.helpEmail,
               Uri(scheme: 'mailto', path: venue.helpEmail).toString(),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
+}
+
+class _HelpRow extends StatelessWidget {
+  const _HelpRow(this.icon, this.label, this.url);
+  final IconData icon;
+  final String label, url;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(14),
+    onTap: () => openLink(context, url),
+    child: Padding(
+      padding: const EdgeInsets.all(10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: cream,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: forest, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: forest),
+        ],
+      ),
+    ),
+  );
 }

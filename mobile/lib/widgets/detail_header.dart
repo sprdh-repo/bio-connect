@@ -4,15 +4,22 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 
 /// A collapsing forest header for detail pages, with [child] (a portrait or
-/// logo) centred on the leaf texture.
+/// logo) centred on the leaf texture. With [photo], the photo fills the header
+/// and [child] sits at its lower left, over a shade that keeps it legible.
 class DetailHeader extends StatelessWidget {
   const DetailHeader({
     super.key,
     required this.title,
     required this.childHeight,
     required this.child,
+    this.photo,
+    this.photoAlignment = Alignment.center,
   });
   final String title;
+  final ImageProvider? photo;
+
+  /// Which part of [photo] stays in view when the header crops it.
+  final Alignment photoAlignment;
 
   /// The height [child] needs; the header grows to fit it under the toolbar.
   final double childHeight;
@@ -44,26 +51,59 @@ class DetailHeader extends StatelessWidget {
         color: forest,
         child: FlexibleSpaceBar(
           collapseMode: CollapseMode.parallax,
-          background: DecoratedBox(
-            decoration: const BoxDecoration(
-              color: forest,
-              image: DecorationImage(
-                image: AssetImage('assets/images/pass-texture.webp'),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  Color(0x59051C17),
-                  BlendMode.srcOver,
-                ),
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.only(top: kToolbarHeight, bottom: 28),
-                child: Center(child: _CollapseFade(child: child)),
-              ),
-            ),
-          ),
+          background: photo == null ? _textured() : _photographed(photo!),
+        ),
+      ),
+    ),
+  );
+
+  Widget _textured() => DecoratedBox(
+    decoration: const BoxDecoration(
+      color: forest,
+      image: DecorationImage(
+        image: AssetImage('assets/images/pass-texture.webp'),
+        fit: BoxFit.cover,
+        colorFilter: ColorFilter.mode(Color(0x59051C17), BlendMode.srcOver),
+      ),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(top: kToolbarHeight, bottom: 28),
+        child: Center(child: _CollapseFade(child: child)),
+      ),
+    ),
+  );
+
+  Widget _photographed(ImageProvider image) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: forest,
+      image: DecorationImage(
+        image: image,
+        fit: BoxFit.cover,
+        alignment: photoAlignment,
+      ),
+    ),
+    child: DecoratedBox(
+      // Shade the toolbar at the top and the copy at the bottom.
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0x99051C17),
+            Color(0x00051C17),
+            Color(0x00051C17),
+            Color(0xE6051C17),
+          ],
+          stops: [0, .3, .45, 1],
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 26),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: _CollapseFade(child: child),
         ),
       ),
     ),
