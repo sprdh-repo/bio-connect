@@ -210,9 +210,26 @@ func scanOpsPerson(row pgx.Row) (opsPerson, error) {
 	return p, err
 }
 
+// opsScanCode reduces a scanned value to the pass QR token. Printed badges
+// carry the public profile URL (see badgeURL); passes and the mobile app carry
+// the bare token. Taking the trailing token rather than parsing the URL keeps
+// keyboard-wedge scanners working when a keyboard layout mangles ":" or "/".
+func opsScanCode(value string) string {
+	value = strings.TrimSpace(value)
+	path := value
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+	path = strings.TrimRight(path, "/")
+	if n := len(path); n > 43 && admissionQRPattern.MatchString(path[n-43:]) {
+		return path[n-43:]
+	}
+	return value
+}
+
 func (a *App) opsFind(ctx context.Context, value, day string) (opsPerson, error) {
 	clean := opsReference(value)
-	return scanOpsPerson(a.DB.QueryRow(ctx, opsPersonSQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3)`, day, strings.TrimSpace(value), clean))
+	return scanOpsPerson(a.DB.QueryRow(ctx, opsPersonSQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3)`, day, opsScanCode(value), clean))
 }
 
 func (a *App) opsLookup(w http.ResponseWriter, r *http.Request) {
@@ -281,7 +298,7 @@ func (a *App) opsCheckIn(w http.ResponseWriter, r *http.Request, principal opsPr
 	}
 	p, err := a.opsFind(r.Context(), code, day)
 	if err != nil {
-		a.opsLog(r.Context(), "", day, "check_in_denied", principal.Station, strings.TrimSpace(code)+" | No approved pass matches that code.")
+		a.opsLog(r.Context(), "", day, "check_in_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.")
 		fail(w, 404, "no approved pass matches that code")
 		return
 	}
@@ -336,7 +353,7 @@ func (a *App) opsCheckOut(w http.ResponseWriter, r *http.Request, principal opsP
 	}
 	p, err := a.opsFind(r.Context(), code, day)
 	if err != nil {
-		a.opsLog(r.Context(), "", day, "check_out_denied", principal.Station, strings.TrimSpace(code)+" | No approved pass matches that code.")
+		a.opsLog(r.Context(), "", day, "check_out_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.")
 		fail(w, 404, "no approved pass matches that code")
 		return
 	}
@@ -415,7 +432,7 @@ func (a *App) opsQR(w http.ResponseWriter, r *http.Request, qrID string) {
 		http.NotFound(w, r)
 		return
 	}
-	png, err := qrcode.Encode(qrID, qrcode.Medium, 512)
+	png, err := qrcode.Encode(a.badgeURL(qrID), qrcode.Medium, 512)
 	if err != nil {
 		http.Error(w, "QR unavailable", 500)
 		return
@@ -663,7 +680,7 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 	}
 	scanID := id()
 	attendee := ""
-	reference := strings.TrimSpace(in.Code)
+	reference := opsScanCode(in.Code)
 	if findErr == nil {
 		attendee = p.AttendeeID
 		reference = p.Reference

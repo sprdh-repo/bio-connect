@@ -64,6 +64,7 @@ func (a *App) Handler() http.Handler {
 		m.HandleFunc("GET "+path, a.page)
 	}
 	m.HandleFunc("GET /ops", a.opsPage)
+	m.HandleFunc("GET /p/{qr}", a.publicProfile)
 	m.HandleFunc("GET /privacy-policy", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		body, err := resources.ReadFile("web/privacy-policy.html")

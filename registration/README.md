@@ -25,6 +25,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 Console changes never deliver anything on their own: staff send each pass from the attendee list, or all of them with Send passes. Only the normal review buttons (Approve and send) send on approval.
 - Exhibitor stalls include 5 (premium), 3 (standard) or 2 (table space) passes. The allowance rose from 3 / 2 / 2 at no extra fee, and existing registrations were given it too: the exhibitor, or staff on their behalf, adds the extra people later, and each new pass is issued and delivered to that person alone. `bioconnect roster-notice` emails affected exhibitors a link to do it (see [operations](docs/operations.md#exhibitor-pass-upgrade-migration-009)).
 - Branded A5 PDF passes with an opaque QR (no contact information). The same opaque QR drives check-in, badge printing and access control without exposing attendee details in the code.
+  Printed ops badges wrap it in a public profile URL (`/p/<qr_id>`) that every ops scanner reduces back to the identifier.
 - Short human identifiers in one series per category: a registration is `BC4-EX-0007` (the 7th exhibitor), and each of its passes is that reference plus the holder's place in it, `BC4-EX-0007-3`, printed large on the pass and repeated in the pass email.
 The two letters are the word already printed on the pass (`EX`, `FC`, `IN`, `SP`, `ST`), so a code and a badge can never disagree.
 Staff search matches either, with or without the hyphens.

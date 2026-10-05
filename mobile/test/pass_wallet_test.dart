@@ -145,12 +145,18 @@ void main() {
     expect(store.data, isEmpty);
     expect(wallet.passes, isEmpty);
   });
-  test(
-    'scanner accepts only raw admission identifiers, never arbitrary URLs',
-    () {
-      expect(admissionQr(pass.qrId), pass.qrId);
-      expect(admissionQr('https://example.com/passes/token'), isNull);
-      expect(admissionQr('BC-1'), isNull);
-    },
-  );
+  test('scanner accepts admission identifiers and badge profile URLs, never arbitrary URLs', () {
+    expect(admissionQr(pass.qrId), pass.qrId);
+    expect(admissionQr('https://example.com/passes/token'), isNull);
+    expect(
+      admissionQr(' https://reg.bioconnect.kerala.gov.in/p/${pass.qrId} '),
+      pass.qrId,
+    );
+    expect(
+      admissionQr('https://reg.bioconnect.kerala.gov.in/x/${pass.qrId}'),
+      isNull,
+    );
+    expect(admissionQr('https://reg.bioconnect.kerala.gov.in/p/short'), isNull);
+    expect(admissionQr('BC-1'), isNull);
+  });
 }

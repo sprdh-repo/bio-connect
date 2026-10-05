@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{if eq .Status "active"}}{{.Name}} | {{end}}Bio Connect 4.0</title>
+<link rel="icon" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/profile.css">
+</head>
+<body>
+<main>
+<img class="logo" src="/static/bio-connect-logo.png" alt="Bio Connect 4.0">
+{{if eq .Status "active"}}
+<section class="card" aria-labelledby="attendee-name">
+<p class="status"><span aria-hidden="true">✓</span> Registered attendee</p>
+<h1 id="attendee-name">{{.Name}}</h1>
+{{with .Designation}}<p class="designation">{{.}}</p>{{end}}
+{{with .Institution}}<p class="institution">{{.}}</p>{{end}}
+<p class="category">{{.Category}}</p>
+</section>
+{{else if eq .Status "unavailable"}}
+<section class="card">
+<h1>Profile unavailable</h1>
+<p class="note">We could not load this badge right now. Please try again in a moment.</p>
+</section>
+{{else}}
+<section class="card">
+<h1>Badge not found</h1>
+<p class="note">This badge is not linked to an active Bio Connect 4.0 registration.</p>
+</section>
+{{end}}
+<footer>
+<p><strong>Bio Connect 4.0</strong> · 8-9 October 2026<br>Hyatt Regency Trivandrum, Thiruvananthapuram</p>
+<a href="https://bioconnect.kerala.gov.in">About the event</a>
+</footer>
+</main>
+</body>
+</html>

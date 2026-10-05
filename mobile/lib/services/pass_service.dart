@@ -227,7 +227,18 @@ class SecurePassStore implements PassStore {
   Future<void> clear() => _storage.delete(key: _key);
 }
 
+/// Accepts the bare pass token (PDF passes, app QR) or a printed badge's
+/// profile URL, which ends in the same token (`https://host/p/token`).
 String? admissionQr(String raw) {
   final value = raw.trim();
-  return RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(value) ? value : null;
+  if (RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(value)) return value;
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.isScheme('https') && !uri.isScheme('http')) {
+    return null;
+  }
+  final segments = uri.pathSegments;
+  if (segments.length != 2 || segments.first != 'p') return null;
+  return RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(segments.last)
+      ? segments.last
+      : null;
 }
