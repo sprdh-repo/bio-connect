@@ -11,12 +11,14 @@ import '../models/event_guide.dart';
 import '../providers/contact_book.dart';
 import '../providers/content_provider.dart';
 import '../services/attendee_service.dart';
+import '../services/pass_service.dart' show admissionQr;
 import '../widgets/detail_header.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
 import 'event_guide_screens.dart';
 import 'my_passes_screen.dart';
+import 'qr_scanner_screen.dart';
 
 /// Opens the badge scanner, saves the scanned attendee and shows them.
 Future<void> scanBadge(BuildContext context) async {
@@ -25,12 +27,15 @@ Future<void> scanBadge(BuildContext context) async {
   final navigator = Navigator.of(context);
   final qr = await navigator.push<String>(
     MaterialPageRoute(
-      builder: (_) => const PassScannerScreen(
+      builder: (_) => const QrScannerScreen(
         title: 'Scan a badge',
-        instructions: 'Point the camera at the QR on another attendee’s badge or pass to save their event profile.',
+        eyebrow: 'SAVE A CONTACT',
+        instructions: 'Fit the QR on another attendee’s badge or pass inside the frame to save their event profile.',
         invalid: 'This is not a Bio Connect badge. Scan the QR printed on an attendee’s badge.',
         fallback: 'Back to contacts',
-        cameraHelp: 'Camera unavailable. Allow camera access in your phone settings to scan badges.',
+        cameraHelp:
+            'Allow camera access in your phone settings to scan badges.',
+        accept: admissionQr,
       ),
     ),
   );

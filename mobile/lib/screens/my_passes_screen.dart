@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -15,6 +14,7 @@ import '../services/content_service.dart';
 import '../services/pass_service.dart';
 import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
+import 'qr_scanner_screen.dart';
 
 /// Debug builds on a device show a sample pass while none are saved, so the
 /// pass design can be checked without an issued registration. Never in release
@@ -808,7 +808,17 @@ class _AddPassScreenState extends State<AddPassScreen> {
   Future<void> _scan() async {
     final qr = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (_) => const PassScannerScreen()),
+      MaterialPageRoute(
+        builder: (_) => const QrScannerScreen(
+          title: 'Scan your pass',
+          eyebrow: 'ADD YOUR PASS',
+          instructions: 'Fit the QR on your Bio Connect pass inside the frame. You will verify its registered email or mobile next.',
+          invalid: 'This is not a Bio Connect admission QR. Scan the QR printed on your pass.',
+          fallback: 'Use email or WhatsApp instead',
+          cameraHelp: 'Allow camera access in your phone settings, or add your pass using email or WhatsApp.',
+          accept: admissionQr,
+        ),
+      ),
     );
     if (qr != null && mounted) {
       setState(() {
@@ -1092,76 +1102,6 @@ class _AddPassScreenState extends State<AddPassScreen> {
           ],
         ),
       ),
-    ),
-  );
-}
-
-class PassScannerScreen extends StatefulWidget {
-  const PassScannerScreen({
-    super.key,
-    this.title = 'Scan your pass',
-    this.instructions = 'Point the camera at the admission QR on your Bio Connect pass. You will verify its registered email or mobile next.',
-    this.invalid = 'This is not a Bio Connect admission QR. Scan the QR printed on your pass.',
-    this.fallback = 'Use email or WhatsApp',
-    this.cameraHelp = 'Camera unavailable. Allow camera access in your phone settings, or add your pass using email or WhatsApp.',
-  });
-  final String title, instructions, invalid, fallback, cameraHelp;
-  @override
-  State<PassScannerScreen> createState() => _PassScannerScreenState();
-}
-
-class _PassScannerScreenState extends State<PassScannerScreen> {
-  bool _done = false;
-  String? _error;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.title)),
-    body: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text(widget.instructions),
-        ),
-        Expanded(
-          child: MobileScanner(
-            errorBuilder: (context, error) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.no_photography_outlined, size: 40),
-                    const SizedBox(height: 12),
-                    Text(widget.cameraHelp, textAlign: TextAlign.center),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(widget.fallback),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            onDetect: (capture) {
-              if (_done) return;
-              for (final barcode in capture.barcodes) {
-                final qr = admissionQr(barcode.rawValue ?? '');
-                if (qr != null) {
-                  _done = true;
-                  AppFeedback.success();
-                  Navigator.pop(context, qr);
-                  return;
-                }
-              }
-              if (mounted) {
-                setState(() => _error = widget.invalid);
-              }
-            },
-          ),
-        ),
-        if (_error != null)
-          Padding(padding: const EdgeInsets.all(16), child: Text(_error!)),
-      ],
     ),
   );
 }
