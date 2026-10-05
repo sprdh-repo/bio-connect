@@ -24,7 +24,7 @@ func TestPublicAppContent(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Event.Title != "Bio Connect 4.0" || len(out.ProductLaunch) == 0 || len(out.Partners) != 4 || len(out.Speakers) != 55 {
+	if out.Event.Title != "Bio Connect 4.0" || len(out.ProductLaunch) == 0 || len(out.Partners) != 4 || len(out.Speakers) != 56 {
 		t.Fatalf("incomplete app content: event=%q launch=%d partners=%d speakers=%d", out.Event.Title, len(out.ProductLaunch), len(out.Partners), len(out.Speakers))
 	}
 	if rr.Header().Get("Access-Control-Allow-Origin") != "*" {

@@ -19,8 +19,8 @@ func TestPublicSpeakers(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Speakers) != 55 {
-		t.Fatalf("got %d speakers, want 55", len(out.Speakers))
+	if len(out.Speakers) != 56 {
+		t.Fatalf("got %d speakers, want 56", len(out.Speakers))
 	}
 	first := out.Speakers[0]
 	if first.ID != "jayakrishna-ambati" || first.Name != "Dr. Jayakrishna Ambati" || first.ImageURL == "" {
