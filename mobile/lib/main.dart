@@ -7,6 +7,7 @@ import 'package:upgrader/upgrader.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'widgets/destinations.dart';
+import 'widgets/detail_header.dart';
 import 'widgets/directory.dart';
 import 'widgets/interaction.dart';
 import 'widgets/motion.dart';
@@ -1037,80 +1038,18 @@ class SpeakerDetailScreen extends StatelessWidget {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            pinned: true,
-            stretch: true,
-            // The clipped flexible space paints the header, so the bar itself
-            // stays transparent and flat while content scrolls under it.
-            backgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            systemOverlayStyle: SystemUiOverlayStyle.light,
-            expandedHeight: portrait * 1.25 + kToolbarHeight + 36,
-            title: const Text('Speaker'),
-            // The flexible space is sized to the bar's current height, so the
-            // rounded clip follows the bottom edge as the header collapses.
-            flexibleSpace: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(28),
-              ),
-              child: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-                background: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    color: forest,
-                    image: DecorationImage(
-                      image: AssetImage('assets/images/pass-texture.webp'),
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(
-                        Color(0x59051C17),
-                        BlendMode.srcOver,
-                      ),
-                    ),
-                  ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        top: kToolbarHeight,
-                        bottom: 28,
-                      ),
-                      child: Center(
-                        child: Hero(
-                          tag: 'speaker-photo-${speaker.id}',
-                          child: Container(
-                            width: portrait,
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .14),
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x40000000),
-                                  blurRadius: 24,
-                                  offset: Offset(0, 12),
-                                ),
-                              ],
-                            ),
-                            child: AspectRatio(
-                              aspectRatio: 4 / 5,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(22),
-                                child: ColoredBox(
-                                  color: cream,
-                                  child: SpeakerImage(
-                                    speaker,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+          DetailHeader(
+            title: 'Speaker',
+            childHeight: portrait * 1.25,
+            child: Hero(
+              tag: 'speaker-photo-${speaker.id}',
+              child: HeaderFrame(
+                width: portrait,
+                child: AspectRatio(
+                  aspectRatio: 4 / 5,
+                  child: ColoredBox(
+                    color: cream,
+                    child: SpeakerImage(speaker, fit: BoxFit.contain),
                   ),
                 ),
               ),
@@ -1136,17 +1075,12 @@ class SpeakerDetailScreen extends StatelessWidget {
                 if (speaker.role.isNotEmpty || speaker.organization.isNotEmpty)
                   Reveal(
                     order: 2,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 20),
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: DetailPanel(
                         children: [
                           if (speaker.role.isNotEmpty)
-                            _SpeakerFact(
+                            DetailFact(
                               Icons.work_outline_rounded,
                               'Role',
                               speaker.role,
@@ -1155,7 +1089,7 @@ class SpeakerDetailScreen extends StatelessWidget {
                               speaker.organization.isNotEmpty)
                             const Divider(height: 1, indent: 62, color: cream),
                           if (speaker.organization.isNotEmpty)
-                            _SpeakerFact(
+                            DetailFact(
                               Icons.apartment_rounded,
                               'Organisation',
                               speaker.organization,
@@ -1195,57 +1129,6 @@ class SpeakerDetailScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SpeakerFact extends StatelessWidget {
-  const _SpeakerFact(this.icon, this.label, this.value);
-  final IconData icon;
-  final String label, value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(10),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: cream,
-            borderRadius: BorderRadius.circular(13),
-          ),
-          child: Icon(icon, color: forest, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: const TextStyle(
-                  color: muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 class Eyebrow extends StatelessWidget {

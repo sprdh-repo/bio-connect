@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../main.dart';
 import '../models/event_content.dart';
 import '../providers/content_provider.dart';
+import '../widgets/detail_header.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
+import '../widgets/motion.dart';
 import 'event_guide_screens.dart';
 
 enum ExhibitorSort { stall, name }
@@ -404,126 +406,175 @@ class ExhibitorDetailScreen extends StatelessWidget {
     final floorPlan =
         context.watch<ContentProvider>().content?.guide.venue.floorPlanUrl ??
         '';
+    final logoWidth = (MediaQuery.sizeOf(context).width * .68).clamp(
+      200.0,
+      300.0,
+    );
+    const logoHeight = 150.0;
     return Scaffold(
-      appBar: AppBar(title: const Text('Exhibitor')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          Hero(
-            tag: _heroTag(e),
-            child: LogoBox(
-              url: e.logoUrl,
-              name: e.name,
-              size: double.infinity,
-              height: 160,
-              radius: 22,
-              padding: 28,
-            ),
-          ),
-          const SizedBox(height: 22),
-          const Eyebrow('EXHIBITOR'),
-          const SizedBox(height: 8),
-          SelectableText(
-            e.name,
-            style: const TextStyle(
-              fontFamily: 'Manrope',
-              fontSize: 28,
-              height: 1.15,
-              color: ink,
-            ),
-          ),
-          if (e.stallType.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Align(alignment: Alignment.centerLeft, child: Pill(e.stallType)),
-          ],
-          // Stall and floor plan details appear only once published.
-          if (e.hasStall) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: forest,
-                borderRadius: BorderRadius.circular(20),
+      body: CustomScrollView(
+        slivers: [
+          DetailHeader(
+            title: 'Exhibitor',
+            childHeight: logoHeight + 8,
+            child: Hero(
+              tag: _heroTag(e),
+              child: HeaderFrame(
+                width: logoWidth,
+                child: LogoBox(
+                  url: e.logoUrl,
+                  name: e.name,
+                  size: double.infinity,
+                  height: logoHeight,
+                  radius: 22,
+                  padding: 24,
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'FIND THEM AT STALL',
-                              style: TextStyle(
-                                color: lime,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.3,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              e.stallNumber,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontFamily: 'Manrope',
-                                fontSize: 40,
-                                height: 1.1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.storefront_outlined,
-                        color: lime,
-                        size: 30,
-                      ),
-                    ],
-                  ),
-                  if (floorPlan.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    FilledButton.icon(
-                      onPressed: () => openLink(context, floorPlan),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: lime,
-                        foregroundColor: forest,
-                      ),
-                      icon: const Icon(Icons.map_outlined),
-                      label: const Text('Open venue floor plan'),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 26, 24, 36),
+            sliver: SliverList.list(
+              children: [
+                const Reveal(child: Eyebrow('EXHIBITOR')),
+                const SizedBox(height: 10),
+                Reveal(
+                  order: 1,
+                  child: SelectableText(
+                    e.name,
+                    style: const TextStyle(
+                      fontFamily: 'Manrope',
+                      fontSize: 26,
+                      height: 1.18,
+                      color: ink,
                     ),
-                  ],
+                  ),
+                ),
+                if (e.stallType.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Pill(e.stallType),
+                  ),
                 ],
-              ),
+                // Stall and floor plan details appear only once published.
+                if (e.hasStall)
+                  Reveal(
+                    order: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: _StallPanel(e, floorPlan: floorPlan),
+                    ),
+                  )
+                else if (floorPlan.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    onPressed: () => openLink(context, floorPlan),
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('Open venue floor plan'),
+                  ),
+                ],
+                if (e.description.isNotEmpty)
+                  Reveal(
+                    order: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: DetailPanel(
+                        padding: 18,
+                        children: [
+                          const Eyebrow('ABOUT'),
+                          const SizedBox(height: 10),
+                          SelectableText(
+                            e.description,
+                            style: const TextStyle(
+                              color: ink,
+                              height: 1.6,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () => showGuidePage(context, const VenueScreen()),
+                  icon: const Icon(Icons.place_outlined),
+                  label: const Text('Venue & directions'),
+                ),
+              ],
             ),
-          ] else if (floorPlan.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: () => openLink(context, floorPlan),
-              icon: const Icon(Icons.map_outlined),
-              label: const Text('Open venue floor plan'),
-            ),
-          ],
-          if (e.description.isNotEmpty) ...[
-            const SizedBox(height: 26),
-            const SectionLabel('About'),
-            const SizedBox(height: 8),
-            SelectableText(
-              e.description,
-              style: const TextStyle(color: ink, height: 1.55, fontSize: 15),
-            ),
-          ],
-          const SizedBox(height: 26),
-          OutlinedButton.icon(
-            onPressed: () => showGuidePage(context, const VenueScreen()),
-            icon: const Icon(Icons.place_outlined),
-            label: const Text('Venue & directions'),
           ),
         ],
       ),
     );
   }
+}
+
+/// Where to find the exhibitor: the stall number large, with the floor plan.
+class _StallPanel extends StatelessWidget {
+  const _StallPanel(this.exhibitor, {required this.floorPlan});
+  final Exhibitor exhibitor;
+  final String floorPlan;
+
+  @override
+  Widget build(BuildContext context) => DetailPanel(
+    padding: 18,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'FIND THEM AT STALL',
+                  style: TextStyle(
+                    color: muted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  exhibitor.stallNumber,
+                  style: const TextStyle(
+                    color: forest,
+                    fontFamily: 'Manrope',
+                    fontSize: 38,
+                    height: 1.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: lime.withValues(alpha: .45),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.storefront_outlined,
+              color: forest,
+              size: 28,
+            ),
+          ),
+        ],
+      ),
+      if (floorPlan.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () => openLink(context, floorPlan),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Open venue floor plan'),
+          ),
+        ),
+      ],
+    ],
+  );
 }
