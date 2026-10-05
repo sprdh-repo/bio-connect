@@ -29,7 +29,7 @@ Then open <http://localhost:4173>.
 - `sponsors.html` - equal-weight sponsor cards.
   SBI, KMTC, the MEA States Division and KIMSHEALTH lead at the organisers' request; the rest (CSIR-NIIST, Federal Bank, Haier Biomedical & Helixpro, HLL Lifecare, Kerala Rubber) follow alphabetically.
   Logos are the organisers' supplied files, trimmed into `assets/*-logo.png`; profile copy comes from each sponsor's official website.
-- `product-launch.html` - Kerala Startup Mission's Product Launch application details, eligibility, focus areas, deadline and application link.
+- `product-launch.html` - Kerala Startup Mission's Product Launch details, eligibility, focus areas and closed application deadline.
 - `404.html` - served by CloudFront for any unknown path.
   The domain previously hosted Bio Connect 3.0, so search engines still request old
   URLs like `/about/` and `/agenda/`; without this they get an S3 `AccessDenied` 403,
