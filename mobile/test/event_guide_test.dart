@@ -113,7 +113,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('attendee can reach unpublished sessions, venue and FAQs', (
+  testWidgets('unpublished details are left out rather than announced', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -130,17 +130,21 @@ void main() {
     expect(find.text('Session timetable to be announced'), findsOneWidget);
     await tester.tap(find.text('Guide').last);
     await tester.pumpAndSettle();
+    // Sections with nothing published are not offered at all.
+    expect(find.text('Activities'), findsNothing);
+    expect(find.text('FAQs'), findsNothing);
     await tester.tap(find.text('Venue & directions'));
     await tester.pumpAndSettle();
-    // No floor plan is published, so nothing about one is shown.
-    expect(find.text('Arrival & check-in'), findsOneWidget);
-    expect(find.text('Open venue floor plan'), findsNothing);
-    expect(find.text('Floor plan to be announced'), findsNothing);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('FAQs'));
-    await tester.pumpAndSettle();
-    expect(find.text('Event-day FAQs to be announced'), findsOneWidget);
+    expect(find.text('Open directions'), findsOneWidget);
+    for (final text in [
+      'Arrival & check-in',
+      'Accessibility',
+      'Open venue floor plan',
+      'Need a hand?',
+    ]) {
+      expect(find.text(text), findsNothing);
+    }
+    expect(find.textContaining('to be announced'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

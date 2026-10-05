@@ -32,34 +32,53 @@ class SponsorsScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
             PageIntro(
-              eyebrow: 'OUR SPONSORS',
-              title: 'Shared purpose.\nGreater possibilities.',
+              eyebrow: content.text('sponsors.eyebrow', 'OUR SPONSORS'),
+              title: content.text(
+                'sponsors.title',
+                'Shared purpose.\nGreater possibilities.',
+              ),
               lede: content.sponsorsIntro,
             ),
-            const SizedBox(height: 26),
-            SectionLabel(
-              'Supporting the conclave',
-              trailing:
-                  '${sponsors.length} ${sponsors.length == 1 ? 'sponsor' : 'sponsors'}',
-            ),
-            const SizedBox(height: 12),
-            for (final s in sponsors) SponsorCard(s),
+            if (sponsors.isNotEmpty) ...[
+              const SizedBox(height: 26),
+              SectionLabel(
+                'Supporting the conclave',
+                trailing:
+                    '${sponsors.length} ${sponsors.length == 1 ? 'sponsor' : 'sponsors'}',
+              ),
+              const SizedBox(height: 12),
+              for (final s in sponsors) SponsorCard(s),
+            ],
             if (content.ecosystemPartners.isNotEmpty) ...[
               const SizedBox(height: 18),
               const SectionLabel('Ecosystem partners'),
               const SizedBox(height: 12),
               _PartnerGrid(content.ecosystemPartners),
             ],
-            const SizedBox(height: 24),
-            _CallToAction(
-              eyebrow: 'BECOME A SPONSOR',
-              title: 'Help make the next\nconnection possible.',
-              action: 'Enquire about sponsorship',
-              onTap: () => openLink(
-                context,
-                _enquiry(content.event.sponsorshipEmail, 'Sponsorship enquiry'),
+            if (content.event.sponsorshipEmail.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _CallToAction(
+                eyebrow: content.text(
+                  'sponsors.cta_eyebrow',
+                  'BECOME A SPONSOR',
+                ),
+                title: content.text(
+                  'sponsors.cta_title',
+                  'Help make the next\nconnection possible.',
+                ),
+                action: content.text(
+                  'sponsors.cta_button',
+                  'Enquire about sponsorship',
+                ),
+                onTap: () => openLink(
+                  context,
+                  _enquiry(
+                    content.event.sponsorshipEmail,
+                    'Sponsorship enquiry',
+                  ),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -117,15 +136,17 @@ class SponsorCard extends StatelessWidget {
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  s.description,
-                  style: const TextStyle(
-                    color: muted,
-                    fontSize: 13,
-                    height: 1.5,
+                if (s.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    s.description,
+                    style: const TextStyle(
+                      color: muted,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -159,39 +180,45 @@ class _PartnerGrid extends StatelessWidget {
         runSpacing: 10,
         children: [
           for (final p in partners)
-            Container(
-              width: width,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LogoBox(
-                    url: p.logoUrl,
-                    name: p.name,
-                    size: double.infinity,
-                    height: 72,
-                    color: paper,
-                    padding: 10,
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 32,
-                    child: Text(
-                      p.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        height: 1.3,
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: p.websiteUrl.isEmpty
+                    ? null
+                    : () => openLink(context, p.websiteUrl),
+                child: Container(
+                  width: width,
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LogoBox(
+                        url: p.logoUrl,
+                        name: p.name,
+                        size: double.infinity,
+                        height: 72,
+                        color: paper,
+                        padding: 10,
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 32,
+                        child: Text(
+                          p.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
         ],
@@ -219,8 +246,14 @@ class LeadershipScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
             PageIntro(
-              eyebrow: 'GOVERNMENT OF KERALA',
-              title: 'The people convening\nthe conclave.',
+              eyebrow: content.text(
+                'leadership.eyebrow',
+                'GOVERNMENT OF KERALA',
+              ),
+              title: content.text(
+                'leadership.title',
+                'The people convening\nthe conclave.',
+              ),
               lede: leadership.intro,
             ),
             if (leadership.convenedBy case final convenor?) ...[
@@ -299,11 +332,13 @@ class LeadershipScreen extends StatelessWidget {
                     : committee.title,
                 trailing: '${committee.members.length} members',
               ),
-              const SizedBox(height: 8),
-              Text(
-                leadership.advisoryNote,
-                style: const TextStyle(color: muted, height: 1.5),
-              ),
+              if (leadership.advisoryNote.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  leadership.advisoryNote,
+                  style: const TextStyle(color: muted, height: 1.5),
+                ),
+              ],
               const SizedBox(height: 14),
               _Roster(committee.members),
               if (committee.orderNote.isNotEmpty) ...[
@@ -330,7 +365,7 @@ class LeadershipScreen extends StatelessWidget {
                   ],
                 ),
               ],
-            ] else ...[
+            ] else if (leadership.advisoryNote.isNotEmpty) ...[
               const SizedBox(height: 24),
               const Eyebrow('ADVISORY COMMITTEE'),
               const SizedBox(height: 8),
@@ -339,16 +374,27 @@ class LeadershipScreen extends StatelessWidget {
                 style: const TextStyle(color: muted, height: 1.5),
               ),
             ],
-            const SizedBox(height: 26),
-            _CallToAction(
-              eyebrow: 'WORKING WITH THE ORGANISERS',
-              title: 'Partner with\nBio Connect 4.0.',
-              action: 'Contact the event team',
-              onTap: () => openLink(
-                context,
-                _enquiry(content.event.sponsorshipEmail, 'Committee enquiry'),
+            if (content.event.sponsorshipEmail.isNotEmpty) ...[
+              const SizedBox(height: 26),
+              _CallToAction(
+                eyebrow: content.text(
+                  'leadership.cta_eyebrow',
+                  'WORKING WITH THE ORGANISERS',
+                ),
+                title: content.text(
+                  'leadership.cta_title',
+                  'Partner with\nBio Connect 4.0.',
+                ),
+                action: content.text(
+                  'leadership.cta_button',
+                  'Contact the event team',
+                ),
+                onTap: () => openLink(
+                  context,
+                  _enquiry(content.event.sponsorshipEmail, 'Committee enquiry'),
+                ),
               ),
-            ),
+            ],
             for (final p in credits) ...[
               const SizedBox(height: 16),
               InkWell(
@@ -423,8 +469,10 @@ class LeaderCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Pill(leader.badge, background: lime.withValues(alpha: .45)),
-                const SizedBox(height: 8),
+                if (leader.badge.isNotEmpty) ...[
+                  Pill(leader.badge, background: lime.withValues(alpha: .45)),
+                  const SizedBox(height: 8),
+                ],
                 Text(
                   leader.name,
                   style: const TextStyle(

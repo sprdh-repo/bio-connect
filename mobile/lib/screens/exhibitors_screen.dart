@@ -60,6 +60,7 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
+    final copy = state.content?.text ?? (_, text) => text;
     final all = state.exhibitors;
     final types = {
       for (final e in all)
@@ -116,8 +117,8 @@ class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
             PageIntro(
-              eyebrow: 'THE EXPO',
-              title: 'Meet your next\ncollaborator.',
+              eyebrow: copy('exhibitors.eyebrow', 'THE EXPO'),
+              title: copy('exhibitors.title', 'Meet your next\ncollaborator.'),
               lede: stalls
                   ? 'Find exhibitors by name, expertise or stall number.'
                   : 'Find exhibitors by name or area of expertise.',

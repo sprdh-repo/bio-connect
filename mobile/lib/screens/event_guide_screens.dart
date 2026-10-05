@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
-import 'exhibitors_screen.dart';
-import 'my_passes_screen.dart';
+import '../widgets/destinations.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
 import '../models/event_content.dart';
@@ -15,166 +14,134 @@ void showGuidePage(BuildContext context, Widget page) =>
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
 class AttendeeHomeScreen extends StatelessWidget {
-  const AttendeeHomeScreen(
-    this.content, {
-    super.key,
-    required this.sessions,
-    required this.speakers,
-  });
+  const AttendeeHomeScreen(this.content, {super.key});
   final EventContent content;
-  final VoidCallback sessions, speakers;
   @override
-  Widget build(BuildContext context) => LiveRefresh(
-    onRefresh: context.read<ContentProvider>().load,
-    child: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: forest,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'YOUR CONCLAVE COMPANION',
-                style: TextStyle(
-                  color: lime,
-                  fontSize: 11,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Make the most\nof Bio Connect.',
-                style: TextStyle(
-                  fontFamily: 'Manrope',
-                  color: Colors.white,
-                  fontSize: 30,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 20),
-              IconText(
-                Icons.calendar_today_outlined,
-                eventDateRange(content.event),
-              ),
-              const SizedBox(height: 10),
-              IconText(Icons.place_outlined, content.event.venue),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: sessions,
-                style: FilledButton.styleFrom(
-                  backgroundColor: lime,
-                  foregroundColor: forest,
-                ),
-                icon: const Icon(Icons.view_agenda_outlined),
-                label: const Text('View sessions'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const TitleText('Your event, at a glance.'),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth > 600
-                ? (constraints.maxWidth - 24) / 3
-                : (constraints.maxWidth - 12) / 2;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
+  Widget build(BuildContext context) {
+    final sessions = MenuEntry(
+      'sessions',
+      content.text('home.button', 'View sessions'),
+    );
+    final shortcuts = visibleMenu(content, 'home_shortcuts');
+    final links = visibleMenu(content, 'home_links');
+    final noticeTitle = content.override('home.notice_title');
+    final noticeMessage = content.override('home.notice_message');
+    final count = content.guide.sessions.length;
+    return LiveRefresh(
+      onRefresh: context.read<ContentProvider>().load,
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: forest,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _QuickLink(
-                  Icons.calendar_month_outlined,
-                  'Sessions',
-                  'Programme & timings',
-                  sessions,
-                  width,
+                Text(
+                  content.text('home.eyebrow', 'YOUR CONCLAVE COMPANION'),
+                  style: const TextStyle(
+                    color: lime,
+                    fontSize: 11,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                _QuickLink(
-                  Icons.place_outlined,
-                  'Venue',
-                  'Directions & arrival',
-                  () => showGuidePage(context, const VenueScreen()),
-                  width,
+                const SizedBox(height: 12),
+                Text(
+                  content.text('home.title', 'Make the most\nof Bio Connect.'),
+                  style: const TextStyle(
+                    fontFamily: 'Manrope',
+                    color: Colors.white,
+                    fontSize: 30,
+                    height: 1.15,
+                  ),
                 ),
-                _QuickLink(
-                  Icons.local_activity_outlined,
-                  'Activities',
-                  'Discover & connect',
-                  () => showGuidePage(context, const ActivitiesScreen()),
-                  width,
+                const SizedBox(height: 20),
+                IconText(
+                  Icons.calendar_today_outlined,
+                  eventDateRange(content.event),
                 ),
-                _QuickLink(
-                  Icons.help_outline,
-                  'FAQs',
-                  'Event-day answers',
-                  () => showGuidePage(context, const FaqScreen()),
-                  width,
-                ),
-                _QuickLink(
-                  Icons.people_outline,
-                  'Speakers',
-                  'Meet the voices',
-                  speakers,
-                  width,
-                ),
-                _QuickLink(
-                  Icons.storefront_outlined,
-                  'Exhibitors',
-                  'Explore the expo',
-                  () => showGuidePage(context, const ExhibitorsScreen()),
-                  width,
-                ),
+                if (content.event.venue.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  IconText(Icons.place_outlined, content.event.venue),
+                ],
+                if (visibleTabs(content).any((t) => t.key == 'sessions') ||
+                    count > 0) ...[
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        openDestination(context, content, sessions),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: lime,
+                      foregroundColor: forest,
+                    ),
+                    icon: const Icon(Icons.view_agenda_outlined),
+                    label: Text(sessions.title),
+                  ),
+                ],
               ],
-            );
-          },
-        ),
-        const SizedBox(height: 24),
-        GuideNotice(
-          title: content.guide.sessions.isEmpty
-              ? 'The programme is taking shape'
-              : '${content.guide.sessions.length} sessions to explore',
-          message: content.guide.sessions.isEmpty
-              ? 'Session timings and event-day details will appear here as they are announced. Pull down to check for updates.'
-              : 'Browse the published programme, with timings shown in India time (IST).',
-          icon: Icons.campaign_outlined,
-        ),
-        const SizedBox(height: 16),
-        GuideCard(
-          Icons.confirmation_number_outlined,
-          'My passes',
-          'View your admission QR on this phone',
-          () => showGuidePage(context, const MyPassesScreen()),
-        ),
-        GuideCard(
-          Icons.confirmation_number_outlined,
-          'Registration & passes',
-          'Register or review delegate options',
-          () => showGuidePage(context, RegistrationScreen(content.event)),
-        ),
-        GuideCard(
-          Icons.explore_outlined,
-          'Explore Bio Connect',
-          'Themes, ideas and programme highlights',
-          () => showGuidePage(
-            context,
-            Scaffold(
-              appBar: AppBar(title: const Text('Explore Bio Connect')),
-              body: const ExploreScreen(),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          if (shortcuts.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            TitleText(content.text('home.glance', 'Your event, at a glance.')),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth > 600
+                    ? (constraints.maxWidth - 24) / 3
+                    : (constraints.maxWidth - 12) / 2;
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    for (final entry in shortcuts)
+                      _QuickLink(
+                        entryIcon(entry),
+                        entryTitle(entry),
+                        entrySubtitle(entry, content),
+                        () => openDestination(context, content, entry),
+                        width,
+                      ),
+                  ],
+                );
+              },
+            ),
+          ],
+          // Staff announcements take the place of the programme summary.
+          if (noticeTitle != null || noticeMessage != null) ...[
+            const SizedBox(height: 24),
+            GuideNotice(
+              title: noticeTitle ?? '',
+              message: noticeMessage ?? '',
+              icon: Icons.campaign_outlined,
+            ),
+          ] else if (count > 0) ...[
+            const SizedBox(height: 24),
+            GuideNotice(
+              title: '$count ${count == 1 ? 'session' : 'sessions'} to explore',
+              message: 'Browse the published programme, with timings shown in India time (IST).',
+              icon: Icons.campaign_outlined,
+            ),
+          ],
+          if (links.isNotEmpty) const SizedBox(height: 16),
+          for (final entry in links)
+            GuideCard(
+              entryIcon(entry),
+              entryTitle(entry),
+              entrySubtitle(entry, content),
+              () => openDestination(context, content, entry),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _QuickLink extends StatelessWidget {
@@ -209,11 +176,13 @@ class _QuickLink extends StatelessWidget {
                 title,
                 style: const TextStyle(fontFamily: 'Manrope', fontSize: 16),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(color: muted, fontSize: 12),
-              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: muted, fontSize: 12),
+                ),
+              ],
             ],
           ),
         ),
@@ -242,13 +211,17 @@ class GuideNotice extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: forest),
-        const SizedBox(height: 12),
-        Text(
-          title,
-          style: const TextStyle(fontFamily: 'Manrope', fontSize: 18),
-        ),
-        const SizedBox(height: 8),
-        Text(message, style: const TextStyle(color: muted, height: 1.5)),
+        if (title.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(fontFamily: 'Manrope', fontSize: 18),
+          ),
+        ],
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(message, style: const TextStyle(color: muted, height: 1.5)),
+        ],
       ],
     ),
   );
@@ -265,7 +238,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
-    final sessions = [...state.content!.guide.sessions]
+    final content = state.content!;
+    final sessions = [...content.guide.sessions]
       ..sort((a, b) {
         if (a.startsAt == null) {
           return b.startsAt == null ? a.title.compareTo(b.title) : 1;
@@ -297,13 +271,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
         children: [
-          const Eyebrow('THE PROGRAMME'),
+          Eyebrow(content.text('sessions.eyebrow', 'THE PROGRAMME')),
           const SizedBox(height: 8),
-          const TitleText('Find your next\nconversation.'),
+          TitleText(
+            content.text('sessions.title', 'Find your next\nconversation.'),
+          ),
           const SizedBox(height: 10),
-          const Text(
-            'Sessions, speakers and places to be. All times are in IST.',
-            style: TextStyle(color: muted),
+          Text(
+            content.text(
+              'sessions.intro',
+              'Sessions, speakers and places to be. All times are in IST.',
+            ),
+            style: const TextStyle(color: muted),
           ),
           const SizedBox(height: 24),
           if (sessions.isEmpty) ...[
@@ -311,13 +290,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
               title: 'Session timetable to be announced',
               message: 'The confirmed programme, session times and halls will appear here. Pull down to check for updates.',
             ),
-            const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: () =>
-                  openLink(context, state.content!.event.brochureUrl),
-              icon: const Icon(Icons.article_outlined),
-              label: const Text('View event brochure'),
-            ),
+            if (content.event.brochureUrl.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              OutlinedButton.icon(
+                onPressed: () => openLink(context, content.event.brochureUrl),
+                icon: const Icon(Icons.article_outlined),
+                label: const Text('View event brochure'),
+              ),
+            ],
           ] else ...[
             GuideSearchField(
               label: 'Search sessions, speakers or halls',
@@ -357,12 +337,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     session.title,
                     style: const TextStyle(fontFamily: 'Manrope'),
                   ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '${session.startsAt == null ? 'Time to be announced' : '${sessionDay(session.startsAt!)} · ${sessionTime(session.startsAt!)} IST'}\n${session.location.isEmpty ? 'Hall to be announced' : session.location}',
+                  subtitle: switch ([
+                    if (session.startsAt case final start?)
+                      '${sessionDay(start)} · ${sessionTime(start)} IST',
+                    if (session.location.isNotEmpty) session.location,
+                  ]) {
+                    [] => null,
+                    final lines => Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(lines.join('\n')),
                     ),
-                  ),
+                  },
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () =>
                       showGuidePage(context, SessionDetailScreen(session.id)),
@@ -409,26 +394,17 @@ class SessionDetailScreen extends StatelessWidget {
                     children: [
                       TitleText(s.title),
                       const SizedBox(height: 20),
-                      _DetailBlock(
-                        'When',
-                        s.startsAt == null
-                            ? 'To be announced'
-                            : '${sessionDay(s.startsAt!)}\n${sessionTime(s.startsAt!)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
-                      ),
-                      _DetailBlock(
-                        'Where',
-                        s.location.isEmpty ? 'To be announced' : s.location,
-                      ),
-                      _DetailBlock(
-                        'Speakers',
-                        s.speakers.isEmpty ? 'To be announced' : s.speakers,
-                      ),
-                      _DetailBlock(
-                        'About the session',
-                        s.description.isEmpty
-                            ? 'Details to be announced'
-                            : s.description,
-                      ),
+                      if (s.startsAt case final start?)
+                        _DetailBlock(
+                          'When',
+                          '${sessionDay(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
+                        ),
+                      if (s.location.isNotEmpty)
+                        _DetailBlock('Where', s.location),
+                      if (s.speakers.isNotEmpty)
+                        _DetailBlock('Speakers', s.speakers),
+                      if (s.description.isNotEmpty)
+                        _DetailBlock('About the session', s.description),
                     ],
                   );
                 },
@@ -443,7 +419,9 @@ class VenueScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
-    final event = state.content!.event, venue = state.content!.guide.venue;
+    final content = state.content!;
+    final event = content.event, venue = content.guide.venue;
+    final address = venue.address.isNotEmpty ? venue.address : event.city;
     return Scaffold(
       appBar: AppBar(title: const Text('Venue & directions')),
       body: LiveRefresh(
@@ -453,30 +431,28 @@ class VenueScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            const Eyebrow('GETTING HERE'),
+            Eyebrow(content.text('venue.eyebrow', 'GETTING HERE')),
             const SizedBox(height: 8),
-            TitleText(event.venue),
-            const SizedBox(height: 10),
-            SelectableText(venue.address.isEmpty ? event.city : venue.address),
-            const SizedBox(height: 18),
-            FilledButton.icon(
-              onPressed: () => openLink(context, directionsUrl(event)),
-              icon: const Icon(Icons.directions_outlined),
-              label: const Text('Open directions'),
-            ),
+            TitleText(event.venue.isEmpty ? 'The venue' : event.venue),
+            if (address.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SelectableText(address),
+            ],
+            if (event.venue.isNotEmpty || event.city.isNotEmpty) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: () => openLink(context, directionsUrl(event)),
+                icon: const Icon(Icons.directions_outlined),
+                label: Text(
+                  content.text('venue.directions', 'Open directions'),
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
-            _DetailBlock(
-              'Arrival & check-in',
-              venue.arrival.isEmpty
-                  ? 'Arrival, parking and check-in details to be announced.'
-                  : venue.arrival,
-            ),
-            _DetailBlock(
-              'Accessibility',
-              venue.accessibility.isEmpty
-                  ? 'Venue accessibility details to be announced.'
-                  : venue.accessibility,
-            ),
+            if (venue.arrival.isNotEmpty)
+              _DetailBlock('Arrival & check-in', venue.arrival),
+            if (venue.accessibility.isNotEmpty)
+              _DetailBlock('Accessibility', venue.accessibility),
             // Shown only once the organisers publish a floor plan.
             if (venue.floorPlanUrl.isNotEmpty)
               OutlinedButton.icon(
@@ -485,7 +461,7 @@ class VenueScreen extends StatelessWidget {
                 label: const Text('Open venue floor plan'),
               ),
             const SizedBox(height: 20),
-            _HelpDesk(venue),
+            _HelpDesk(venue, content.text('help.title', 'Need a hand?')),
           ],
         ),
       ),
@@ -508,9 +484,11 @@ class ActivitiesScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            const Eyebrow('BEYOND THE SESSIONS'),
+            Eyebrow(content.text('activities.eyebrow', 'BEYOND THE SESSIONS')),
             const SizedBox(height: 8),
-            const TitleText('Discover. Meet. Connect.'),
+            TitleText(
+              content.text('activities.title', 'Discover. Meet. Connect.'),
+            ),
             const SizedBox(height: 20),
             if (content.guide.activities.isEmpty) ...[
               const GuideNotice(
@@ -550,20 +528,13 @@ class ActivitiesScreen extends StatelessWidget {
                           const SizedBox(height: 10),
                           Text(a.description),
                         ],
-                        const SizedBox(height: 14),
-                        Text(
-                          a.schedule.isEmpty
-                              ? 'Schedule to be announced'
-                              : a.schedule,
-                          style: const TextStyle(color: muted),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          a.location.isEmpty
-                              ? 'Location to be announced'
-                              : a.location,
-                          style: const TextStyle(color: muted),
-                        ),
+                        for (final (i, line) in [
+                          if (a.schedule.isNotEmpty) a.schedule,
+                          if (a.location.isNotEmpty) a.location,
+                        ].indexed) ...[
+                          SizedBox(height: i == 0 ? 14 : 6),
+                          Text(line, style: const TextStyle(color: muted)),
+                        ],
                       ],
                     ),
                   ),
@@ -586,7 +557,8 @@ class _FaqScreenState extends State<FaqScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
-    final guide = state.content!.guide;
+    final content = state.content!;
+    final guide = content.guide;
     final items = guide.faqs.where(
       (f) => '${f.question} ${f.answer}'.toLowerCase().contains(
         query.toLowerCase(),
@@ -601,9 +573,9 @@ class _FaqScreenState extends State<FaqScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            const Eyebrow('A LITTLE HELP'),
+            Eyebrow(content.text('faqs.eyebrow', 'A LITTLE HELP')),
             const SizedBox(height: 8),
-            const TitleText('Good to know.'),
+            TitleText(content.text('faqs.title', 'Good to know.')),
             const SizedBox(height: 20),
             if (guide.faqs.isEmpty)
               const GuideNotice(
@@ -640,7 +612,7 @@ class _FaqScreenState extends State<FaqScreen> {
                 ),
             ],
             const SizedBox(height: 24),
-            _HelpDesk(guide.venue),
+            _HelpDesk(guide.venue, content.text('help.title', 'Need a hand?')),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () =>
@@ -675,43 +647,51 @@ class _DetailBlock extends StatelessWidget {
   );
 }
 
+/// Event-day contacts. Absent entirely until staff publish one.
 class _HelpDesk extends StatelessWidget {
-  const _HelpDesk(this.venue);
+  const _HelpDesk(this.venue, this.title);
   final VenueGuide venue;
+  final String title;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'Need a hand?',
-        style: TextStyle(fontFamily: 'Manrope', fontSize: 18),
-      ),
-      const SizedBox(height: 8),
-      if (venue.helpEmail.isEmpty && venue.helpPhone.isEmpty)
-        const Text(
-          'Event-day help desk contacts to be announced.',
-          style: TextStyle(color: muted),
+  Widget build(BuildContext context) {
+    if (!venue.hasHelp) return const SizedBox.shrink();
+    final whatsapp = venue.helpWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontFamily: 'Manrope', fontSize: 18),
         ),
-      if (venue.helpEmail.isNotEmpty)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.mail_outline),
-          title: Text(venue.helpEmail),
-          onTap: () => openLink(
-            context,
-            Uri(scheme: 'mailto', path: venue.helpEmail).toString(),
+        const SizedBox(height: 8),
+        if (venue.helpPhone.isNotEmpty)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.phone_outlined),
+            title: Text(venue.helpPhone),
+            onTap: () => openLink(
+              context,
+              Uri(scheme: 'tel', path: venue.helpPhone).toString(),
+            ),
           ),
-        ),
-      if (venue.helpPhone.isNotEmpty)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.phone_outlined),
-          title: Text(venue.helpPhone),
-          onTap: () => openLink(
-            context,
-            Uri(scheme: 'tel', path: venue.helpPhone).toString(),
+        if (whatsapp.isNotEmpty)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.chat_outlined),
+            title: Text('WhatsApp ${venue.helpWhatsApp}'),
+            onTap: () => openLink(context, 'https://wa.me/$whatsapp'),
           ),
-        ),
-    ],
-  );
+        if (venue.helpEmail.isNotEmpty)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.mail_outline),
+            title: Text(venue.helpEmail),
+            onTap: () => openLink(
+              context,
+              Uri(scheme: 'mailto', path: venue.helpEmail).toString(),
+            ),
+          ),
+      ],
+    );
+  }
 }

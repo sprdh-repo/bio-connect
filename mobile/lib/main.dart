@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'widgets/destinations.dart';
 import 'widgets/directory.dart';
 import 'widgets/interaction.dart';
 
@@ -12,9 +13,7 @@ import 'models/event_content.dart';
 import 'providers/content_provider.dart';
 import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
-import 'screens/exhibitors_screen.dart';
 import 'screens/my_passes_screen.dart';
-import 'screens/partners_screens.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -53,11 +52,11 @@ String eventDateRange(EventDetails event, {bool uppercase = false}) {
   return uppercase ? value.toUpperCase() : value;
 }
 
-String directionsUrl(EventDetails event) => Uri.https(
-  'www.google.com',
-  '/maps/search/',
-  {'api': '1', 'query': '${event.venue}, ${event.city}'},
-).toString();
+String directionsUrl(EventDetails event) =>
+    Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': [event.venue, event.city].where((s) => s.isNotEmpty).join(', '),
+    }).toString();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -163,7 +162,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final controller in _tabScroll) {
+    for (final controller in _tabScroll.values) {
       controller.dispose();
     }
     super.dispose();
@@ -176,14 +175,25 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  int selected = 0;
-  final _tabScroll = List.generate(4, (_) => ScrollController());
+  /// Tabs are kept by key, because staff can hide Sessions or Speakers.
+  String selected = 'home';
+  final _tabScroll = <String, ScrollController>{};
   bool _exitPromptOpen = false;
+  List<String> _tabs = const ['home', 'guide'];
 
-  void _selectTab(int index) {
+  ScrollController _scroll(String key) =>
+      _tabScroll.putIfAbsent(key, ScrollController.new);
+
+  bool _selectKey(String key) {
+    if (!_tabs.contains(key)) return false;
+    _selectTab(key);
+    return true;
+  }
+
+  void _selectTab(String index) {
     FocusManager.instance.primaryFocus?.unfocus();
     if (selected == index) {
-      final controller = _tabScroll[index];
+      final controller = _scroll(index);
       if (controller.hasClients && controller.offset > 0) {
         AppFeedback.selection();
         controller.animateTo(
@@ -204,8 +214,8 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       FocusManager.instance.primaryFocus?.unfocus();
       return;
     }
-    if (selected != 0) {
-      _selectTab(0);
+    if (selected != 'home') {
+      _selectTab('home');
       return;
     }
     // iOS has no app-exit navigation. Keep native detail-page swipe gestures.
@@ -287,63 +297,65 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       );
     }
     final content = state.content!;
-    return Scaffold(
-      appBar: header,
-      body: SafeArea(
-        child: IndexedStack(
-          index: selected,
-          children:
-              [
-                    AttendeeHomeScreen(
-                      content,
-                      sessions: () => _selectTab(1),
-                      speakers: () => _selectTab(2),
-                    ),
-                    const SessionsScreen(),
-                    SpeakersScreen(content.speakers),
-                    MoreScreen(content),
-                  ]
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => TickerMode(
-                      enabled: selected == entry.key,
-                      child: PrimaryScrollController(
-                        controller: _tabScroll[entry.key],
-                        child: entry.value,
-                      ),
-                    ),
-                  )
-                  .toList(),
+    final tabs = visibleTabs(content);
+    _tabs = ['home', for (final tab in tabs) tab.key, 'guide'];
+    if (!_tabs.contains(selected)) selected = 'home';
+    final pages = <String, Widget>{
+      'home': AttendeeHomeScreen(content),
+      'sessions': const SessionsScreen(),
+      'speakers': SpeakersScreen(content.speakers),
+      'guide': MoreScreen(content),
+    };
+    return TabScope(
+      select: _selectKey,
+      child: Scaffold(
+        appBar: header,
+        body: SafeArea(
+          child: IndexedStack(
+            index: _tabs.indexOf(selected),
+            children: [
+              for (final key in _tabs)
+                TickerMode(
+                  key: ValueKey(key),
+                  enabled: selected == key,
+                  child: PrimaryScrollController(
+                    controller: _scroll(key),
+                    child: pages[key]!,
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selected,
-        onDestinationSelected: _selectTab,
-        backgroundColor: paper,
-        indicatorColor: lime.withValues(alpha: .42),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Sessions',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Speakers',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view),
-            label: 'Guide',
-          ),
-        ],
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _tabs.indexOf(selected),
+          onDestinationSelected: (index) => _selectTab(_tabs[index]),
+          backgroundColor: paper,
+          indicatorColor: lime.withValues(alpha: .42),
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            for (final tab in tabs)
+              tab.key == 'sessions'
+                  ? NavigationDestination(
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      selectedIcon: const Icon(Icons.calendar_month),
+                      label: entryTitle(tab),
+                    )
+                  : NavigationDestination(
+                      icon: const Icon(Icons.people_outline),
+                      selectedIcon: const Icon(Icons.people),
+                      label: entryTitle(tab),
+                    ),
+            const NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view),
+              label: 'Guide',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -363,40 +375,54 @@ class ExploreScreen extends StatelessWidget {
     physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
-      const Eyebrow('BIO CONNECT 4.0'),
-      const SizedBox(height: 7),
-      const TitleText('Explore the ideas\nshaping tomorrow.'),
-      const SizedBox(height: 10),
-      const Text(
-        'Five themes drive the conversations, showcases and connections at Bio Connect 4.0.',
-        style: TextStyle(color: muted, height: 1.45),
-      ),
-      const SizedBox(height: 21),
-      for (var i = 0; i < content.themes.length; i++)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: ThemeRow(content.themes[i], i + 1),
+      if (content.themes.isNotEmpty) ...[
+        Eyebrow(content.text('explore.eyebrow', 'BIO CONNECT 4.0')),
+        const SizedBox(height: 7),
+        TitleText(
+          content.text('explore.title', 'Explore the ideas\nshaping tomorrow.'),
         ),
-      const SizedBox(height: 22),
-      const Eyebrow('THE PROGRAMME'),
-      const SizedBox(height: 7),
-      const TitleText('Built for connection.'),
-      const SizedBox(height: 10),
-      const Text(
-        'The event brings science, enterprise and policy together through:',
-        style: TextStyle(color: muted, height: 1.45),
-      ),
-      const SizedBox(height: 15),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final item in content.programmeHighlights)
-            Chip(label: Text(item), backgroundColor: cream),
-        ],
-      ),
-      const SizedBox(height: 24),
-      VisitPanel(content.event),
+        const SizedBox(height: 10),
+        Text(
+          content.text(
+            'explore.intro',
+            'Five themes drive the conversations, showcases and connections at Bio Connect 4.0.',
+          ),
+          style: const TextStyle(color: muted, height: 1.45),
+        ),
+        const SizedBox(height: 21),
+        for (var i = 0; i < content.themes.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: ThemeRow(content.themes[i], i + 1),
+          ),
+        const SizedBox(height: 22),
+      ],
+      if (content.programmeHighlights.isNotEmpty) ...[
+        Eyebrow(content.text('explore.programme_eyebrow', 'THE PROGRAMME')),
+        const SizedBox(height: 7),
+        TitleText(
+          content.text('explore.programme_title', 'Built for connection.'),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          content.text(
+            'explore.programme_intro',
+            'The event brings science, enterprise and policy together through:',
+          ),
+          style: const TextStyle(color: muted, height: 1.45),
+        ),
+        const SizedBox(height: 15),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final item in content.programmeHighlights)
+              Chip(label: Text(item), backgroundColor: cream),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
+      VisitPanel(content),
     ],
   );
 }
@@ -426,6 +452,8 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
           ),
         )
         .toList();
+    final copy =
+        context.watch<ContentProvider>().content?.text ?? (_, text) => text;
     return LiveRefresh(
       onRefresh: context.read<ContentProvider>().load,
       child: ListView(
@@ -433,9 +461,9 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
         children: [
-          const Eyebrow('CONCLAVE SPEAKERS'),
+          Eyebrow(copy('speakers.eyebrow', 'CONCLAVE SPEAKERS')),
           const SizedBox(height: 7),
-          const TitleText('The voices\ntaking the stage.'),
+          TitleText(copy('speakers.title', 'The voices\ntaking the stage.')),
           const SizedBox(height: 16),
           TextField(
             controller: queryController,
@@ -496,90 +524,19 @@ class MoreScreen extends StatelessWidget {
     physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
-      const Eyebrow('YOUR EVENT GUIDE'),
+      Eyebrow(content.text('guide.eyebrow', 'YOUR EVENT GUIDE')),
       const SizedBox(height: 7),
-      const TitleText('Everything in\none place.'),
+      TitleText(content.text('guide.title', 'Everything in\none place.')),
       const SizedBox(height: 22),
-      GuideCard(
-        Icons.place_outlined,
-        'Venue & directions',
-        content.event.venue,
-        () => showGuidePage(context, const VenueScreen()),
-      ),
-      GuideCard(
-        Icons.local_activity_outlined,
-        'Activities',
-        'Discover what is happening',
-        () => showGuidePage(context, const ActivitiesScreen()),
-      ),
-      GuideCard(
-        Icons.help_outline,
-        'FAQs',
-        'Answers and event-day help',
-        () => showGuidePage(context, const FaqScreen()),
-      ),
-      GuideCard(
-        Icons.storefront_outlined,
-        'Exhibitors',
-        'Stalls and the expo line-up',
-        () => showGuidePage(context, const ExhibitorsScreen()),
-      ),
-      GuideCard(
-        Icons.confirmation_number_outlined,
-        'My passes',
-        'View your admission QR on this phone',
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const MyPassesScreen()),
+      for (final entry in visibleMenu(content, 'guide'))
+        GuideCard(
+          entryIcon(entry),
+          entryTitle(entry),
+          entrySubtitle(entry, content),
+          () => openDestination(context, content, entry),
         ),
-      ),
-      GuideCard(
-        Icons.confirmation_number_outlined,
-        'Registration & passes',
-        'Delegate and exhibition options',
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => RegistrationScreen(content.event)),
-        ),
-      ),
-
-      GuideCard(
-        Icons.article_outlined,
-        'Event brochure',
-        'View the programme overview',
-        () => openLink(context, content.event.brochureUrl),
-      ),
-      GuideCard(
-        Icons.rocket_launch_outlined,
-        'Product launch',
-        'Kerala Startup Mission showcase',
-        () => showGuidePage(context, const ProductLaunchScreen()),
-      ),
-      GuideCard(
-        Icons.handshake_outlined,
-        'Sponsors',
-        content.sponsors.length > 1
-            ? '${content.sponsors.length} sponsors and ecosystem partners'
-            : 'Sponsors and ecosystem partners',
-        () => showGuidePage(context, const SponsorsScreen()),
-      ),
-      GuideCard(
-        Icons.account_balance_outlined,
-        'Leadership',
-        'State leadership and the advisory committee',
-        () => showGuidePage(context, const LeadershipScreen()),
-      ),
-      GuideCard(
-        Icons.privacy_tip_outlined,
-        'Privacy policy',
-        'How we use and protect your information',
-        () => openLink(
-          context,
-          'https://bioconnect.kerala.gov.in/privacy-policy',
-        ),
-      ),
       const SizedBox(height: 16),
-      VisitPanel(content.event),
+      VisitPanel(content),
     ],
   );
 }
@@ -619,99 +576,113 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Registration')),
-    body: LiveRefresh(
-      onRefresh: _load,
-      child: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        children: [
-          const TitleText('Three ways\nto take part.'),
-          const SizedBox(height: 9),
-          const Text(
-            'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
-            style: TextStyle(color: muted, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          if (_options == null && _error == null)
-            const Center(child: CircularProgressIndicator()),
-          if (_error != null)
-            StateMessage(
-              'Live registration options are unavailable. Please try again.',
-              action: 'Try again',
-              onTap: _load,
-            ),
-          if (_options case final options?) ...[
-            if (!options.enabled)
-              const StateMessage(
-                'Registration is not accepting public submissions right now. Current options are shown below.',
-              ),
-            const Eyebrow('DELEGATE PASSES'),
+  Widget build(BuildContext context) {
+    final copy =
+        context.watch<ContentProvider?>()?.content?.text ?? (_, text) => text;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Registration')),
+      body: LiveRefresh(
+        onRefresh: _load,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
+            TitleText(copy('registration.title', 'Three ways\nto take part.')),
             const SizedBox(height: 9),
-            for (final category in options.categories.where(
-              (category) => category.kind == 'delegate',
-            ))
-              _CategoryRow(category),
-            const SizedBox(height: 8),
-            const Text(
-              'Prices and availability update live from event registration. Invitation-only categories and private complimentary links are not shown.',
-              style: TextStyle(color: muted, fontSize: 11, height: 1.4),
+            Text(
+              copy(
+                'registration.intro',
+                'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
+              ),
+              style: const TextStyle(color: muted, height: 1.5),
             ),
-          ],
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed:
-                _options?.enabled == true &&
-                    _options!.categories.any(
-                      (category) =>
-                          category.kind == 'delegate' && category.open,
+            const SizedBox(height: 24),
+            if (_options == null && _error == null)
+              const Center(child: CircularProgressIndicator()),
+            if (_error != null)
+              StateMessage(
+                'Live registration options are unavailable. Please try again.',
+                action: 'Try again',
+                onTap: _load,
+              ),
+            if (_options case final options?) ...[
+              if (!options.enabled)
+                const StateMessage(
+                  'Registration is not accepting public submissions right now. Current options are shown below.',
+                ),
+              const Eyebrow('DELEGATE PASSES'),
+              const SizedBox(height: 9),
+              for (final category in options.categories.where(
+                (category) => category.kind == 'delegate',
+              ))
+                _CategoryRow(category),
+              const SizedBox(height: 8),
+              const Text(
+                'Prices and availability update live from event registration. Invitation-only categories and private complimentary links are not shown.',
+                style: TextStyle(color: muted, fontSize: 11, height: 1.4),
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed:
+                  _options?.enabled == true &&
+                      _options!.categories.any(
+                        (category) =>
+                            category.kind == 'delegate' && category.open,
+                      )
+                  ? () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DelegateRegistrationScreen(),
+                      ),
                     )
-                ? () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const DelegateRegistrationScreen(),
-                    ),
-                  )
-                : null,
-            child: const Text('Register in the app'),
-          ),
-          const SizedBox(height: 27),
-          const Eyebrow('EXHIBITION SPACE'),
-          const SizedBox(height: 9),
-          if (_options case final options?)
-            for (final category in options.categories.where(
-              (category) => category.kind == 'exhibitor',
-            ))
-              _CategoryRow(category),
-          const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () => openLink(
-              context,
-              '${RegistrationService.apiBaseUrl}/exhibitors',
+                  : null,
+              child: const Text('Register in the app'),
             ),
-            child: const Text('Book exhibition space'),
-          ),
-          const SizedBox(height: 27),
-          const Eyebrow('SPONSORSHIP'),
-          const SizedBox(height: 9),
-          const Text(
-            'Sponsorships are arranged with the event team.',
-            style: TextStyle(color: muted),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => openLink(
-              context,
-              'mailto:${widget.event.sponsorshipEmail}?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
+            const SizedBox(height: 27),
+            const Eyebrow('EXHIBITION SPACE'),
+            const SizedBox(height: 9),
+            if (_options case final options?)
+              for (final category in options.categories.where(
+                (category) => category.kind == 'exhibitor',
+              ))
+                _CategoryRow(category),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => openLink(
+                context,
+                '${RegistrationService.apiBaseUrl}/exhibitors',
+              ),
+              child: const Text('Book exhibition space'),
             ),
-            child: const Text('Enquire about sponsorship'),
-          ),
-        ],
+            if (widget.event.sponsorshipEmail.isNotEmpty) ...[
+              const SizedBox(height: 27),
+              const Eyebrow('SPONSORSHIP'),
+              const SizedBox(height: 9),
+              Text(
+                copy(
+                  'registration.sponsorship',
+                  'Sponsorships are arranged with the event team.',
+                ),
+                style: const TextStyle(color: muted),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () => openLink(
+                  context,
+                  'mailto:${widget.event.sponsorshipEmail}?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
+                ),
+                child: Text(
+                  copy('sponsors.cta_button', 'Enquire about sponsorship'),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class ProductLaunchScreen extends StatelessWidget {
@@ -729,88 +700,106 @@ class ProductLaunchScreen extends StatelessWidget {
     );
   }
 
-  Widget _body(BuildContext context, EventContent content) => ListView(
-    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-    children: [
-      Eyebrow(content.productLaunch.eyebrow.toUpperCase()),
-      const SizedBox(height: 8),
-      TitleText(content.productLaunch.title),
-      const SizedBox(height: 12),
-      Text(
-        content.productLaunch.description,
-        style: TextStyle(color: muted, height: 1.5),
-      ),
-      const SizedBox(height: 22),
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: forest,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.event_available_outlined, color: lime),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'APPLICATION DEADLINE',
-                    style: TextStyle(
-                      color: lime,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    content.productLaunch.deadline,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Manrope',
-                      fontSize: 21,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 24),
-      const Eyebrow('WHO CAN APPLY'),
-      const SizedBox(height: 10),
-      for (var i = 0; i < content.productLaunch.eligibility.length; i++)
-        _InfoRow(
-          i == 0
-              ? Icons.rocket_launch_outlined
-              : Icons.business_center_outlined,
-          content.productLaunch.eligibility[i].title,
-          content.productLaunch.eligibility[i].description,
-        ),
-      const SizedBox(height: 20),
-      const Eyebrow('FOCUS AREAS'),
-      const SizedBox(height: 10),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final item in content.productLaunch.focusAreas)
-            Chip(label: Text(item), backgroundColor: cream),
+  Widget _body(BuildContext context, EventContent content) {
+    final launch = content.productLaunch;
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      children: [
+        if (launch.eyebrow.isNotEmpty) ...[
+          Eyebrow(launch.eyebrow.toUpperCase()),
+          const SizedBox(height: 8),
         ],
-      ),
-      const SizedBox(height: 28),
-      FilledButton.icon(
-        onPressed: () => openLink(context, content.productLaunch.applyUrl),
-        icon: const Icon(Icons.open_in_new),
-        label: const Text('Apply via Kerala Startup Mission'),
-      ),
-    ],
-  );
+        if (launch.title.isNotEmpty) ...[
+          TitleText(launch.title),
+          const SizedBox(height: 12),
+        ],
+        if (launch.description.isNotEmpty)
+          Text(
+            launch.description,
+            style: const TextStyle(color: muted, height: 1.5),
+          ),
+        if (launch.deadline.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: forest,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_available_outlined, color: lime),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'APPLICATION DEADLINE',
+                        style: TextStyle(
+                          color: lime,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        launch.deadline,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'Manrope',
+                          fontSize: 21,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (launch.eligibility.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          const Eyebrow('WHO CAN APPLY'),
+          const SizedBox(height: 10),
+          for (var i = 0; i < launch.eligibility.length; i++)
+            _InfoRow(
+              i == 0
+                  ? Icons.rocket_launch_outlined
+                  : Icons.business_center_outlined,
+              launch.eligibility[i].title,
+              launch.eligibility[i].description,
+            ),
+        ],
+        if (launch.focusAreas.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          const Eyebrow('FOCUS AREAS'),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final item in launch.focusAreas)
+                Chip(label: Text(item), backgroundColor: cream),
+            ],
+          ),
+        ],
+        if (launch.applyUrl.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          FilledButton.icon(
+            onPressed: () => openLink(context, launch.applyUrl),
+            icon: const Icon(Icons.open_in_new),
+            label: Text(
+              launch.applyLabel.isEmpty ? 'Apply now' : launch.applyLabel,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -829,7 +818,9 @@ class _InfoRow extends StatelessWidget {
         child: Icon(icon),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: Text(description, style: const TextStyle(color: muted)),
+      subtitle: description.isEmpty
+          ? null
+          : Text(description, style: const TextStyle(color: muted)),
     ),
   );
 }
@@ -872,19 +863,27 @@ class SpeakerDetailScreen extends StatelessWidget {
                 speaker.name,
                 style: const TextStyle(fontFamily: 'Manrope', fontSize: 30),
               ),
-              const SizedBox(height: 12),
-              Text(
-                speaker.role,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+              if (speaker.role.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  speaker.role,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                speaker.organization,
-                style: const TextStyle(color: muted, fontSize: 15, height: 1.4),
-              ),
+              ],
+              if (speaker.organization.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  speaker.organization,
+                  style: const TextStyle(
+                    color: muted,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+              ],
               if (speaker.linkedin.isNotEmpty) ...[
                 const SizedBox(height: 23),
                 OutlinedButton.icon(
@@ -1007,7 +1006,7 @@ class ThemeTile extends StatelessWidget {
     child: Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(theme.image, fit: BoxFit.cover),
+        ThemeImage(theme.image),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -1050,12 +1049,7 @@ class ThemeRow extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(11),
-          child: Image.asset(
-            theme.image,
-            width: 88,
-            height: 91,
-            fit: BoxFit.cover,
-          ),
+          child: ThemeImage(theme.image, width: 88, height: 91),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -1075,17 +1069,57 @@ class ThemeRow extends StatelessWidget {
                 theme.title,
                 style: const TextStyle(fontFamily: 'Manrope', fontSize: 17),
               ),
-              const SizedBox(height: 5),
-              Text(
-                theme.description,
-                style: const TextStyle(color: muted, fontSize: 11, height: 1.3),
-              ),
+              if (theme.description.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  theme.description,
+                  style: const TextStyle(
+                    color: muted,
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ],
     ),
   );
+}
+
+/// A theme picture shipped with the app, or one staff host online.
+class ThemeImage extends StatelessWidget {
+  const ThemeImage(this.source, {super.key, this.width, this.height});
+  final String source;
+  final double? width, height;
+  @override
+  Widget build(BuildContext context) {
+    final fallback = SizedBox(
+      width: width,
+      height: height,
+      child: const ColoredBox(
+        color: cream,
+        child: Icon(Icons.biotech_outlined, color: forest),
+      ),
+    );
+    if (source.isEmpty) return fallback;
+    return source.startsWith('https://')
+        ? Image.network(
+            source,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallback,
+          )
+        : Image.asset(
+            source,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallback,
+          );
+  }
 }
 
 class SpeakerTile extends StatelessWidget {
@@ -1282,11 +1316,13 @@ class GuideCard extends StatelessWidget {
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: muted, fontSize: 11),
-                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(color: muted, fontSize: 11),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1299,51 +1335,64 @@ class GuideCard extends StatelessWidget {
 }
 
 class VisitPanel extends StatelessWidget {
-  const VisitPanel(this.event, {super.key});
-  final EventDetails event;
+  const VisitPanel(this.content, {super.key});
+  final EventContent content;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: forest,
-      borderRadius: BorderRadius.circular(18),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'PLAN YOUR VISIT',
-          style: TextStyle(
-            color: lime,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.3,
+  Widget build(BuildContext context) {
+    final event = content.event;
+    final city = event.city.split(',').first.trim();
+    final place = event.venue.isNotEmpty || event.city.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: forest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            content.text('visit.eyebrow', 'PLAN YOUR VISIT'),
+            style: const TextStyle(
+              color: lime,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.3,
+            ),
           ),
-        ),
-        const SizedBox(height: 9),
-        Text(
-          'See you in\n${event.city.split(',').first}.',
-          style: const TextStyle(
-            color: Colors.white,
-            fontFamily: 'Manrope',
-            fontSize: 24,
+          const SizedBox(height: 9),
+          Text(
+            content.text(
+              'visit.title',
+              city.isEmpty ? 'See you there.' : 'See you in\n$city.',
+            ),
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Manrope',
+              fontSize: 24,
+            ),
           ),
-        ),
-        const SizedBox(height: 13),
-        Text(
-          '${eventDateRange(event)} · ${event.venue}',
-          style: const TextStyle(color: Colors.white70, fontSize: 11),
-        ),
-        const SizedBox(height: 9),
-        TextButton.icon(
-          onPressed: () => openLink(context, directionsUrl(event)),
-          icon: const Icon(Icons.arrow_outward, size: 16),
-          label: const Text('Get directions'),
-          style: TextButton.styleFrom(foregroundColor: lime),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 13),
+          Text(
+            [
+              eventDateRange(event),
+              if (event.venue.isNotEmpty) event.venue,
+            ].join(' · '),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+          if (place) ...[
+            const SizedBox(height: 9),
+            TextButton.icon(
+              onPressed: () => openLink(context, directionsUrl(event)),
+              icon: const Icon(Icons.arrow_outward, size: 16),
+              label: const Text('Get directions'),
+              style: TextButton.styleFrom(foregroundColor: lime),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _CategoryRow extends StatelessWidget {

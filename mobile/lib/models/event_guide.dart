@@ -1,3 +1,5 @@
+import 'event_content.dart' show map, maps, str;
+
 /// Published event-day content. Empty sections are deliberately unannounced.
 class EventGuide {
   const EventGuide({
@@ -11,16 +13,19 @@ class EventGuide {
   final List<GuideFaq> faqs;
   final VenueGuide venue;
   factory EventGuide.fromJson(Map<String, dynamic> json) => EventGuide(
-    sessions: (json['sessions'] as List? ?? [])
-        .map((e) => GuideSession.fromJson(e as Map<String, dynamic>))
+    sessions: maps(json['sessions'])
+        .map(GuideSession.fromJson)
+        .where((s) => s.id.isNotEmpty && s.title.isNotEmpty)
         .toList(),
-    activities: (json['activities'] as List? ?? [])
-        .map((e) => GuideActivity.fromJson(e as Map<String, dynamic>))
+    activities: maps(json['activities'])
+        .map(GuideActivity.fromJson)
+        .where((a) => a.id.isNotEmpty && a.title.isNotEmpty)
         .toList(),
-    faqs: (json['faqs'] as List? ?? [])
-        .map((e) => GuideFaq.fromJson(e as Map<String, dynamic>))
+    faqs: maps(json['faqs'])
+        .map(GuideFaq.fromJson)
+        .where((f) => f.question.isNotEmpty && f.answer.isNotEmpty)
         .toList(),
-    venue: VenueGuide.fromJson(json['venue'] as Map<String, dynamic>? ?? {}),
+    venue: VenueGuide.fromJson(map(json['venue'])),
   );
 }
 
@@ -37,13 +42,13 @@ class GuideSession {
   final String id, title, description, location, speakers;
   final DateTime? startsAt, endsAt;
   factory GuideSession.fromJson(Map<String, dynamic> j) => GuideSession(
-    id: j['id'] as String,
-    title: j['title'] as String,
-    description: j['description'] as String? ?? '',
-    startsAt: DateTime.tryParse(j['starts_at'] as String? ?? ''),
-    endsAt: DateTime.tryParse(j['ends_at'] as String? ?? ''),
-    location: j['location'] as String? ?? '',
-    speakers: j['speakers'] as String? ?? '',
+    id: str(j['id']),
+    title: str(j['title']),
+    description: str(j['description']),
+    startsAt: DateTime.tryParse(str(j['starts_at'])),
+    endsAt: DateTime.tryParse(str(j['ends_at'])),
+    location: str(j['location']),
+    speakers: str(j['speakers']),
   );
 }
 
@@ -57,11 +62,11 @@ class GuideActivity {
   });
   final String id, title, description, schedule, location;
   factory GuideActivity.fromJson(Map<String, dynamic> j) => GuideActivity(
-    id: j['id'] as String,
-    title: j['title'] as String,
-    description: j['description'] as String? ?? '',
-    schedule: j['schedule'] as String? ?? '',
-    location: j['location'] as String? ?? '',
+    id: str(j['id']),
+    title: str(j['title']),
+    description: str(j['description']),
+    schedule: str(j['schedule']),
+    location: str(j['location']),
   );
 }
 
@@ -73,9 +78,9 @@ class GuideFaq {
   });
   final String id, question, answer;
   factory GuideFaq.fromJson(Map<String, dynamic> j) => GuideFaq(
-    id: j['id'] as String,
-    question: j['question'] as String,
-    answer: j['answer'] as String,
+    id: str(j['id']),
+    question: str(j['question']),
+    answer: str(j['answer']),
   );
 }
 
@@ -87,20 +92,25 @@ class VenueGuide {
     this.floorPlanUrl = '',
     this.helpEmail = '',
     this.helpPhone = '',
+    this.helpWhatsApp = '',
   });
   final String address,
       arrival,
       accessibility,
       floorPlanUrl,
       helpEmail,
-      helpPhone;
+      helpPhone,
+      helpWhatsApp;
+  bool get hasHelp =>
+      helpEmail.isNotEmpty || helpPhone.isNotEmpty || helpWhatsApp.isNotEmpty;
   factory VenueGuide.fromJson(Map<String, dynamic> j) => VenueGuide(
-    address: j['address'] as String? ?? '',
-    arrival: j['arrival'] as String? ?? '',
-    accessibility: j['accessibility'] as String? ?? '',
-    floorPlanUrl: j['floor_plan_url'] as String? ?? '',
-    helpEmail: j['help_email'] as String? ?? '',
-    helpPhone: j['help_phone'] as String? ?? '',
+    address: str(j['address']),
+    arrival: str(j['arrival']),
+    accessibility: str(j['accessibility']),
+    floorPlanUrl: str(j['floor_plan_url']),
+    helpEmail: str(j['help_email']),
+    helpPhone: str(j['help_phone']),
+    helpWhatsApp: str(j['help_whatsapp']),
   );
 }
 

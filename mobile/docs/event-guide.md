@@ -1,69 +1,56 @@
-# Event-day guide
+# Event-day guide and app content
 
-The mobile app reads published sessions, activities, FAQs and venue details from `GET /api/v1/public/app-content`, under `event_guide`.
-The same guide is available independently at `GET /api/v1/public/event-guide`.
-Empty sections show “To be announced”; no schedule, hall, floor plan or event-day policy is invented.
-Existing programme highlights remain visible in Activities while activity details are unannounced.
+The mobile app reads everything it shows from `GET /api/v1/public/app-content`: event details, menus, headings, sessions, activities, FAQs, venue and help contacts, speakers, sponsors, partners, leadership, product launch and themes.
+The guide part is also available on its own at `GET /api/v1/public/event-guide`.
+The full response contract is in [`registration/docs/api.md`](../../registration/docs/api.md#get-publicapp-content).
+
+Nothing is invented and nothing is announced before it exists.
+Empty values are left out of the screens, menu entries whose page would be empty are hidden, and the Sessions tab shows a short notice until the programme is published.
 
 ## Staff workflow
 
-1. Apply the backend migrations using the existing deployment process, including `014_event_guide.sql`.
-2. Open `/admin?view=event-guide` on the registration backend and sign in with an individual staff account.
-3. Add sessions, activities and FAQs, and fill in venue details.
-4. Select **Published in the mobile app** for each entry that is ready.
-5. Save the event guide.
+1. Deploy the backend; it applies `031_mobile_content_control.sql` on start.
+2. Sign in to the staff console and choose **Mobile app** (or open `/admin?view=mobile`).
+3. Pick a section: Event, Menus, Headings & text, Sessions, Activities, FAQs, Venue & help, Speakers, Sponsors & partners, Leadership, Product launch, or Themes & highlights.
+4. Edit, reorder with the arrows, and tick **Show in app** on each entry that is ready.
+   Tick **Hide in app** beside a field to keep its value in the console while withholding it from phones.
+5. Select **Save all changes**.
+   Phones pick the changes up on their next refresh: pull down, or return to the app.
 
 Both manager and reviewer accounts can edit this content.
-The editor uses the existing staff session and CSRF protection.
-Unpublished entries stay in the admin response and are omitted from both public APIs.
-Venue fields publish together.
+One save writes the content, the guide and the speaker directory together and records a `mobile_content.update` audit event.
+Saving fails with HTTP 409 if someone else has saved since the page was loaded; use **Discard & reload** and edit again.
 Removing an entry applies only after saving.
-Saving fails with HTTP 409 if another editor has saved since the page was loaded; reload saved content before editing again.
-Every save records a staff audit event.
+**View live data** opens exactly what phones receive.
 
-## API contract
+### What staff control
 
-`GET /api/v1/admin/event-guide` returns the complete editable guide and its integer `revision`.
-`PUT /api/v1/admin/event-guide` replaces the guide using that revision and returns the saved guide with the next revision.
-Requests use JSON, an authenticated `bc_session` cookie and the matching `X-CSRF-Token` header.
+- **Bottom tabs**: show, hide or rename Sessions and Speakers.
+  Home and Guide always remain.
+- **Home shortcuts, home links and the Guide tab**: which entries appear, their order, titles and subtitles.
+  A **Custom link** entry opens any `https:`, `mailto:` or `tel:` address, for a help line, live stream or survey.
+- **Headings & text**: every screen heading and intro, the home announcement, and call-to-action wording.
+  A blank field keeps the built-in wording, shown in grey.
+- **Venue & help**: address, arrival, accessibility, floor plan, help phone, help WhatsApp and help email, each shown only when filled in and not hidden.
+- **Sponsors, partners, leaders, committee members, themes, speakers, sessions, activities and FAQs**: each entry has its own **Show in app** switch.
 
-```json
-{
-  "revision": 1,
-  "sessions": [],
-  "activities": [],
-  "faqs": [],
-  "venue": {
-    "address": "",
-    "arrival": "",
-    "accessibility": "",
-    "floor_plan_url": "",
-    "help_email": "",
-    "help_phone": "",
-    "published": false
-  }
-}
-```
+Session times are entered in India time and stored with `+05:30`; the app shows IST regardless of the device timezone.
+Both times can be left blank while unconfirmed.
+Links must be public HTTPS URLs.
+Theme images may be a bundled `assets/images/...` path or an HTTPS URL.
 
-Session fields: `id`, `title`, `description`, `starts_at`, `ends_at`, `location`, `speakers`, `published`.
-Both timestamps can be empty; otherwise both must be RFC 3339 timestamps with timezone offsets and the end must follow the start.
-The editor accepts India time and sends `+05:30`; mobile displays IST regardless of the device timezone.
+### Older app versions
 
-Activity fields: `id`, `title`, `description`, `schedule`, `location`, `published`.
-FAQ fields: `id`, `question`, `answer`, `published`.
-IDs are unique within each section and remain stable when an entry is edited.
-The array order controls activity and FAQ order; mobile sorts sessions chronologically, followed by untimed sessions.
-Floor plans must use an HTTPS URL.
-The guide supports up to 300 sessions, 100 activities and 100 FAQs, subject to the existing 128 KiB JSON request limit.
+Builds released before this editor ignore menus, headings and hidden-field controls but keep working: hidden fields reach them as empty strings and hidden entries are simply absent.
+They still show “To be announced” for empty venue and session details.
 
 ## Mobile updates and offline behavior
 
 Pull down on Home, Sessions, Activities, Venue or FAQs to refresh.
 Returning to the app also refreshes content.
 An unsuccessful refresh retains content already loaded in the current app session.
-A fresh app launch without connectivity uses the bundled event snapshot, which currently contains no confirmed event-day guide entries.
-Updating that release snapshot is necessary if confirmed guide details must be available on a first offline launch.
-An older backend without `event_guide` remains compatible and displays the unannounced states.
+A fresh app launch without connectivity uses the bundled snapshot `assets/content/event.json`, which uses the built-in menus and headings.
+Refresh it from `GET /api/v1/public/app-content` before a release if confirmed details must be available on a first offline launch.
 
 For a local backend, start Flutter with the existing `BIO_CONNECT_API_BASE_URL` setting pointing at that backend.
 The default URL still points at the public registration backend, so local API changes are not visible there until deployed.

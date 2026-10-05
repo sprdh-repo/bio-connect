@@ -131,7 +131,6 @@ void main() {
       expect(refreshed.guide.venue.arrival, 'Use the main entrance');
       expect(refreshed.speakers.single.name, 'New Speaker');
       expect(refreshed.productLaunch.title, 'New launch');
-      expect(refreshed.sponsor.name, 'New sponsor');
       // Content without a sponsors list still lists the single sponsor.
       expect(refreshed.sponsors.single.name, 'New sponsor');
       expect(refreshed.leadership.committee.members, isEmpty);
