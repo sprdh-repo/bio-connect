@@ -177,6 +177,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Sponsors'), 200);
+    await tester.ensureVisible(find.text('Sponsors'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sponsors'));
     await tester.pumpAndSettle();
     expect(find.text('9 sponsors'), findsOneWidget);
@@ -186,6 +188,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(find.text('Leadership'), 200);
+    await tester.ensureVisible(find.text('Leadership'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Leadership'));
     await tester.pumpAndSettle();
     expect(find.text('V. D. Satheesan'), findsOneWidget);

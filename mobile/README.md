@@ -31,6 +31,9 @@ App IDs and release signing are still placeholders and must be set before store 
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
 - My passes: email or WhatsApp OTP, optional admission QR scanning, secure saved passes and on-phone admission QR display.
 - Moments: consent-based selfie matching against the organizer's event album, processing updates, a private photo gallery, zoom, save and share.
+- My agenda: bookmark sessions, speakers and exhibitors; Now and Up next; clash warnings; offline session reminders; add sessions to the phone calendar.
+- Contacts: scan a badge to save someone's event profile, with private notes and tags and CSV or vCard export. Email and phone are shared only when the holder opts in from My passes.
+- Feedback and After Bio Connect: anonymous ratings for the event and sessions while staff keep feedback open, and a follow-up page for after the event.
 - Loading, retry, empty and no-match states are included for live content and directories.
 
 Unpublished event-day sections show “To be announced”.
@@ -39,6 +42,7 @@ For Moments, staff set the provider's numeric album ID under Event details and p
 Debug builds also show Moments in Guide and provide a sample state when no pass has been saved, so the screen can be reviewed during local development.
 See [Event-day guide](docs/event-guide.md) for the API contract, publishing workflow and offline behavior.
 See [My passes](docs/my-passes.md) for attendee verification, WhatsApp template setup and saved pass behavior.
+See [My agenda, contacts and feedback](docs/agenda-contacts-feedback.md) for reminders, consent and the staff controls.
 Bank payment and exhibitor registration remain on the secure official portal; maps, LinkedIn, the brochure and third-party applications open in their owning apps.
 
 ## Content and backend boundary

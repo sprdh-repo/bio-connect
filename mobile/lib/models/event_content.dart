@@ -27,6 +27,7 @@ class EventContent {
     required this.ecosystemPartners,
     this.menus = const {},
     this.copy = const {},
+    this.feedback = const FeedbackSettings(),
   });
   final EventDetails event;
   final EventGuide guide;
@@ -47,6 +48,32 @@ class EventContent {
 
   /// Staff overrides of the app's headings, keyed like "sessions.title".
   final Map<String, String> copy;
+
+  /// Whether attendees can send feedback, and how it is introduced.
+  final FeedbackSettings feedback;
+
+  /// The published sessions [speaker] takes part in: those staff linked to
+  /// them, or, for sessions without links, those naming them in the
+  /// speakers line, ignoring honorifics.
+  List<GuideSession> sessionsOf(Speaker speaker) {
+    final name = speaker.name
+        .replaceFirst(
+          RegExp(
+            r'^((dr|prof|mr|mrs|ms|shri|smt)\.?\s+)+',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .toLowerCase()
+        .trim();
+    return guide.sessions
+        .where(
+          (s) => s.speakerIds.isNotEmpty
+              ? s.speakerIds.contains(speaker.id)
+              : name.isNotEmpty && s.speakers.toLowerCase().contains(name),
+        )
+        .toList();
+  }
 
   /// The staff override for [key], or the app's own wording.
   String text(String key, String fallback) {
@@ -98,7 +125,16 @@ class EventContent {
       for (final MapEntry(:key, :value) in map(json['copy']).entries)
         if (value is String) key: value,
     },
+    feedback: FeedbackSettings.fromJson(map(json['feedback'])),
   );
+}
+
+class FeedbackSettings {
+  const FeedbackSettings({this.open = false, this.intro = ''});
+  final bool open;
+  final String intro;
+  factory FeedbackSettings.fromJson(Map<String, dynamic> json) =>
+      FeedbackSettings(open: json['open'] == true, intro: str(json['intro']));
 }
 
 /// One menu entry: an app destination, or "link" to [url].
@@ -121,6 +157,10 @@ class MenuEntry {
 const destinationKeys = {
   'sessions',
   'speakers',
+  'agenda',
+  'contacts',
+  'feedback',
+  'hub',
   'venue',
   'activities',
   'faqs',
@@ -142,6 +182,7 @@ const defaultMenus = <String, List<MenuEntry>>{
   'tabs': [
     MenuEntry('sessions', 'Sessions'),
     MenuEntry('speakers', 'Speakers'),
+    MenuEntry('agenda', 'My agenda'),
   ],
   'home_shortcuts': [
     MenuEntry('sessions', 'Sessions', 'Programme & timings'),
@@ -150,6 +191,8 @@ const defaultMenus = <String, List<MenuEntry>>{
     MenuEntry('faqs', 'FAQs', 'Event-day answers'),
     MenuEntry('speakers', 'Speakers', 'Meet the voices'),
     MenuEntry('exhibitors', 'Exhibitors', 'Explore the expo'),
+    MenuEntry('agenda', 'My agenda', 'Your day plan'),
+    MenuEntry('contacts', 'Contacts', 'Scan a badge'),
   ],
   'home_links': [
     MenuEntry('my_passes', 'My passes', 'View your admission QR on this phone'),
@@ -165,6 +208,8 @@ const defaultMenus = <String, List<MenuEntry>>{
     ),
   ],
   'guide': [
+    MenuEntry('agenda', 'My agenda', 'Saved sessions, speakers and exhibitors'),
+    MenuEntry('contacts', 'Contacts', 'People you met, with your notes'),
     MenuEntry('venue', 'Venue & directions'),
     MenuEntry('activities', 'Activities', 'Discover what is happening'),
     MenuEntry('faqs', 'FAQs', 'Answers and event-day help'),
@@ -457,6 +502,7 @@ class Speaker {
 
 class Exhibitor {
   const Exhibitor({
+    this.id = '',
     required this.name,
     required this.description,
     required this.logoUrl,
@@ -464,11 +510,16 @@ class Exhibitor {
     this.stallType = '',
   });
 
+  /// [id] is the registration reference; empty from servers that predate it.
   /// [stallNumber] is empty until the organisers allocate a stall.
-  final String name, description, logoUrl, stallNumber, stallType;
+  final String id, name, description, logoUrl, stallNumber, stallType;
+
+  /// A key that survives refreshes, for saving the exhibitor to an agenda.
+  String get key => id.isNotEmpty ? id : 'name:${name.toLowerCase()}';
   bool get hasStall => stallNumber.isNotEmpty;
 
   Exhibitor withLogoUrl(String value) => Exhibitor(
+    id: id,
     name: name,
     description: description,
     logoUrl: value,
@@ -477,12 +528,21 @@ class Exhibitor {
   );
 
   factory Exhibitor.fromJson(Map<String, dynamic> json) => Exhibitor(
+    id: json['id'] as String? ?? '',
     name: json['name'] as String,
     description: json['description'] as String? ?? '',
     logoUrl: json['logo_url'] as String? ?? '',
     stallNumber: json['stall_number'] as String? ?? '',
     stallType: json['stall_type'] as String? ?? '',
   );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'logo_url': logoUrl,
+    'stall_number': stallNumber,
+    'stall_type': stallType,
+  };
 }
 
 /// Orders stalls the way they read on a floor plan: "A-2" before "A-10".

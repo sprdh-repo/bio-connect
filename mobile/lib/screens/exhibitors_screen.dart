@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../main.dart';
 import '../models/event_content.dart';
+import '../providers/agenda.dart';
 import '../providers/content_provider.dart';
 import '../widgets/detail_header.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
+import '../widgets/saving.dart';
 import 'event_guide_screens.dart';
 
 enum ExhibitorSort { stall, name }
@@ -496,7 +498,18 @@ class ExhibitorDetailScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                const SizedBox(height: 24),
+                if (context.watch<Agenda?>() case final agenda?) ...[
+                  const SizedBox(height: 24),
+                  SaveButton(
+                    saved: agenda.hasExhibitor(e),
+                    saveLabel: 'Save exhibitor',
+                    onPressed: () {
+                      AppFeedback.selection();
+                      agenda.toggleExhibitor(e);
+                    },
+                  ),
+                ],
+                const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: () => showGuidePage(context, const VenueScreen()),
                   icon: const Icon(Icons.place_outlined),

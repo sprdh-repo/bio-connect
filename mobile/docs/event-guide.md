@@ -11,7 +11,7 @@ Empty values are left out of the screens, menu entries whose page would be empty
 
 1. Deploy the backend; it applies `031_mobile_content_control.sql` on start.
 2. Sign in to the staff console and choose **Mobile app** (or open `/admin?view=mobile`).
-3. Pick a section: Event, Menus, Headings & text, Sessions, Activities, FAQs, Venue & help, Speakers, Sponsors & partners, Leadership, Product launch, or Themes & highlights.
+3. Pick a section: Event, Menus, Headings & text, Sessions, Activities, FAQs, Venue & help, Speakers, Sponsors & partners, Leadership, Product launch, Themes & highlights, or Feedback.
 4. Edit, reorder with the arrows, and tick **Show in app** on each entry that is ready.
    Tick **Hide in app** beside a field to keep its value in the console while withholding it from phones.
 5. Select **Save all changes**.
@@ -25,7 +25,7 @@ Removing an entry applies only after saving.
 
 ### What staff control
 
-- **Bottom tabs**: show, hide or rename Sessions and Speakers.
+- **Bottom tabs**: show, hide or rename Sessions, Speakers and My agenda.
   Home and Guide always remain.
 - **Home shortcuts, home links and the Guide tab**: which entries appear, their order, titles and subtitles.
   A **Custom link** entry opens any `https:`, `mailto:` or `tel:` address, for a help line, live stream or survey.

@@ -736,8 +736,24 @@
       "help_whatsapp": ""
     }
   },
+  "feedback": {
+    "intro": "",
+    "open": false
+  },
   "menus": {
     "guide": [
+      {
+        "key": "agenda",
+        "subtitle": "Saved sessions, speakers and exhibitors",
+        "title": "My agenda",
+        "url": ""
+      },
+      {
+        "key": "contacts",
+        "subtitle": "People you met, with your notes",
+        "title": "Contacts",
+        "url": ""
+      },
       {
         "key": "venue",
         "subtitle": "",
@@ -861,6 +877,18 @@
         "subtitle": "Explore the expo",
         "title": "Exhibitors",
         "url": ""
+      },
+      {
+        "key": "agenda",
+        "subtitle": "Your day plan",
+        "title": "My agenda",
+        "url": ""
+      },
+      {
+        "key": "contacts",
+        "subtitle": "Scan a badge",
+        "title": "Contacts",
+        "url": ""
       }
     ],
     "tabs": [
@@ -874,6 +902,12 @@
         "key": "speakers",
         "subtitle": "",
         "title": "Speakers",
+        "url": ""
+      },
+      {
+        "key": "agenda",
+        "subtitle": "",
+        "title": "My agenda",
         "url": ""
       }
     ]

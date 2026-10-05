@@ -17,7 +17,10 @@ type guideSession struct {
 	EndsAt      string `json:"ends_at"`
 	Location    string `json:"location"`
 	Speakers    string `json:"speakers"`
-	Published   bool   `json:"published"`
+	// SpeakerIDs links the session to the speaker directory, so the app can
+	// list a speaker's sessions and plan a day around saved speakers.
+	SpeakerIDs []string `json:"speaker_ids"`
+	Published  bool     `json:"published"`
 }
 type guideActivity struct {
 	ID          string `json:"id"`
@@ -102,6 +105,9 @@ func (g eventGuide) validate() error {
 		if (s.StartsAt == "") != (s.EndsAt == "") {
 			return fmt.Errorf("provide both session start and end, or leave both blank")
 		}
+		if len(s.SpeakerIDs) > 30 {
+			return fmt.Errorf("session %q links too many speakers", s.Title)
+		}
 		if s.StartsAt != "" {
 			start, e1 := time.Parse(time.RFC3339, s.StartsAt)
 			end, e2 := time.Parse(time.RFC3339, s.EndsAt)
@@ -165,6 +171,7 @@ func (a *App) loadEventGuide(ctx context.Context) (eventGuide, error) {
 	}
 	err = json.Unmarshal(raw, &g)
 	g.Revision = revision
+	normalizeGuide(&g)
 	return g, err
 }
 func (a *App) publicEventGuide(w http.ResponseWriter, r *http.Request) {

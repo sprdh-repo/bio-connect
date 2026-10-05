@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../models/event_content.dart';
+import '../screens/agenda_screen.dart';
+import '../screens/contacts_screen.dart';
 import '../screens/event_guide_screens.dart';
 import '../screens/exhibitors_screen.dart';
+import '../screens/feedback_screen.dart';
+import '../screens/hub_screen.dart';
 import '../screens/my_passes_screen.dart';
 import '../screens/moments_screen.dart';
 import '../screens/partners_screens.dart';
@@ -26,6 +30,10 @@ class TabScope extends InheritedWidget {
 const _icons = <String, IconData>{
   'sessions': Icons.calendar_month_outlined,
   'speakers': Icons.people_outline,
+  'agenda': Icons.bookmarks_outlined,
+  'contacts': Icons.qr_code_scanner_rounded,
+  'feedback': Icons.rate_review_outlined,
+  'hub': Icons.waving_hand_outlined,
   'venue': Icons.place_outlined,
   'activities': Icons.local_activity_outlined,
   'faqs': Icons.help_outline,
@@ -45,6 +53,10 @@ const _icons = <String, IconData>{
 const _titles = <String, String>{
   'sessions': 'Sessions',
   'speakers': 'Speakers',
+  'agenda': 'My agenda',
+  'contacts': 'Contacts',
+  'feedback': 'Share feedback',
+  'hub': 'After Bio Connect',
   'venue': 'Venue & directions',
   'activities': 'Activities',
   'faqs': 'FAQs',
@@ -86,6 +98,7 @@ String entrySubtitle(MenuEntry entry, EventContent content) {
 bool hasContent(String key, EventContent c, {String url = ''}) => switch (key) {
   'sessions' => c.guide.sessions.isNotEmpty,
   'speakers' => c.speakers.isNotEmpty,
+  'feedback' => c.feedback.open,
   'venue' =>
     c.event.venue.isNotEmpty ||
         c.event.city.isNotEmpty ||
@@ -128,10 +141,12 @@ List<MenuEntry> visibleMenu(EventContent content, String name) {
   ];
 }
 
+const tabKeys = {'sessions', 'speakers', 'agenda'};
+
 /// Bottom tabs staff have published, in order, by destination key.
 List<MenuEntry> visibleTabs(EventContent content) => [
   for (final entry in content.menu('tabs'))
-    if (entry.key == 'sessions' || entry.key == 'speakers') entry,
+    if (tabKeys.contains(entry.key)) entry,
 ];
 
 void openDestination(
@@ -149,6 +164,10 @@ void openDestination(
       appBar: AppBar(title: Text(entryTitle(entry))),
       body: SpeakersScreen(content.speakers),
     ),
+    'agenda' => AgendaPage(title: entryTitle(entry)),
+    'contacts' => ContactsScreen(title: entryTitle(entry)),
+    'feedback' => FeedbackScreen(title: entryTitle(entry)),
+    'hub' => AfterEventScreen(title: entryTitle(entry)),
     'venue' => const VenueScreen(),
     'activities' => const ActivitiesScreen(),
     'faqs' => const FaqScreen(),

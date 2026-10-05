@@ -6,17 +6,19 @@
 const mobileSections = [
   ['event', 'Event'], ['menus', 'Menus'], ['text', 'Headings & text'], ['sessions', 'Sessions'],
   ['activities', 'Activities'], ['faqs', 'FAQs'], ['venue', 'Venue & help'], ['speakers', 'Speakers'],
-  ['sponsors', 'Sponsors & partners'], ['leadership', 'Leadership'], ['launch', 'Product launch'], ['themes', 'Themes & highlights']
+  ['sponsors', 'Sponsors & partners'], ['leadership', 'Leadership'], ['launch', 'Product launch'], ['themes', 'Themes & highlights'],
+  ['feedback', 'Feedback']
 ];
 const mobileDestinations = [
-  ['sessions', 'Sessions'], ['speakers', 'Speakers'], ['venue', 'Venue & directions'], ['activities', 'Activities'],
+  ['sessions', 'Sessions'], ['speakers', 'Speakers'], ['agenda', 'My agenda'], ['contacts', 'Contacts (badge scanning)'],
+  ['feedback', 'Feedback form'], ['hub', 'After the event'], ['venue', 'Venue & directions'], ['activities', 'Activities'],
   ['faqs', 'FAQs'], ['exhibitors', 'Exhibitors'], ['my_passes', 'My passes'], ['registration', 'Registration & passes'],
   ['moments', 'Moments album'],
   ['brochure', 'Event brochure'], ['product_launch', 'Product launch'], ['sponsors', 'Sponsors'], ['leadership', 'Leadership'],
   ['explore', 'Explore Bio Connect'], ['privacy', 'Privacy policy'], ['link', 'Custom link (web, email or phone)']
 ];
 const mobileMenus = [
-  ['tabs', 'Bottom tabs', 'Home and Guide are always shown. Hide Sessions or Speakers, or rename them.'],
+  ['tabs', 'Bottom tabs', 'Home and Guide are always shown. Hide Sessions, Speakers or My agenda, or rename them.'],
   ['home_shortcuts', 'Home - shortcut tiles', 'The grid of tiles on the home screen.'],
   ['home_links', 'Home - links', 'The list below the home announcement.'],
   ['guide', 'Guide tab', 'Every entry on the Guide tab, in order.']
@@ -36,6 +38,10 @@ const mobileCopy = [
   ['Leadership', [['leadership.eyebrow', 'GOVERNMENT OF KERALA'], ['leadership.title', 'The people convening\nthe conclave.'], ['leadership.cta_eyebrow', 'WORKING WITH THE ORGANISERS'], ['leadership.cta_title', 'Partner with\nBio Connect 4.0.'], ['leadership.cta_button', 'Contact the event team']]],
   ['Explore', [['explore.eyebrow', 'BIO CONNECT 4.0'], ['explore.title', 'Explore the ideas\nshaping tomorrow.'], ['explore.intro', 'Five themes drive the conversations, showcases and connections at Bio Connect 4.0.'], ['explore.programme_title', 'Built for connection.'], ['explore.programme_intro', 'The event brings science, enterprise and policy together through:']]],
   ['Registration', [['registration.title', 'Three ways\nto take part.'], ['registration.intro', 'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.'], ['registration.sponsorship', 'Sponsorships are arranged with the event team.']]],
+  ['My agenda', [['agenda.eyebrow', 'YOUR DAY PLAN'], ['agenda.title', 'Your Bio Connect,\nyour way.']]],
+  ['Contacts', [['contacts.eyebrow', 'PEOPLE YOU MET'], ['contacts.title', 'Every conversation,\nin one place.']]],
+  ['Feedback', [['feedback.title', 'How was\nBio Connect?']]],
+  ['After the event', [['hub.eyebrow', 'AFTER BIO CONNECT'], ['hub.title', 'Keep the\nconversations going.']]],
   ['Plan your visit panel', [['visit.eyebrow', 'PLAN YOUR VISIT'], ['visit.title', 'See you in Thiruvananthapuram.']]]
 ];
 
@@ -79,6 +85,28 @@ async function mobileContentPage() {
   function shown(path, label = 'Show in app') {
     return `<label class="check"><input type="checkbox" data-path="${esc(path)}" data-type="checkbox" ${mobilePath(state, path) ? 'checked' : ''}> ${esc(label)}</label>`;
   }
+  // Links a session to speakers in the directory, so the session appears on
+  // their profiles and in attendees' day plans. New speakers get their ID on save.
+  function speakerLinks(path, item) {
+    const linked = item.speaker_ids || [], byId = new Map(state.speakers.filter(s => s.id).map(s => [s.id, s]));
+    const chips = linked.map(id => `<span class="mc-chip">${esc(byId.get(id)?.name || id)}<button type="button" class="quiet" data-unlink="${esc(path)}" data-speaker="${esc(id)}" aria-label="Unlink ${esc(byId.get(id)?.name || id)}">×</button></span>`).join('');
+    const options = [...byId.values()].filter(s => !linked.includes(s.id)).map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    const id = `mc-f${++fieldId}`;
+    return `<div class="mc-field full"><div class="mc-label"><label for="${id}">Linked speakers</label></div><div class="mc-chips">${chips || '<span class="muted">None linked</span>'}</div>
+      <select id="${id}" data-link="${esc(path)}"><option value="">Link a speaker…</option>${options}</select><p class="help">Linked speakers show this session on their profile, and attendees who save a speaker see it in their day plan. Save new speakers before linking them.</p></div>`;
+  }
+  async function feedbackReport() {
+    const box = document.getElementById('mc-feedback');
+    if (!box) return;
+    try {
+      const report = await api('/admin/feedback');
+      if (!document.body.contains(box)) return;
+      const stars = n => `${n.toFixed(1)} / 5`;
+      box.innerHTML = report.summary.length ? `<div class="table-scroll"><table><thead><tr><th>Rated</th><th>Responses</th><th>Average</th><th>1★ – 5★</th></tr></thead><tbody>${report.summary.map(s => `<tr><td>${esc(s.title)}</td><td>${s.responses}</td><td>${stars(s.average)}</td><td>${s.ratings.join(' · ')}</td></tr>`).join('')}</tbody></table></div>
+        <h3 class="mc-subhead">Comments</h3>${report.responses.filter(r => r.comment).map(r => `<blockquote class="mc-comment"><p>${esc(r.comment)}</p><footer>${'★'.repeat(r.rating)} · ${esc(r.title)} · ${esc(new Date(r.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }))}</footer></blockquote>`).join('') || '<p class="muted">No comments yet.</p>'}`
+        : '<p class="muted">No responses yet.</p>';
+    } catch (err) { box.innerHTML = `<p class="muted">${esc(err.message)}</p>`; }
+  }
   // A reorderable list of records; fields(path) renders one record's inputs.
   function list(path, { title, fields, blank, noun, publish = true }) {
     const items = mobilePath(state, path) || [];
@@ -106,7 +134,7 @@ async function mobileContentPage() {
     </div></section>`,
     menus: () => mobileMenus.map(([name, label, help]) => {
       if (!state.content.menus[name]) state.content.menus[name] = [];
-      const keys = name === 'tabs' ? mobileDestinations.filter(([k]) => k === 'sessions' || k === 'speakers') : mobileDestinations;
+      const keys = name === 'tabs' ? mobileDestinations.filter(([k]) => ['sessions', 'speakers', 'agenda'].includes(k)) : mobileDestinations;
       return `<section class="card"><h2>${esc(label)}</h2><p class="help">${esc(help)} A blank title uses the app’s default label. Entries for empty sections (no sessions, no sponsors…) are hidden automatically.</p>${listOf(`content.menus.${name}`, {
         noun: 'entry', blank: () => ({ key: name === 'tabs' ? 'sessions' : 'link', title: '', subtitle: '', url: '', published: false }),
         title: item => item.title || keys.find(([k]) => k === item.key)?.[1],
@@ -117,8 +145,8 @@ async function mobileContentPage() {
       mobileCopy.map(([group, keys]) => `<section class="card"><h3>${esc(group)}</h3><div class="fields">${keys.map(([key, fallback]) =>
         `<label class="full"><span class="mc-label">${esc(key)}</span><textarea data-copy="${esc(key)}" rows="${fallback.length > 60 ? 2 : 1}" maxlength="600" placeholder="${esc(fallback)}">${esc(state.content.copy[key] || '')}</textarea></label>`).join('')}</div></section>`).join(''),
     sessions: () => `<section class="card"><h2>Sessions</h2><p class="help">Times are India time (IST). Leave both blank if unconfirmed; blank details are left out in the app.</p>${listOf('guide.sessions', {
-      noun: 'session', blank: () => ({ id: uuid(), title: '', description: '', starts_at: '', ends_at: '', location: '', speakers: '', published: false }), title: i => i.title,
-      fields: p => `${input(`${p}.title`, 'Session title', 'text', { required: true, full: true })}${input(`${p}.starts_at`, 'Start (IST)', 'datetime-local')}${input(`${p}.ends_at`, 'End (IST)', 'datetime-local')}${input(`${p}.location`, 'Hall / location')}${input(`${p}.speakers`, 'Speakers')}${input(`${p}.description`, 'Description', 'textarea')}`
+      noun: 'session', blank: () => ({ id: uuid(), title: '', description: '', starts_at: '', ends_at: '', location: '', speakers: '', speaker_ids: [], published: false }), title: i => i.title,
+      fields: (p, item) => `${input(`${p}.title`, 'Session title', 'text', { required: true, full: true })}${input(`${p}.starts_at`, 'Start (IST)', 'datetime-local')}${input(`${p}.ends_at`, 'End (IST)', 'datetime-local')}${input(`${p}.location`, 'Hall / location')}${input(`${p}.speakers`, 'Speakers (as shown)', 'text', { help: 'Shown on the session exactly as written.' })}${speakerLinks(p, item)}${input(`${p}.description`, 'Description', 'textarea')}`
     })}</section>`,
     activities: () => `<section class="card"><h2>Activities</h2>${listOf('guide.activities', {
       noun: 'activity', blank: () => ({ id: uuid(), title: '', description: '', schedule: '', location: '', published: false }), title: i => i.title,
@@ -173,6 +201,9 @@ async function mobileContentPage() {
       noun: 'eligibility', publish: false, blank: () => ({ title: '', description: '' }), title: i => i.title,
       fields: p => `${input(`${p}.title`, 'Title', 'text', { required: true, full: true })}${input(`${p}.description`, 'Description', 'textarea', { rows: 2 })}`
     })}</section>`,
+    feedback: () => `<section class="card"><h2>Feedback</h2><p class="help">When open, attendees can rate the event and each published session from the app. Add “Feedback form” or “After the event” to a menu to point people to it. Answers are anonymous; one per phone, replaced if they change it.</p>
+      ${shown('content.feedback.open', 'Open feedback in the app')}<div class="fields">${input('content.feedback.intro', 'Introduction', 'textarea', { rows: 2, placeholder: 'Your answers help shape Bio Connect 5.0. It takes a minute.' })}</div></section>
+      <section class="card"><div class="mc-row"><h3>Responses</h3><a class="button secondary" href="/api/v1/admin/feedback?format=csv">Download CSV</a></div><div id="mc-feedback"><p class="muted">Loading responses…</p></div></section>`,
     themes: () => `<section class="card"><h2>Programme highlights</h2><div class="fields">${input('content.programme_highlights', 'Highlights (one per line)', 'lines', { rows: 8 })}</div></section><section class="card"><h3>Themes</h3>${listOf('content.themes', {
       noun: 'theme', blank: () => ({ title: '', description: '', image: '', published: false }), title: i => i.title,
       fields: p => `${input(`${p}.title`, 'Title', 'text', { required: true })}${input(`${p}.image`, 'Image (bundled path or HTTPS URL)', 'text', { required: true })}${input(`${p}.description`, 'Description', 'textarea', { rows: 2 })}`
@@ -187,6 +218,7 @@ async function mobileContentPage() {
       <nav class="mc-tabs" aria-label="Mobile app sections">${mobileSections.map(([k, l]) => `<button type="button" data-section="${k}" class="${k === section ? '' : 'secondary'}" ${k === section ? 'aria-current="page"' : ''}>${esc(l)}</button>`).join('')}</nav>
       <form id="mc-form" novalidate>${views[section]()}<div class="mc-savebar"><span id="mc-status" class="muted">${dirty ? 'Unsaved changes' : `Saved · revision ${state.revision}`}</span><button type="button" id="mc-reload" class="secondary">Discard & reload</button><button type="submit">Save all changes</button></div></form></div>`;
     scrollTo({ top: y });
+    if (section === 'feedback') feedbackReport();
   }
   function changed() {
     dirty = true;
@@ -220,6 +252,11 @@ async function mobileContentPage() {
       const list = mobilePath(state, el.dataset.hide) || [], name = el.dataset.field;
       mobileSet(state, el.dataset.hide, el.checked ? [...new Set([...list, name])] : list.filter(n => n !== name));
       changed();
+    } else if (el.dataset.link) {
+      if (!el.value) return;
+      const session = mobilePath(state, el.dataset.link);
+      session.speaker_ids = [...(session.speaker_ids || []), el.value];
+      changed(); render();
     } else if (el.dataset.copy) {
       if (el.value.trim()) state.content.copy[el.dataset.copy] = el.value; else delete state.content.copy[el.dataset.copy];
       changed();
@@ -252,6 +289,10 @@ async function mobileContentPage() {
         const items = mobilePath(state, b.dataset.move), i = +b.dataset.index, j = i + +b.dataset.step;
         [items[i], items[j]] = [items[j], items[i]];
         changed(); render();
+      } else if (b.dataset.unlink) {
+        const session = mobilePath(state, b.dataset.unlink);
+        session.speaker_ids = (session.speaker_ids || []).filter(id => id !== b.dataset.speaker);
+        changed(); render();
       } else if (b.dataset.remove) {
         if (!confirm('Remove this entry? It is deleted when you save.')) return;
         mobilePath(state, b.dataset.remove).splice(+b.dataset.index, 1);
@@ -265,6 +306,8 @@ async function mobileContentPage() {
     message('');
     const taken = new Set(state.speakers.map(s => s.id).filter(Boolean));
     for (const s of state.speakers) if (!s.id) { s.id = mobileSlug(s.name, taken); taken.add(s.id); }
+    // A removed speaker drops out of the sessions that linked them.
+    for (const session of state.guide.sessions) session.speaker_ids = (session.speaker_ids || []).filter(id => taken.has(id));
     try {
       await busy(e.submitter || app.querySelector('[type=submit]'), async () => {
         state = await api('/admin/mobile-content', { method: 'PUT', body: JSON.stringify(state) });

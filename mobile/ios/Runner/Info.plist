@@ -3,9 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan your Bio Connect pass or take a selfie to find your event photos.</string>
+	<string>Scan your Bio Connect pass or another attendee's badge, or take a selfie to find your event photos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Save your Bio Connect Moments photos to your photo library.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Add the Bio Connect sessions you choose to your calendar.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Add the Bio Connect sessions you choose to your calendar.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>The calendar's location search may suggest places from your contacts. Bio Connect does not read your contacts.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

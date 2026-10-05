@@ -75,8 +75,12 @@ void main() {
     expect(content.sponsors.single.logoUrl, isEmpty);
     expect(content.menu('guide').single.key, 'faqs');
     expect(content.menus.containsKey('drawer'), isFalse);
-    // Menus not published keep the released layout.
-    expect(content.menu('tabs').map((e) => e.key), ['sessions', 'speakers']);
+    // Menus not published keep the built-in layout, now with My agenda.
+    expect(content.menu('tabs').map((e) => e.key), [
+      'sessions',
+      'speakers',
+      'agenda',
+    ]);
     expect(content.text('home.title', 'x'), 'Hello');
     expect(content.text('bad', 'fallback'), 'fallback');
     expect(content.guide.sessions.single.startsAt, isNull);

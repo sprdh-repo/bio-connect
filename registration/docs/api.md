@@ -15,6 +15,11 @@ Email and WhatsApp OTP, optional admission QR matching, and identity-scoped pass
 The endpoints are `POST /mobile/pass-access/challenges`, `POST /mobile/pass-access/verify`, and authenticated `GET`/`DELETE /mobile/passes`.
 These sessions are separate from staff and registration-management access.
 
+Each pass in `GET /mobile/passes` carries `share_email` and `share_phone`, the holder's consent to give these to people who scan their badge in the app.
+Both are `false` until the holder turns them on.
+`PUT /mobile/passes/{id}/sharing` with `{share_email, share_phone}` and the same bearer token changes them for one pass.
+It answers 404 for a pass outside the verified identity, so a holder can never consent for a colleague on the same stall.
+
 ## Public
 
 ### `GET /public/app-content`
@@ -25,7 +30,9 @@ The document includes `event`, `themes`, `programme_highlights`, `product_launch
 - `event` adds `privacy_url`; `product_launch` adds `apply_label`; partners add an optional `website_url`; `event_guide.venue` adds `help_whatsapp`.
 - `sponsors` lists every visible sponsor as `{name, category, description, logo_url, website_url}`. `sponsor` repeats the first one (or blank strings) for app versions released before the list.
 - `leadership` holds `intro`, `advisory_note`, `convened_by {name, note}` (or `null`), `people` (`name`, `role`, `badge`, optional `image_url`, `image_credit`, `image_credit_url`) and `committee {title, order_note, members[{role, name, organization}]}`.
-- `menus` maps `tabs`, `home_shortcuts`, `home_links` and `guide` to ordered `[{key, title, subtitle, url}]`. `key` is an app destination (`sessions`, `speakers`, `venue`, `activities`, `faqs`, `exhibitors`, `my_passes`, `registration`, `brochure`, `product_launch`, `sponsors`, `leadership`, `explore`, `privacy`) or `link`, which opens `url` (`https:`, `mailto:` or `tel:`). Only `sessions` and `speakers` can be tabs; Home and Guide always are. A blank title keeps the app's label.
+- `menus` maps `tabs`, `home_shortcuts`, `home_links` and `guide` to ordered `[{key, title, subtitle, url}]`. `key` is an app destination (`sessions`, `speakers`, `agenda`, `contacts`, `feedback`, `hub`, `venue`, `activities`, `faqs`, `exhibitors`, `my_passes`, `registration`, `brochure`, `product_launch`, `sponsors`, `leadership`, `explore`, `privacy`) or `link`, which opens `url` (`https:`, `mailto:` or `tel:`). Only `sessions`, `speakers` and `agenda` can be tabs; Home and Guide always are. A blank title keeps the app's label.
+- `feedback` is `{open, intro}`. The app accepts ratings only while `open` is true, and hides the `feedback` destination otherwise.
+- Each `event_guide.sessions` entry adds `speaker_ids`, the speaker directory IDs staff linked to it (an empty list when none). The free-text `speakers` line is unchanged.
 - `copy` maps keys such as `sessions.title` to staff wording for the app's headings. A missing key keeps the built-in text.
 
 Staff visibility controls never reach the app: list entries switched off are omitted, and fields staff hide are sent as an empty string (an empty list, or `null` for `convened_by`), so released app versions still find every key they require.
@@ -41,6 +48,7 @@ Returns approved exhibitors, ordered by name, without contact, payment or attend
 ```json
 {
   "exhibitors": [{
+    "id": "BC4-EX-0007",
     "name": "Biotech Labs Pvt Ltd",
     "description": "Molecular diagnostics",
     "logo_url": "/api/v1/public/exhibitors/logos/5c74c0f6a86b38b82962912af36e8931",
@@ -50,6 +58,7 @@ Returns approved exhibitors, ordered by name, without contact, payment or attend
 }
 ```
 
+`id` is the registration reference, already printed on the exhibitor's passes; the app uses it to keep a saved exhibitor across refreshes.
 `logo_url` is empty when no logo was uploaded, and `stall_number` is empty until staff allocate one.
 Logo URLs are relative and re-check approval on every request.
 
@@ -71,6 +80,27 @@ Returns the published speaker directory in its curated display order:
 ```
 
 The endpoint permits anonymous cross-origin reads. Unpublished rows are omitted.
+
+### `GET /public/badges/{qr_id}`
+
+Resolves the QR on a badge or pass (the `/p/<qr_id>` URL reduces to `qr_id`) for the app's contact exchange:
+
+```json
+{"qr_id": "…", "name": "Asha Nair", "designation": "CTO", "institution": "Helix Labs", "category": "Industry", "email": "", "phone": ""}
+```
+
+The first five fields are what the badge prints.
+`email` and `phone` are filled only when the holder consented from My passes, and are empty strings otherwise.
+Unknown, revoked or removed badges answer 404.
+Responses are `no-store` and rate limited per address (3,000 an hour, since a venue network shares one address).
+
+### `POST /public/feedback`
+
+`{device_id, kind, session_id, rating, comment}` records an anonymous rating while `feedback.open` is true (409 otherwise).
+`kind` is `event` (with an empty `session_id`) or `session` (with the ID of a published session; 404 otherwise).
+`rating` is 1-5 and `comment` up to 2,000 characters.
+`device_id` is a random 16-64 character value the app keeps per install; a second answer from it for the same target replaces the first.
+Rate limited per address.
 
 ### `GET /categories`
 
@@ -210,12 +240,13 @@ Roles are disjoint:
 
 - `manager`: `GET/POST /admin/staff` only. Creating an account returns `201 {"totp_uri":"otpauth://..."}`. Editing (`{id, role, active}`) revokes that account's sessions.
 - `reviewer`: everything else below, except the poster routes.
-- Both roles reach `/admin/mobile-content` and `/admin/posters/*`. A poster is neither registration data nor account data, and the person making a speaker reveal is as likely to hold either account. Saves are still attributed to the staff id in the audit trail.
+- Both roles reach `/admin/mobile-content`, `/admin/feedback` and `/admin/posters/*`. A poster is neither registration data nor account data, and the person making a speaker reveal is as likely to hold either account. Saves are still attributed to the staff id in the audit trail.
 
 | Route | Purpose |
 |---|---|
 | `GET /admin/me` | `{id, role}` |
-| `GET/PUT /admin/mobile-content` | Both roles. The mobile app editor: `{revision, content, guide, speakers}`, where `content` is the stored app document (list entries carry `published`; `event`, `product_launch` and `leadership` carry `hidden`, the field names withheld from the app), `guide` is the event guide (`sessions`, `activities`, `faqs`, `venue`, the venue also with `hidden`), and `speakers` is the ordered directory `[{id, name, role, organization, image_url, linkedin, published}]`. `PUT` replaces all three atomically, returns the saved editor, and answers 409 when `revision` is stale. Links must be public HTTPS; up to 2 MB. Audited as `mobile_content.update` |
+| `GET/PUT /admin/mobile-content` | Both roles. Session `speaker_ids` must name speakers in the saved directory. The mobile app editor: `{revision, content, guide, speakers}`, where `content` is the stored app document (list entries carry `published`; `event`, `product_launch` and `leadership` carry `hidden`, the field names withheld from the app), `guide` is the event guide (`sessions`, `activities`, `faqs`, `venue`, the venue also with `hidden`), and `speakers` is the ordered directory `[{id, name, role, organization, image_url, linkedin, published}]`. `PUT` replaces all three atomically, returns the saved editor, and answers 409 when `revision` is stale. Links must be public HTTPS; up to 2 MB. Audited as `mobile_content.update` |
+| `GET /admin/feedback` | Both roles. `{open, summary, responses}`: `summary` is one row per rated target (`kind`, `session_id`, `title`, `responses`, `average` to one decimal, `ratings` counted by star), the event first and then programme order; `responses` lists every answer newest first. `?format=csv` downloads the responses with formula-injection protection |
 | `POST /admin/logout` | clears the session |
 | `GET /admin/registrations?q=&category=&status=&from=&to=&page=&page_size=` | `{items, page, page_size, pages, total, status_counts}`, newest first. `page_size` is 25 (default), 50 or 100. `status_counts` maps each status to its count under every filter except `status`, so it stays stable while switching status; `total` is the count under all filters. `from`/`to` are `YYYY-MM-DD`. `q` matches reference, institution, contact, attendee name/email, and pass number; references and pass numbers match case-insensitively with the hyphens optional |
 | `GET /admin/summary` | `{categories:[{id, kind, label, registered, confirmed}]}` in category order, event-wide (ignores list filters). `registered` excludes `rejected` and `cancelled`; `confirmed` counts `approved` |

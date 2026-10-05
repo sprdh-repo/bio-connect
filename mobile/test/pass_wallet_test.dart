@@ -76,6 +76,7 @@ class DelayedPassStore extends MemoryPassStore {
 }
 
 void main() {
+  sharingTests();
   test(
     'adding a pass serializes secure storage against foreground refresh',
     () async {
@@ -188,4 +189,50 @@ void main() {
     expect(admissionQr('https://reg.bioconnect.kerala.gov.in/p/short'), isNull);
     expect(admissionQr('BC-1'), isNull);
   });
+}
+
+class SharingPassService extends FakePassService {
+  final calls = <(String, String, bool, bool)>[];
+  @override
+  Future<void> setSharing(
+    PassAccess access,
+    String passId, {
+    required bool email,
+    required bool phone,
+  }) async {
+    if (failure != null) throw failure!;
+    calls.add((access.token, passId, email, phone));
+  }
+}
+
+void sharingTests() {
+  test(
+    'contact sharing is saved for the pass and kept on this phone',
+    () async {
+      final store = MemoryPassStore([access()]);
+      final service = SharingPassService();
+      final wallet = PassWallet(service: service, store: store, now: () => now);
+      await wallet.load();
+      await wallet.setSharing(pass, email: true, phone: false);
+      expect(service.calls.single, ('session', 'p1', true, false));
+      expect(wallet.passes.single.shareEmail, isTrue);
+      expect(store.data.single.passes.single.shareEmail, isTrue);
+      expect(
+        AdmissionPass.fromJson(store.data.single.passes.single.toJson())
+            .shareEmail,
+        isTrue,
+      );
+
+      service.failure = const PassException('offline');
+      await expectLater(
+        wallet.setSharing(pass, email: false, phone: true),
+        throwsA(isA<PassException>()),
+      );
+      expect(
+        wallet.passes.single.shareEmail,
+        isTrue,
+        reason: 'unchanged on failure',
+      );
+    },
+  );
 }

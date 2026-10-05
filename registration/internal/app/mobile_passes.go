@@ -192,15 +192,20 @@ type mobilePass struct {
 	Number      string `json:"number"`
 	QRID        string `json:"qr_id"`
 	DownloadURL string `json:"download_url"`
+	// ShareEmail and SharePhone are the holder's consent to give these to
+	// people who scan their badge in the app.
+	ShareEmail bool `json:"share_email"`
+	SharePhone bool `json:"share_phone"`
 }
 
-func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+// mobileSession resolves the attendee's bearer token. It writes the error
+// response itself and returns ok=false when the request cannot continue.
+func (a *App) mobileSession(w http.ResponseWriter, r *http.Request) (token, channel, identifier, qr string, ok bool) {
+	token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || !admissionQRPattern.MatchString(token) {
 		fail(w, 401, "verify your email or mobile again")
 		return
 	}
-	var channel, identifier, qr string
 	err := a.DB.QueryRow(r.Context(), "SELECT channel,identifier,qr_id FROM mobile_pass_sessions WHERE token_hash=$1 AND expires_at>$2", hash(token), a.Now()).Scan(&channel, &identifier, &qr)
 	if errors.Is(err, pgx.ErrNoRows) {
 		fail(w, 401, "verify your email or mobile again")
@@ -210,6 +215,15 @@ func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "passes unavailable; retry shortly")
 		return
 	}
+	return token, channel, identifier, qr, true
+}
+
+func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
+	token, channel, identifier, qr, ok := a.mobileSession(w, r)
+	if !ok {
+		return
+	}
+	var err error
 	if r.Method == http.MethodDelete {
 		if _, err = a.DB.Exec(r.Context(), "DELETE FROM mobile_pass_sessions WHERE token_hash=$1", hash(token)); err != nil {
 			fail(w, 503, "could not sign out; retry")
@@ -218,7 +232,7 @@ func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]bool{"ok": true})
 		return
 	}
-	rows, err := a.DB.Query(r.Context(), "SELECT p.id,a.name,r.institution,a.designation,c.label,p.number,p.qr_id,p.download_cipher"+mobilePassScope+" ORDER BY p.created_at,p.id", channel, identifier, qr)
+	rows, err := a.DB.Query(r.Context(), "SELECT p.id,a.name,r.institution,a.designation,c.label,p.number,p.qr_id,p.download_cipher,a.share_email,a.share_phone"+mobilePassScope+" ORDER BY p.created_at,p.id", channel, identifier, qr)
 	if err != nil {
 		fail(w, 503, "passes unavailable; retry shortly")
 		return
@@ -228,7 +242,7 @@ func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var p mobilePass
 		var cipher string
-		if err = rows.Scan(&p.ID, &p.Name, &p.Institution, &p.Designation, &p.Category, &p.Number, &p.QRID, &cipher); err != nil {
+		if err = rows.Scan(&p.ID, &p.Name, &p.Institution, &p.Designation, &p.Category, &p.Number, &p.QRID, &cipher, &p.ShareEmail, &p.SharePhone); err != nil {
 			fail(w, 503, "passes unavailable; retry shortly")
 			return
 		}
@@ -260,4 +274,31 @@ func (a *App) sendPassOTP(ctx context.Context, j job, code string) sendResult {
 	components := []any{map[string]any{"type": "body", "parameters": param}, map[string]any{"type": "button", "sub_type": "url", "index": "0", "parameters": param}}
 	payload := map[string]any{"messaging_product": "whatsapp", "to": strings.TrimPrefix(j.Recipient, "+"), "type": "template", "biz_opaque_callback_data": j.ID, "template": map[string]any{"name": a.Config.MetaOTPTemplate, "language": map[string]string{"code": a.Config.MetaOTPLanguage}, "components": components}}
 	return providerRequest(ctx, a.Config.MetaAPIBase+"/"+a.Config.MetaVersion+"/"+a.Config.MetaPhoneID+"/messages", "Authorization", "Bearer "+a.Config.MetaToken, payload, "whatsapp")
+}
+
+// mobilePassSharing records whether a pass holder's email and phone go to
+// people who scan their badge. Only a verified holder of that pass can change it.
+func (a *App) mobilePassSharing(w http.ResponseWriter, r *http.Request) {
+	_, channel, identifier, qr, ok := a.mobileSession(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		ShareEmail bool `json:"share_email"`
+		SharePhone bool `json:"share_phone"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	result, err := a.DB.Exec(r.Context(), "UPDATE attendees SET share_email=$4,share_phone=$5,sharing_updated_at=$6 WHERE id=(SELECT a.id"+mobilePassScope+" AND p.id=$7)",
+		channel, identifier, qr, in.ShareEmail, in.SharePhone, a.Now(), r.PathValue("id"))
+	if err != nil {
+		fail(w, 503, "could not save your choice; retry shortly")
+		return
+	}
+	if result.RowsAffected() != 1 {
+		fail(w, 404, "pass not found; refresh your passes")
+		return
+	}
+	respond(w, 200, map[string]bool{"share_email": in.ShareEmail, "share_phone": in.SharePhone})
 }

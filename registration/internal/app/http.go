@@ -126,6 +126,9 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/mobile/moments/photos", a.mobileMoments)
 	m.HandleFunc("POST /api/v1/mobile/moments/selfie", a.mobileMoments)
 	m.HandleFunc("DELETE /api/v1/mobile/moments/selfie", a.mobileMoments)
+	m.HandleFunc("PUT /api/v1/mobile/passes/{id}/sharing", a.mobilePassSharing)
+	m.HandleFunc("GET /api/v1/public/badges/{qr}", a.publicBadgeContact)
+	m.HandleFunc("POST /api/v1/public/feedback", a.publicFeedback)
 	m.HandleFunc("POST /api/v1/recovery/exchange", a.exchange)
 	m.HandleFunc("POST /api/v1/auth/login", a.login)
 	m.HandleFunc("/api/v1/ops/", a.opsAPI)
@@ -426,6 +429,11 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "mobile-content" {
 		a.adminMobileContent(w, r, p)
+		return
+	}
+	// Feedback is anonymous app content, so both roles can read it, like the editor.
+	if path == "feedback" {
+		a.adminFeedback(w, r)
 		return
 	}
 	if path == "staff" && (r.Method == "GET" || r.Method == "POST") {

@@ -15,7 +15,12 @@ class AdmissionPass {
     required this.number,
     required this.qrId,
     required this.downloadUrl,
+    this.shareEmail = false,
+    this.sharePhone = false,
   });
+
+  /// Whether people who scan this holder's badge receive their email or phone.
+  final bool shareEmail, sharePhone;
   final String id,
       name,
       institution,
@@ -34,7 +39,22 @@ class AdmissionPass {
     number: json['number'] as String,
     qrId: json['qr_id'] as String,
     downloadUrl: json['download_url'] as String,
+    shareEmail: json['share_email'] == true,
+    sharePhone: json['share_phone'] == true,
   );
+  AdmissionPass withSharing({required bool email, required bool phone}) =>
+      AdmissionPass(
+        id: id,
+        name: name,
+        institution: institution,
+        designation: designation,
+        category: category,
+        number: number,
+        qrId: qrId,
+        downloadUrl: downloadUrl,
+        shareEmail: email,
+        sharePhone: phone,
+      );
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
@@ -44,6 +64,8 @@ class AdmissionPass {
     'number': number,
     'qr_id': qrId,
     'download_url': downloadUrl,
+    'share_email': shareEmail,
+    'share_phone': sharePhone,
   };
 }
 
@@ -159,6 +181,20 @@ class PassService {
       passes: (json['passes'] as List)
           .map((p) => AdmissionPass.fromJson(p as Map<String, dynamic>))
           .toList(),
+    );
+  }
+
+  Future<void> setSharing(
+    PassAccess access,
+    String passId, {
+    required bool email,
+    required bool phone,
+  }) async {
+    await _request(
+      'PUT',
+      '/api/v1/mobile/passes/${Uri.encodeComponent(passId)}/sharing',
+      data: {'share_email': email, 'share_phone': phone},
+      token: access.token,
     );
   }
 

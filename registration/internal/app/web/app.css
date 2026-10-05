@@ -221,6 +221,13 @@ td button, td .button { min-height: 32px; padding: 0 12px; font-size: 11px; }
   margin-top: 8px; padding: 14px 0; background: var(--paper); border-top: 1px solid var(--line);
 }
 .mc-savebar #mc-status { margin-right: auto; font-size: 14px; }
+.mc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.mc-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 12px; background: var(--cream); border-radius: 30px; font-size: 13px; }
+.mc-chip .quiet { min-height: 28px; padding: 0 8px; font-size: 15px; }
+.mc-subhead { margin-top: 22px; }
+.mc-comment { margin: 0 0 12px; padding: 12px 16px; background: var(--cream); border-radius: 10px; }
+.mc-comment p { margin: 0 0 6px; white-space: pre-wrap; }
+.mc-comment footer { color: var(--muted); font-size: 12px; }
 
 .admin-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 .summary-group { padding: 16px 18px 14px; background: white; border: 1px solid var(--line); border-radius: 10px; }

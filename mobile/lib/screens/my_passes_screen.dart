@@ -209,6 +209,8 @@ class _MyPassesScreenState extends State<MyPassesScreen>
                 offline: _wallet.offline,
               ),
             ),
+            const SizedBox(height: 12),
+            _SharingPanel(wallet: _wallet, pass: pass),
             const SizedBox(height: 18),
           ],
           const Text(
@@ -219,6 +221,90 @@ class _MyPassesScreenState extends State<MyPassesScreen>
       ),
     ),
   );
+}
+
+/// The holder's consent to give their email or phone to people who scan
+/// their badge in the app. Off until they turn it on.
+class _SharingPanel extends StatefulWidget {
+  const _SharingPanel({required this.wallet, required this.pass});
+  final PassWallet wallet;
+  final AdmissionPass pass;
+  @override
+  State<_SharingPanel> createState() => _SharingPanelState();
+}
+
+class _SharingPanelState extends State<_SharingPanel> {
+  bool _saving = false;
+
+  Future<void> _set({bool? email, bool? phone}) async {
+    final pass = widget.pass;
+    setState(() => _saving = true);
+    AppFeedback.selection();
+    try {
+      await widget.wallet.setSharing(
+        pass,
+        email: email ?? pass.shareEmail,
+        phone: phone ?? pass.sharePhone,
+      );
+    } on PassException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pass = widget.pass;
+    // Material, not a decorated box, so the switches' ink shows.
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.badge_outlined, color: forest, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'When someone scans your badge',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Text(
+                'They always see what your badge prints. Choose what else they may save in their Bio Connect contacts.',
+                style: TextStyle(color: muted, fontSize: 12, height: 1.4),
+              ),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: pass.shareEmail,
+              onChanged: _saving ? null : (v) => _set(email: v),
+              title: const Text('Share my email'),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: pass.sharePhone,
+              onChanged: _saving ? null : (v) => _set(phone: v),
+              title: const Text('Share my phone number'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SampleBadge extends StatelessWidget {
@@ -1011,7 +1097,15 @@ class _AddPassScreenState extends State<AddPassScreen> {
 }
 
 class PassScannerScreen extends StatefulWidget {
-  const PassScannerScreen({super.key});
+  const PassScannerScreen({
+    super.key,
+    this.title = 'Scan your pass',
+    this.instructions = 'Point the camera at the admission QR on your Bio Connect pass. You will verify its registered email or mobile next.',
+    this.invalid = 'This is not a Bio Connect admission QR. Scan the QR printed on your pass.',
+    this.fallback = 'Use email or WhatsApp',
+    this.cameraHelp = 'Camera unavailable. Allow camera access in your phone settings, or add your pass using email or WhatsApp.',
+  });
+  final String title, instructions, invalid, fallback, cameraHelp;
   @override
   State<PassScannerScreen> createState() => _PassScannerScreenState();
 }
@@ -1022,14 +1116,12 @@ class _PassScannerScreenState extends State<PassScannerScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Scan your pass')),
+    appBar: AppBar(title: Text(widget.title)),
     body: Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.all(20),
-          child: Text(
-            'Point the camera at the admission QR on your Bio Connect pass. You will verify its registered email or mobile next.',
-          ),
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(widget.instructions),
         ),
         Expanded(
           child: MobileScanner(
@@ -1041,13 +1133,10 @@ class _PassScannerScreenState extends State<PassScannerScreen> {
                   children: [
                     const Icon(Icons.no_photography_outlined, size: 40),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Camera unavailable. Allow camera access in your phone settings, or add your pass using email or WhatsApp.',
-                      textAlign: TextAlign.center,
-                    ),
+                    Text(widget.cameraHelp, textAlign: TextAlign.center),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Use email or WhatsApp'),
+                      child: Text(widget.fallback),
                     ),
                   ],
                 ),
@@ -1065,9 +1154,7 @@ class _PassScannerScreenState extends State<PassScannerScreen> {
                 }
               }
               if (mounted) {
-                setState(
-                  () => _error = 'This is not a Bio Connect admission QR. Scan the QR printed on your pass.',
-                );
+                setState(() => _error = widget.invalid);
               }
             },
           ),

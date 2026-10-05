@@ -1,4 +1,4 @@
-import 'event_content.dart' show map, maps, str;
+import 'event_content.dart' show map, maps, str, strings;
 
 /// Published event-day content. Empty sections are deliberately unannounced.
 class EventGuide {
@@ -38,9 +38,23 @@ class GuideSession {
     this.endsAt,
     this.location = '',
     this.speakers = '',
+    this.speakerIds = const [],
   });
   final String id, title, description, location, speakers;
   final DateTime? startsAt, endsAt;
+
+  /// Speakers from the directory that staff linked to this session.
+  final List<String> speakerIds;
+
+  /// Whether both sessions have times and they share any minute.
+  bool clashesWith(GuideSession other) =>
+      other.id != id &&
+      startsAt != null &&
+      endsAt != null &&
+      other.startsAt != null &&
+      other.endsAt != null &&
+      startsAt!.isBefore(other.endsAt!) &&
+      other.startsAt!.isBefore(endsAt!);
   factory GuideSession.fromJson(Map<String, dynamic> j) => GuideSession(
     id: str(j['id']),
     title: str(j['title']),
@@ -49,6 +63,7 @@ class GuideSession {
     endsAt: DateTime.tryParse(str(j['ends_at'])),
     location: str(j['location']),
     speakers: str(j['speakers']),
+    speakerIds: strings(j['speaker_ids']),
   );
 }
 

@@ -11,7 +11,10 @@ import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
 import '../models/event_content.dart';
 import '../models/event_guide.dart';
+import '../providers/agenda.dart';
 import '../providers/content_provider.dart';
+import '../widgets/saving.dart';
+import 'agenda_screen.dart';
 import 'delegate_registration_screen.dart';
 
 void showGuidePage(BuildContext context, Widget page) =>
@@ -91,6 +94,10 @@ class AttendeeHomeScreen extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 16),
+            child: AgendaGlance(),
           ),
           if (shortcuts.isNotEmpty) ...[
             const SizedBox(height: 28),
@@ -294,14 +301,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
     final content = state.content!;
-    final sessions = [...content.guide.sessions]
-      ..sort((a, b) {
-        if (a.startsAt == null) {
-          return b.startsAt == null ? a.title.compareTo(b.title) : 1;
-        }
-        if (b.startsAt == null) return -1;
-        return a.startsAt!.compareTo(b.startsAt!);
-      });
+    final agenda = context.watch<Agenda>();
+    final sessions = sortSessions(content.guide.sessions);
     final days = sessions
         .where((s) => s.startsAt != null)
         .map((s) => sessionDay(s.startsAt!))
@@ -403,7 +404,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       child: Text(lines.join('\n')),
                     ),
                   },
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: SaveIcon(
+                    saved: agenda.hasSession(session.id),
+                    label: session.title,
+                    onPressed: () => toggleSavedSession(context, session),
+                  ),
                   onTap: () =>
                       showGuidePage(context, SessionDetailScreen(session.id)),
                 ),
@@ -421,9 +426,22 @@ class SessionDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
-    final items = state.content!.guide.sessions.where((s) => s.id == id);
+    final content = state.content!;
+    final agenda = context.watch<Agenda>();
+    final items = content.guide.sessions.where((s) => s.id == id);
     return Scaffold(
-      appBar: AppBar(title: const Text('Session details')),
+      appBar: AppBar(
+        title: const Text('Session details'),
+        actions: [
+          if (items.isNotEmpty)
+            SaveIcon(
+              saved: agenda.hasSession(id),
+              label: 'this session',
+              onPressed: () => toggleSavedSession(context, items.first),
+            ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: LiveRefresh(
         onRefresh: state.load,
         child: items.isEmpty
@@ -441,6 +459,11 @@ class SessionDetailScreen extends StatelessWidget {
             : Builder(
                 builder: (context) {
                   final s = items.first;
+                  final saved = agenda.hasSession(s.id);
+                  final clashes = agenda.clashesFor(s, content);
+                  final linked = [
+                    for (final id in s.speakerIds) ?content.speaker(id),
+                  ];
                   return ListView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
@@ -448,6 +471,32 @@ class SessionDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(20),
                     children: [
                       TitleText(s.title),
+                      const SizedBox(height: 18),
+                      SaveButton(
+                        saved: saved,
+                        onPressed: () => toggleSavedSession(context, s),
+                      ),
+                      if (s.startsAt != null && s.endsAt != null) ...[
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed: () => addSessionsToCalendar(context, [s]),
+                          icon: const Icon(Icons.event_available_outlined),
+                          label: const Text('Add to calendar'),
+                        ),
+                      ],
+                      if (clashes.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        GuideNotice(
+                          icon: Icons.warning_amber_rounded,
+                          title: saved
+                              ? 'Overlaps your agenda'
+                              : 'Would overlap your agenda',
+                          message: [
+                            for (final c in clashes)
+                              '${c.title} (${sessionSpan(c)})',
+                          ].join('\n'),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       if (s.startsAt case final start?)
                         _DetailBlock(
@@ -467,6 +516,23 @@ class SessionDetailScreen extends StatelessWidget {
                           s.speakers,
                           icon: Icons.people_outline_rounded,
                         ),
+                      if (linked.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        for (final speaker in linked)
+                          GuideCard(
+                            Icons.person_outline,
+                            speaker.name,
+                            [
+                              speaker.role,
+                              speaker.organization,
+                            ].where((v) => v.isNotEmpty).join(' · '),
+                            () => showGuidePage(
+                              context,
+                              SpeakerDetailScreen(speaker),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                      ],
                       if (s.description.isNotEmpty)
                         _DetailBlock(
                           'About the session',

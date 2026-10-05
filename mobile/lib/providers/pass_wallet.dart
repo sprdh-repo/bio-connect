@@ -138,6 +138,41 @@ class PassWallet extends ChangeNotifier {
     }
   }
 
+  /// Records whether people who scan [pass]'s badge get its holder's email
+  /// or phone. Throws [PassException] when the choice could not be saved.
+  Future<void> setSharing(
+    AdmissionPass pass, {
+    required bool email,
+    required bool phone,
+  }) async {
+    final access = _access.where(
+      (a) =>
+          a.expiresAt.isAfter(_now()) && a.passes.any((p) => p.id == pass.id),
+    );
+    if (access.isEmpty) {
+      throw const PassException('Add this pass again to change sharing.');
+    }
+    await service.setSharing(access.last, pass.id, email: email, phone: phone);
+    _access = [
+      for (final a in _access)
+        PassAccess(
+          token: a.token,
+          expiresAt: a.expiresAt,
+          checkedAt: a.checkedAt,
+          passes: [
+            for (final p in a.passes)
+              p.id == pass.id ? p.withSharing(email: email, phone: phone) : p,
+          ],
+        ),
+    ];
+    notifyListeners();
+    try {
+      await _store.write(_access);
+    } catch (_) {
+      // The server holds the choice; the next refresh restores the copy.
+    }
+  }
+
   Future<void> forget() async {
     if (busy) return;
     busy = true;

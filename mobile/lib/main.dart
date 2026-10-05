@@ -15,10 +15,16 @@ import 'widgets/nav_bar.dart';
 
 import 'models/event_content.dart';
 import 'models/event_guide.dart';
+import 'providers/agenda.dart';
+import 'providers/contact_book.dart';
 import 'providers/content_provider.dart';
+import 'providers/feedback_book.dart';
+import 'screens/agenda_screen.dart';
+import 'screens/contacts_screen.dart';
 import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
 import 'screens/my_passes_screen.dart';
+import 'widgets/saving.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -92,6 +98,9 @@ Future<void> openLink(BuildContext context, String url) async {
 
 final _navigationObserver = AppNavigationObserver();
 
+/// Lets a tapped notification open a page from outside the widget tree.
+final appNavigator = GlobalKey<NavigatorState>();
+
 /// Store update checks. Only release builds can match a store listing, so
 /// debug and test runs never prompt or touch the network.
 final _upgrader = Upgrader(
@@ -101,12 +110,38 @@ final _upgrader = Upgrader(
 );
 
 class BioConnectApp extends StatelessWidget {
-  const BioConnectApp({super.key, this.checkForUpdates = kReleaseMode});
+  const BioConnectApp({
+    super.key,
+    this.checkForUpdates = kReleaseMode,
+    this.agenda,
+    this.contacts,
+    this.feedback,
+  });
   final bool checkForUpdates;
+
+  /// The attendee's own data on this phone; tests pass in-memory copies.
+  final Agenda? agenda;
+  final ContactBook? contacts;
+  final FeedbackBook? feedback;
+
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) => MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => (agenda ?? Agenda())..load()),
+      ChangeNotifierProvider(
+        create: (_) => (contacts ?? ContactBook())..load(),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => (feedback ?? FeedbackBook())..load(),
+      ),
+    ],
+    child: _app(context),
+  );
+
+  Widget _app(BuildContext context) => MaterialApp(
     title: 'Bio Connect 4.0',
     debugShowCheckedModeBanner: false,
+    navigatorKey: appNavigator,
     navigatorObservers: [_navigationObserver],
     theme: ThemeData(
       useMaterial3: true,
@@ -233,6 +268,53 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _startReminders();
+  }
+
+  /// Reminder notifications open their session, including one that launched
+  /// the app.
+  Future<void> _startReminders() async {
+    final reminders = context.read<Agenda>().reminders;
+    await reminders.init(_openPayload);
+    final launch = await reminders.launchPayload();
+    if (launch != null) _openPayload(launch);
+  }
+
+  void _openPayload(String payload) {
+    if (!payload.startsWith('session:') || !mounted) return;
+    final id = payload.substring('session:'.length);
+    final provider = context.read<ContentProvider>();
+    void open() => appNavigator.currentState?.push(
+      MaterialPageRoute<void>(builder: (_) => SessionDetailScreen(id)),
+    );
+    if (provider.content != null) return open();
+    void ready() {
+      if (provider.content == null) return;
+      provider.removeListener(ready);
+      open();
+    }
+
+    provider.addListener(ready);
+  }
+
+  EventContent? _synced;
+  List<Exhibitor>? _syncedExhibitors;
+
+  /// Keeps reminders and saved exhibitors in step with refreshed content.
+  void _syncAgenda(ContentProvider state) {
+    final content = state.content;
+    if (identical(content, _synced) &&
+        identical(state.exhibitors, _syncedExhibitors)) {
+      return;
+    }
+    _synced = content;
+    _syncedExhibitors = state.exhibitors;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final agenda = context.read<Agenda>();
+      if (content != null) agenda.syncReminders(content);
+      if (state.exhibitorsLoaded) agenda.refreshExhibitors(state.exhibitors);
+    });
   }
 
   @override
@@ -332,6 +414,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   Widget _buildShell(BuildContext context) {
     final state = context.watch<ContentProvider>();
+    _syncAgenda(state);
     final header = AppBar(
       backgroundColor: cream,
       scrolledUnderElevation: 0,
@@ -344,6 +427,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         fit: BoxFit.contain,
       ),
       actions: [
+        if (state.content != null &&
+            visibleMenu(
+              state.content!,
+              'guide',
+            ).any((e) => e.key == 'contacts'))
+          IconButton(
+            tooltip: 'Scan a badge',
+            color: forest,
+            onPressed: () => scanBadge(context),
+            icon: const Icon(Icons.qr_code_scanner_rounded),
+          ),
         Padding(
           padding: const EdgeInsets.only(right: 12),
           child: IconButton(
@@ -380,6 +474,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       'home': AttendeeHomeScreen(content),
       'sessions': const SessionsScreen(),
       'speakers': SpeakersScreen(content.speakers),
+      'agenda': const AgendaScreen(),
       'guide': MoreScreen(content),
     };
     return TabScope(
@@ -411,17 +506,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           items: [
             const BioNavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
             for (final tab in tabs)
-              tab.key == 'sessions'
-                  ? BioNavItem(
-                      Icons.calendar_month_outlined,
-                      Icons.calendar_month_rounded,
-                      entryTitle(tab),
-                    )
-                  : BioNavItem(
-                      Icons.people_outline_rounded,
-                      Icons.people_alt_rounded,
-                      entryTitle(tab),
-                    ),
+              switch (tab.key) {
+                'sessions' => BioNavItem(
+                  Icons.calendar_month_outlined,
+                  Icons.calendar_month_rounded,
+                  entryTitle(tab),
+                ),
+                'agenda' => BioNavItem(
+                  Icons.bookmarks_outlined,
+                  Icons.bookmarks_rounded,
+                  entryTitle(tab),
+                ),
+                _ => BioNavItem(
+                  Icons.people_outline_rounded,
+                  Icons.people_alt_rounded,
+                  entryTitle(tab),
+                ),
+              },
             const BioNavItem(
               Icons.grid_view_outlined,
               Icons.grid_view_rounded,
@@ -1011,28 +1112,12 @@ class SpeakerDetailScreen extends StatelessWidget {
   const SpeakerDetailScreen(this.speaker, {super.key});
   final Speaker speaker;
 
-  /// Published sessions that name this speaker, ignoring honorifics.
-  List<GuideSession> _sessions(EventContent? content) {
-    if (content == null) return const [];
-    final name = speaker.name
-        .replaceFirst(
-          RegExp(
-            r'^((dr|prof|mr|mrs|ms|shri|smt)\.?\s+)+',
-            caseSensitive: false,
-          ),
-          '',
-        )
-        .toLowerCase()
-        .trim();
-    if (name.isEmpty) return const [];
-    return content.guide.sessions
-        .where((s) => s.speakers.toLowerCase().contains(name))
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final sessions = _sessions(context.watch<ContentProvider?>()?.content);
+    final sessions =
+        context.watch<ContentProvider?>()?.content?.sessionsOf(speaker) ??
+        const [];
+    final agenda = context.watch<Agenda?>();
     final width = MediaQuery.sizeOf(context).width;
     final portrait = (width * .6).clamp(160.0, 240.0);
     return Scaffold(
@@ -1098,6 +1183,25 @@ class SpeakerDetailScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (agenda != null) ...[
+                  const SizedBox(height: 22),
+                  SaveButton(
+                    saved: agenda.hasSpeaker(speaker.id),
+                    saveLabel: 'Save speaker',
+                    onPressed: () {
+                      AppFeedback.selection();
+                      agenda.toggleSpeaker(speaker.id);
+                    },
+                  ),
+                  if (sessions.isNotEmpty && !agenda.hasSpeaker(speaker.id))
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Their sessions are suggested in your agenda.',
+                        style: TextStyle(color: muted, fontSize: 12),
+                      ),
+                    ),
+                ],
                 if (sessions.isNotEmpty) ...[
                   const SizedBox(height: 28),
                   const Eyebrow('ON STAGE'),

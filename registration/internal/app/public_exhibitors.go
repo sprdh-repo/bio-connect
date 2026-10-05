@@ -10,6 +10,10 @@ import (
 // This is deliberately separate from Registration: contact, payment and attendee
 // data must never enter the public directory's response.
 type publicExhibitor struct {
+	// ID is the registration reference (BC4-EX-0007), already printed on the
+	// exhibitor's passes. It stays the same for the life of the registration,
+	// so the app can keep an exhibitor saved across refreshes.
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	LogoURL     string `json:"logo_url"`
@@ -21,7 +25,7 @@ type publicExhibitor struct {
 
 func (a *App) publicExhibitors(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	rows, err := a.DB.Query(r.Context(), `SELECT r.institution, r.description, COALESCE(f.id,''), r.stall_number, c.label
+	rows, err := a.DB.Query(r.Context(), `SELECT r.reference, r.institution, r.description, COALESCE(f.id,''), r.stall_number, c.label
  FROM registrations r JOIN categories c ON c.id=r.category_id
  LEFT JOIN LATERAL (SELECT id FROM files WHERE registration_id=r.id AND kind='logo'
  ORDER BY created_at DESC,id DESC LIMIT 1) f ON true
@@ -36,7 +40,7 @@ func (a *App) publicExhibitors(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item publicExhibitor
 		var logo string
-		if err := rows.Scan(&item.Name, &item.Description, &logo, &item.StallNumber, &item.StallType); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Description, &logo, &item.StallNumber, &item.StallType); err != nil {
 			fail(w, 503, "exhibitors unavailable; please retry")
 			return
 		}

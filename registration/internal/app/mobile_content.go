@@ -57,6 +57,13 @@ type contentProductLaunch struct {
 	ApplyLabel  string                    `json:"apply_label"`
 	Hidden      []string                  `json:"hidden"`
 }
+
+// contentFeedback controls the app's feedback form. Staff open it when the
+// event is under way and close it once responses are in.
+type contentFeedback struct {
+	Open  bool   `json:"open"`
+	Intro string `json:"intro"`
+}
 type contentLeader struct {
 	Name           string `json:"name"`
 	Role           string `json:"role"`
@@ -123,6 +130,7 @@ type mobileContent struct {
 	SponsorsIntro       string                `json:"sponsors_intro"`
 	Sponsors            []contentSponsor      `json:"sponsors"`
 	EcosystemPartners   []contentPartner      `json:"ecosystem_partners"`
+	Feedback            contentFeedback       `json:"feedback"`
 	Menus               map[string][]menuItem `json:"menus"`
 	// Copy overrides the app's headings and short texts by key, such as
 	// "sessions.title". Blank or missing keys keep the app's built-in wording.
@@ -148,7 +156,8 @@ type adminSpeaker struct {
 
 var (
 	menuNames        = []string{"tabs", "home_shortcuts", "home_links", "guide"}
-	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "moments", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
+	tabDestinations  = []string{"sessions", "speakers", "agenda"}
+	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "moments", "agenda", "contacts", "feedback", "hub", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
 	// Old app builds parse these, so they can never be withheld.
 	eventHideable      = []string{"tagline", "hero_title", "description", "venue", "city", "brochure_url", "sponsorship_email", "privacy_url"}
 	launchHideable     = []string{"eyebrow", "title", "description", "deadline", "eligibility", "focus_areas", "apply_url"}
@@ -328,8 +337,8 @@ func (c mobileContent) validate() error {
 			if !slices.Contains(menuDestinations, item.Key) {
 				return fmt.Errorf("unknown app destination %q", item.Key)
 			}
-			if name == "tabs" && item.Key != "sessions" && item.Key != "speakers" {
-				return fmt.Errorf("only Sessions and Speakers can be bottom tabs")
+			if name == "tabs" && !slices.Contains(tabDestinations, item.Key) {
+				return fmt.Errorf("only Sessions, Speakers and My agenda can be bottom tabs")
 			}
 			if err := textLimit("menu", 120, item.Title, item.Subtitle); err != nil {
 				return err
@@ -345,6 +354,9 @@ func (c mobileContent) validate() error {
 				return fmt.Errorf("only custom links take a URL")
 			}
 		}
+	}
+	if err := textLimit("feedback", 2000, c.Feedback.Intro); err != nil {
+		return err
 	}
 	if len(c.Copy) > 200 {
 		return fmt.Errorf("too many text overrides")
@@ -391,6 +403,25 @@ func validateSpeakers(items []adminSpeaker) error {
 		}
 		if !optionalHTTPS(s.ImageURL) || !optionalHTTPS(s.LinkedIn) {
 			return fmt.Errorf("speaker %q links must be public HTTPS URLs", s.Name)
+		}
+	}
+	return nil
+}
+
+// linkedSpeakers checks that every session's speaker links name a speaker in
+// the directory being saved.
+func linkedSpeakers(g eventGuide, speakers []adminSpeaker) error {
+	known := map[string]bool{}
+	for _, s := range speakers {
+		known[s.ID] = true
+	}
+	for _, s := range g.Sessions {
+		seen := map[string]bool{}
+		for _, id := range s.SpeakerIDs {
+			if !known[id] || seen[id] {
+				return fmt.Errorf("session %q links a speaker that is not in the speaker list", s.Title)
+			}
+			seen[id] = true
 		}
 	}
 	return nil
@@ -447,6 +478,11 @@ func normalizeGuide(g *eventGuide) {
 	}
 	if g.Venue.Hidden == nil {
 		g.Venue.Hidden = []string{}
+	}
+	for i := range g.Sessions {
+		if g.Sessions[i].SpeakerIDs == nil {
+			g.Sessions[i].SpeakerIDs = []string{}
+		}
 	}
 }
 
@@ -521,7 +557,7 @@ func (a *App) adminMobileContent(w http.ResponseWriter, r *http.Request, p princ
 	}
 	normalizeContent(&m.Content)
 	normalizeGuide(&m.Guide)
-	for _, err := range []error{m.Content.validate(), m.Guide.validate(), validateSpeakers(m.Speakers)} {
+	for _, err := range []error{m.Content.validate(), m.Guide.validate(), validateSpeakers(m.Speakers), linkedSpeakers(m.Guide, m.Speakers)} {
 		if err != nil {
 			fail(w, 400, err.Error())
 			return
