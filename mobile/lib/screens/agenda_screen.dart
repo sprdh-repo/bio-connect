@@ -305,10 +305,17 @@ class _EmptyAgenda extends StatelessWidget {
 
 /// "Now" and "Up next" from the saved sessions. Shown on Home and the agenda.
 class AgendaGlance extends StatelessWidget {
-  const AgendaGlance({super.key, this.showEmpty = false});
+  const AgendaGlance({
+    super.key,
+    this.showEmpty = false,
+    this.padding = EdgeInsets.zero,
+  });
 
   /// Whether to say so when nothing saved is still to come.
   final bool showEmpty;
+
+  /// Space around the card, left out when there is nothing to show.
+  final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
@@ -320,48 +327,55 @@ class AgendaGlance extends StatelessWidget {
       if (!showEmpty || agenda.sessions(content).isEmpty) {
         return const SizedBox.shrink();
       }
-      return const GuideNotice(
-        icon: Icons.event_available_outlined,
-        title: 'Nothing else saved for later',
-        message: 'Your saved sessions have finished. Browse the programme for what is still to come.',
+      return Padding(
+        padding: padding,
+        child: const GuideNotice(
+          icon: Icons.event_available_outlined,
+          title: 'Nothing else saved for later',
+          message: 'Your saved sessions have finished. Browse the programme for what is still to come.',
+        ),
       );
     }
     final at = agenda.now();
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [forest, deepForest],
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [forest, deepForest],
+          ),
+          borderRadius: BorderRadius.circular(24),
         ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (now != null)
-            _GlanceRow(
-              label: 'NOW',
-              live: true,
-              session: now,
-              detail: [
-                if (now.endsAt case final end?) 'until ${sessionTime(end)} IST',
-                if (now.location.isNotEmpty) now.location,
-              ].join(' · '),
-            ),
-          if (now != null && next != null)
-            Divider(height: 28, color: Colors.white.withValues(alpha: .14)),
-          if (next != null)
-            _GlanceRow(
-              label: 'UP NEXT',
-              session: next,
-              detail: [
-                '${sessionTime(next.startsAt!)} IST, ${startsIn(next.startsAt!, at)}',
-                if (next.location.isNotEmpty) next.location,
-              ].join(' · '),
-            ),
-        ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (now != null)
+              _GlanceRow(
+                label: 'NOW',
+                live: true,
+                session: now,
+                detail: [
+                  if (now.endsAt case final end?)
+                    'until ${sessionTime(end)} IST',
+                  if (now.location.isNotEmpty) now.location,
+                ].join(' · '),
+              ),
+            if (now != null && next != null)
+              Divider(height: 28, color: Colors.white.withValues(alpha: .14)),
+            if (next != null)
+              _GlanceRow(
+                label: 'UP NEXT',
+                session: next,
+                detail: [
+                  '${sessionTime(next.startsAt!)} IST, ${startsIn(next.startsAt!, at)}',
+                  if (next.location.isNotEmpty) next.location,
+                ].join(' · '),
+              ),
+          ],
+        ),
       ),
     );
   }

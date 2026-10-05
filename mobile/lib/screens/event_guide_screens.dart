@@ -39,7 +39,7 @@ class AttendeeHomeScreen extends StatelessWidget {
       child: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           Reveal(
             child: _HomeHero(
@@ -50,12 +50,12 @@ class AttendeeHomeScreen extends StatelessWidget {
                     content.text('home.eyebrow', 'YOUR CONCLAVE COMPANION'),
                     style: const TextStyle(
                       color: lime,
-                      fontSize: 11,
+                      fontSize: 10,
                       letterSpacing: 1.5,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
                     content.text(
                       'home.title',
@@ -64,30 +64,32 @@ class AttendeeHomeScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontFamily: 'Manrope',
                       color: Colors.white,
-                      fontSize: 30,
+                      fontSize: 24,
                       height: 1.15,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
                   IconText(
                     Icons.calendar_today_outlined,
                     eventDateRange(content.event),
                   ),
                   if (content.event.venue.isNotEmpty) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     IconText(Icons.place_outlined, content.event.venue),
                   ],
                   if (visibleTabs(content).any((t) => t.key == 'sessions') ||
                       count > 0) ...[
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 14),
                     FilledButton.icon(
                       onPressed: () =>
                           openDestination(context, content, sessions),
                       style: FilledButton.styleFrom(
                         backgroundColor: lime,
                         foregroundColor: forest,
+                        minimumSize: const Size(0, 42),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
                       ),
-                      icon: const Icon(Icons.view_agenda_outlined),
+                      icon: const Icon(Icons.view_agenda_outlined, size: 20),
                       label: Text(sessions.title),
                     ),
                   ],
@@ -95,27 +97,40 @@ class AttendeeHomeScreen extends StatelessWidget {
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 16),
-            child: AgendaGlance(),
-          ),
+          const AgendaGlance(padding: EdgeInsets.only(top: 14)),
           if (shortcuts.isNotEmpty) ...[
-            const SizedBox(height: 28),
+            const SizedBox(height: 22),
             Reveal(
               order: 1,
-              child: TitleText(
+              child: Text(
                 content.text('home.glance', 'Your event, at a glance.'),
+                style: const TextStyle(fontFamily: 'Manrope', fontSize: 19),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, constraints) {
-                final width = constraints.maxWidth > 600
-                    ? (constraints.maxWidth - 24) / 3
-                    : (constraints.maxWidth - 12) / 2;
+                // Three tiles a row on phones keeps every shortcut above the fold.
+                final columns = constraints.maxWidth > 600 ? 6 : 3;
+                const gap = 10.0;
+                final width =
+                    (constraints.maxWidth - gap * (columns - 1)) / columns;
+                // Every tile has the same size: an icon, a one-line title and
+                // up to two lines of subtitle at the reader's text scale.
+                final text = MediaQuery.textScalerOf(context);
+                final height =
+                    24.0 +
+                    36 +
+                    10 +
+                    text.scale(_QuickLink.titleSize) * _QuickLink.lineHeight +
+                    2 +
+                    text.scale(_QuickLink.subtitleSize) *
+                        _QuickLink.lineHeight *
+                        2 +
+                    1;
                 return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: gap,
+                  runSpacing: gap,
                   children: [
                     for (final (i, entry) in shortcuts.indexed)
                       Reveal(
@@ -125,7 +140,7 @@ class AttendeeHomeScreen extends StatelessWidget {
                           entryTitle(entry),
                           entrySubtitle(entry, content),
                           () => openDestination(context, content, entry),
-                          width,
+                          Size(width, height),
                         ),
                       ),
                   ],
@@ -164,51 +179,60 @@ class AttendeeHomeScreen extends StatelessWidget {
 }
 
 class _QuickLink extends StatelessWidget {
-  const _QuickLink(
-    this.icon,
-    this.title,
-    this.subtitle,
-    this.onTap,
-    this.width,
-  );
+  const _QuickLink(this.icon, this.title, this.subtitle, this.onTap, this.size);
   final IconData icon;
   final String title, subtitle;
   final VoidCallback onTap;
-  final double width;
+  final Size size;
+
+  /// Fixed line heights, so a tile's height is known before it is laid out.
+  static const titleSize = 14.0, subtitleSize = 11.0, lineHeight = 1.3;
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: width,
+  Widget build(BuildContext context) => SizedBox.fromSize(
+    size: size,
     child: Pressable(
       child: Material(
         color: cream,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: forest, size: 23),
+                  child: Icon(icon, color: forest, size: 20),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 Text(
                   title,
-                  style: const TextStyle(fontFamily: 'Manrope', fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'Manrope',
+                    fontSize: titleSize,
+                    height: lineHeight,
+                  ),
                 ),
                 if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: muted, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: muted,
+                      fontSize: subtitleSize,
+                      height: lineHeight,
+                    ),
                   ),
                 ],
               ],
@@ -228,7 +252,7 @@ class _HomeHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(28),
+    borderRadius: BorderRadius.circular(24),
     child: DecoratedBox(
       decoration: const BoxDecoration(
         color: forest,
@@ -247,7 +271,7 @@ class _HomeHero extends StatelessWidget {
             stops: [0, .55, 1],
           ),
         ),
-        child: Padding(padding: const EdgeInsets.all(24), child: child),
+        child: Padding(padding: const EdgeInsets.all(20), child: child),
       ),
     ),
   );

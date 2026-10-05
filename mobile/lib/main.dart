@@ -418,12 +418,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     final header = AppBar(
       backgroundColor: cream,
       scrolledUnderElevation: 0,
-      toolbarHeight: 76,
+      toolbarHeight: 64,
       titleSpacing: 20,
       title: Image.asset(
         'assets/images/bio-connect-logo.png',
-        width: 180,
-        height: 54,
+        width: 150,
+        height: 44,
         fit: BoxFit.contain,
       ),
       actions: [
