@@ -100,6 +100,15 @@ void main() {
                   'name': 'Expo Labs',
                   'description': 'Diagnostics',
                   'logo_url': '/api/v1/public/exhibitors/logos/logo-id',
+                  'stall_number': 'B-12',
+                  'stall_type': 'Standard stall',
+                },
+                {
+                  'name': 'No Logo Bio',
+                  'description': '',
+                  'logo_url': '',
+                  'stall_number': '',
+                  'stall_type': 'Table space',
                 },
               ],
             }),
@@ -123,13 +132,43 @@ void main() {
       expect(refreshed.speakers.single.name, 'New Speaker');
       expect(refreshed.productLaunch.title, 'New launch');
       expect(refreshed.sponsor.name, 'New sponsor');
+      // Content without a sponsors list still lists the single sponsor.
+      expect(refreshed.sponsors.single.name, 'New sponsor');
+      expect(refreshed.leadership.committee.members, isEmpty);
       expect(refreshed.ecosystemPartners.single.name, 'Partner');
 
       final exhibitors = await service.loadExhibitors();
       expect(
-        exhibitors.single.logoUrl,
+        exhibitors.first.logoUrl,
         '$baseUrl/api/v1/public/exhibitors/logos/logo-id',
       );
+      expect(exhibitors.first.stallNumber, 'B-12');
+      expect(exhibitors.first.stallType, 'Standard stall');
+      // A missing logo stays empty rather than resolving to the API root.
+      expect(exhibitors.last.logoUrl, isEmpty);
+      expect(exhibitors.last.hasStall, isFalse);
     },
   );
+
+  test('bundled snapshot carries every sponsor and the committee', () async {
+    final bundled = EventContent.fromJson(
+      jsonDecode(await File('assets/content/event.json').readAsString())
+          as Map<String, dynamic>,
+    );
+    expect(bundled.sponsors, hasLength(9));
+    expect(bundled.sponsors.every((s) => s.category.isNotEmpty), isTrue);
+    expect(bundled.leadership.committee.members, hasLength(14));
+    expect(bundled.leadership.people.first.imageUrl, startsWith('https://'));
+    expect(bundled.leadership.convenedBy?.name, isNotEmpty);
+  });
+
+  test('fetchEvent surfaces failures that refreshEvent absorbs', () async {
+    final service = CurrentContentService(apiBaseUrl: 'http://127.0.0.1:9');
+    final bundled = EventContent.fromJson(
+      jsonDecode(await File('assets/content/event.json').readAsString())
+          as Map<String, dynamic>,
+    );
+    expect(await service.refreshEvent(bundled), same(bundled));
+    expect(service.fetchEvent(bundled), throwsA(anything));
+  });
 }

@@ -1,16 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import 'widgets/interaction.dart';
-
 import 'package:provider/provider.dart';
+import 'package:upgrader/upgrader.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import 'widgets/directory.dart';
+import 'widgets/interaction.dart';
 
 import 'models/event_content.dart';
 import 'providers/content_provider.dart';
 import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
+import 'screens/exhibitors_screen.dart';
 import 'screens/my_passes_screen.dart';
+import 'screens/partners_screens.dart';
 import 'services/content_service.dart';
 import 'services/registration_service.dart';
 
@@ -84,8 +88,17 @@ Future<void> openLink(BuildContext context, String url) async {
 
 final _navigationObserver = AppNavigationObserver();
 
+/// Store update checks. Only release builds can match a store listing, so
+/// debug and test runs never prompt or touch the network.
+final _upgrader = Upgrader(
+  // The store listings are published for India.
+  countryCode: 'IN',
+  durationUntilAlertAgain: const Duration(days: 1),
+);
+
 class BioConnectApp extends StatelessWidget {
-  const BioConnectApp({super.key});
+  const BioConnectApp({super.key, this.checkForUpdates = kReleaseMode});
+  final bool checkForUpdates;
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Bio Connect 4.0',
@@ -121,7 +134,16 @@ class BioConnectApp extends StatelessWidget {
       textTheme: Theme.of(context).textTheme
           .apply(fontFamily: 'DM Sans', bodyColor: ink, displayColor: ink),
     ),
-    home: const AppShell(),
+    home: checkForUpdates
+        ? UpgradeAlert(
+            upgrader: _upgrader,
+            showIgnore: false,
+            dialogStyle: defaultTargetPlatform == TargetPlatform.iOS
+                ? UpgradeDialogStyle.cupertino
+                : UpgradeDialogStyle.material,
+            child: const AppShell(),
+          )
+        : const AppShell(),
   );
 }
 
@@ -328,11 +350,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 }
 
 class ExploreScreen extends StatelessWidget {
-  const ExploreScreen(this.content, {super.key});
-  final EventContent content;
+  const ExploreScreen({super.key});
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) {
+    final state = context.watch<ContentProvider>();
+    final content = state.content!;
+    return LiveRefresh(onRefresh: state.load, child: _exploreList(content));
+  }
+
+  Widget _exploreList(EventContent content) => ListView(
     keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
       const Eyebrow('BIO CONNECT 4.0'),
@@ -398,54 +426,58 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
           ),
         )
         .toList();
-    return ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
-      children: [
-        const Eyebrow('CONCLAVE SPEAKERS'),
-        const SizedBox(height: 7),
-        const TitleText('The voices\ntaking the stage.'),
-        const SizedBox(height: 16),
-        TextField(
-          controller: queryController,
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) => FocusScope.of(context).unfocus(),
-          onChanged: (v) => setState(() => query = v),
-          decoration: InputDecoration(
-            hintText: 'Search name or organisation',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear search',
-                    onPressed: () {
-                      AppFeedback.selection();
-                      queryController.clear();
-                      setState(() => query = '');
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
+    return LiveRefresh(
+      onRefresh: context.read<ContentProvider>().load,
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+        children: [
+          const Eyebrow('CONCLAVE SPEAKERS'),
+          const SizedBox(height: 7),
+          const TitleText('The voices\ntaking the stage.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: queryController,
+            onTapOutside: (_) => FocusScope.of(context).unfocus(),
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
+            onChanged: (v) => setState(() => query = v),
+            decoration: InputDecoration(
+              hintText: 'Search name or organisation',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: query.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        AppFeedback.selection();
+                        queryController.clear();
+                        setState(() => query = '');
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '${visible.length} speakers',
-          style: const TextStyle(color: muted, fontSize: 12),
-        ),
-        const SizedBox(height: 14),
-        if (visible.isEmpty)
-          const StateMessage(
-            'No speakers match your search. Try another name or organisation.',
+          const SizedBox(height: 12),
+          Text(
+            '${visible.length} speakers',
+            style: const TextStyle(color: muted, fontSize: 12),
           ),
-        for (final s in visible) SpeakerRow(s),
-      ],
+          const SizedBox(height: 14),
+          if (visible.isEmpty)
+            const StateMessage(
+              'No speakers match your search. Try another name or organisation.',
+            ),
+          for (final s in visible) SpeakerRow(s),
+        ],
+      ),
     );
   }
 }
@@ -454,8 +486,14 @@ class MoreScreen extends StatelessWidget {
   const MoreScreen(this.content, {super.key});
   final EventContent content;
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => LiveRefresh(
+    onRefresh: context.read<ContentProvider>().load,
+    child: _guideList(context),
+  );
+
+  Widget _guideList(BuildContext context) => ListView(
     keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    physics: const AlwaysScrollableScrollPhysics(),
     padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
     children: [
       const Eyebrow('YOUR EVENT GUIDE'),
@@ -483,14 +521,8 @@ class MoreScreen extends StatelessWidget {
       GuideCard(
         Icons.storefront_outlined,
         'Exhibitors',
-        'Confirmed expo line-up',
-        () {
-          context.read<ContentProvider>().loadExhibitors();
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ExhibitorsScreen()),
-          );
-        },
+        'Stalls and the expo line-up',
+        () => showGuidePage(context, const ExhibitorsScreen()),
       ),
       GuideCard(
         Icons.confirmation_number_outlined,
@@ -521,19 +553,21 @@ class MoreScreen extends StatelessWidget {
         Icons.rocket_launch_outlined,
         'Product launch',
         'Kerala Startup Mission showcase',
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => ProductLaunchScreen(content)),
-        ),
+        () => showGuidePage(context, const ProductLaunchScreen()),
       ),
       GuideCard(
-        Icons.groups_outlined,
-        'Leadership & sponsors',
-        'People and partners behind the event',
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => PartnersScreen(content)),
-        ),
+        Icons.handshake_outlined,
+        'Sponsors',
+        content.sponsors.length > 1
+            ? '${content.sponsors.length} sponsors and ecosystem partners'
+            : 'Sponsors and ecosystem partners',
+        () => showGuidePage(context, const SponsorsScreen()),
+      ),
+      GuideCard(
+        Icons.account_balance_outlined,
+        'Leadership',
+        'State leadership and the advisory committee',
+        () => showGuidePage(context, const LeadershipScreen()),
       ),
       GuideCard(
         Icons.privacy_tip_outlined,
@@ -548,103 +582,6 @@ class MoreScreen extends StatelessWidget {
       VisitPanel(content.event),
     ],
   );
-}
-
-class ExhibitorsScreen extends StatefulWidget {
-  const ExhibitorsScreen({super.key});
-  @override
-  State<ExhibitorsScreen> createState() => _ExhibitorsScreenState();
-}
-
-class _ExhibitorsScreenState extends State<ExhibitorsScreen> {
-  String query = '';
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<ContentProvider>();
-    final visible = state.exhibitors
-        .where(
-          (e) => '${e.name} ${e.description}'.toLowerCase().contains(
-            query.toLowerCase(),
-          ),
-        )
-        .toList();
-    return Scaffold(
-      appBar: AppBar(title: const Text('Exhibitors')),
-      body: ListView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.all(20),
-        children: [
-          const TitleText('Meet your next\ncollaborator.'),
-          const SizedBox(height: 18),
-          if (state.exhibitorsLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          if (state.exhibitorsError != null)
-            StateMessage(
-              state.exhibitorsError!,
-              action: 'Try again',
-              onTap: state.loadExhibitors,
-            ),
-          if (!state.exhibitorsLoading && state.exhibitorsError == null) ...[
-            GuideSearchField(
-              label: 'Search organisations or expertise',
-              onChanged: (v) => setState(() => query = v),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${visible.length} confirmed exhibitors',
-              style: const TextStyle(color: muted, fontSize: 12),
-            ),
-            const SizedBox(height: 14),
-            if (visible.isEmpty)
-              const StateMessage(
-                'No exhibitors match yet. Try another search or check back soon.',
-              ),
-            for (final e in visible)
-              Card(
-                color: Colors.white,
-                margin: const EdgeInsets.only(bottom: 10),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (e.logoUrl.isNotEmpty) ...[
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Image.network(
-                            e.logoUrl,
-                            height: 52,
-                            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      Text(
-                        e.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Text(
-                        e.description,
-                        style: const TextStyle(color: muted, height: 1.45),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 class RegistrationScreen extends StatefulWidget {
@@ -668,361 +605,211 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  /// Keeps the options already shown when a refresh fails.
+  Future<bool> _load() async {
     setState(() => _error = null);
     try {
       final options = await _service.options();
       if (mounted) setState(() => _options = options);
+      return true;
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted && _options == null) setState(() => _error = error);
+      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Registration')),
-    body: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.all(20),
-      children: [
-        const TitleText('Three ways\nto take part.'),
-        const SizedBox(height: 9),
-        const Text(
-          'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
-          style: TextStyle(color: muted, height: 1.5),
-        ),
-        const SizedBox(height: 24),
-        if (_options == null && _error == null)
-          const Center(child: CircularProgressIndicator()),
-        if (_error != null)
-          StateMessage(
-            'Live registration options are unavailable. Please try again.',
-            action: 'Try again',
-            onTap: _load,
-          ),
-        if (_options case final options?) ...[
-          if (!options.enabled)
-            const StateMessage(
-              'Registration is not accepting public submissions right now. Current options are shown below.',
-            ),
-          const Eyebrow('DELEGATE PASSES'),
+    body: LiveRefresh(
+      onRefresh: _load,
+      child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        children: [
+          const TitleText('Three ways\nto take part.'),
           const SizedBox(height: 9),
-          for (final category in options.categories.where(
-            (category) => category.kind == 'delegate',
-          ))
-            _CategoryRow(category),
-          const SizedBox(height: 8),
           const Text(
-            'Prices and availability update live from event registration. Invitation-only categories and private complimentary links are not shown.',
-            style: TextStyle(color: muted, fontSize: 11, height: 1.4),
+            'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
+            style: TextStyle(color: muted, height: 1.5),
+          ),
+          const SizedBox(height: 24),
+          if (_options == null && _error == null)
+            const Center(child: CircularProgressIndicator()),
+          if (_error != null)
+            StateMessage(
+              'Live registration options are unavailable. Please try again.',
+              action: 'Try again',
+              onTap: _load,
+            ),
+          if (_options case final options?) ...[
+            if (!options.enabled)
+              const StateMessage(
+                'Registration is not accepting public submissions right now. Current options are shown below.',
+              ),
+            const Eyebrow('DELEGATE PASSES'),
+            const SizedBox(height: 9),
+            for (final category in options.categories.where(
+              (category) => category.kind == 'delegate',
+            ))
+              _CategoryRow(category),
+            const SizedBox(height: 8),
+            const Text(
+              'Prices and availability update live from event registration. Invitation-only categories and private complimentary links are not shown.',
+              style: TextStyle(color: muted, fontSize: 11, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed:
+                _options?.enabled == true &&
+                    _options!.categories.any(
+                      (category) =>
+                          category.kind == 'delegate' && category.open,
+                    )
+                ? () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DelegateRegistrationScreen(),
+                    ),
+                  )
+                : null,
+            child: const Text('Register in the app'),
+          ),
+          const SizedBox(height: 27),
+          const Eyebrow('EXHIBITION SPACE'),
+          const SizedBox(height: 9),
+          if (_options case final options?)
+            for (final category in options.categories.where(
+              (category) => category.kind == 'exhibitor',
+            ))
+              _CategoryRow(category),
+          const SizedBox(height: 12),
+          FilledButton(
+            onPressed: () => openLink(
+              context,
+              '${RegistrationService.apiBaseUrl}/exhibitors',
+            ),
+            child: const Text('Book exhibition space'),
+          ),
+          const SizedBox(height: 27),
+          const Eyebrow('SPONSORSHIP'),
+          const SizedBox(height: 9),
+          const Text(
+            'Sponsorships are arranged with the event team.',
+            style: TextStyle(color: muted),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => openLink(
+              context,
+              'mailto:${widget.event.sponsorshipEmail}?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
+            ),
+            child: const Text('Enquire about sponsorship'),
           ),
         ],
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed:
-              _options?.enabled == true &&
-                  _options!.categories.any(
-                    (category) => category.kind == 'delegate' && category.open,
-                  )
-              ? () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DelegateRegistrationScreen(),
-                  ),
-                )
-              : null,
-          child: const Text('Register in the app'),
-        ),
-        const SizedBox(height: 27),
-        const Eyebrow('EXHIBITION SPACE'),
-        const SizedBox(height: 9),
-        if (_options case final options?)
-          for (final category in options.categories.where(
-            (category) => category.kind == 'exhibitor',
-          ))
-            _CategoryRow(category),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: () =>
-              openLink(context, '${RegistrationService.apiBaseUrl}/exhibitors'),
-          child: const Text('Book exhibition space'),
-        ),
-        const SizedBox(height: 27),
-        const Eyebrow('SPONSORSHIP'),
-        const SizedBox(height: 9),
-        const Text(
-          'Sponsorships are arranged with the event team.',
-          style: TextStyle(color: muted),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: () => openLink(
-            context,
-            'mailto:${widget.event.sponsorshipEmail}?subject=Bio%20Connect%204.0%20-%20Sponsorship%20enquiry',
-          ),
-          child: const Text('Enquire about sponsorship'),
-        ),
-      ],
-    ),
-  );
-}
-
-class PartnersScreen extends StatelessWidget {
-  const PartnersScreen(this.content, {super.key});
-  final EventContent content;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('People & partners')),
-    body: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.all(20),
-      children: [
-        const TitleText('A shared vision\nfor life sciences.'),
-        const SizedBox(height: 18),
-        Text(
-          content.leadership.intro,
-          style: TextStyle(color: muted, height: 1.5),
-        ),
-        const SizedBox(height: 24),
-        const Eyebrow('STATE LEADERSHIP'),
-        const SizedBox(height: 10),
-        for (final person in content.leadership.people)
-          _PersonCard(
-            name: person.name,
-            role: person.role,
-            badge: person.badge,
-          ),
-        const SizedBox(height: 20),
-        const Eyebrow('ADVISORY COMMITTEE'),
-        const SizedBox(height: 10),
-        Text(
-          content.leadership.advisoryNote,
-          style: TextStyle(color: muted, height: 1.5),
-        ),
-        const SizedBox(height: 24),
-        const Eyebrow('SPONSOR'),
-        const SizedBox(height: 10),
-        Card(
-          color: Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Image.network(
-                  content.sponsor.logoUrl,
-                  height: 66,
-                  errorBuilder: (_, _, _) => Image.asset(
-                    'assets/images/kerala-rubber-logo.png',
-                    height: 66,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  content.sponsor.name,
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  content.sponsor.description,
-                  style: TextStyle(color: muted, height: 1.45),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => openLink(context, content.sponsor.websiteUrl),
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Visit sponsor website'),
-        ),
-        const SizedBox(height: 28),
-        const Eyebrow('ECOSYSTEM PARTNERS'),
-        const SizedBox(height: 10),
-        for (final partner in content.ecosystemPartners)
-          Card(
-            color: Colors.white,
-            margin: const EdgeInsets.only(bottom: 9),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 68,
-                    height: 44,
-                    child: Image.network(
-                      partner.logoUrl,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const Icon(
-                        Icons.account_balance_outlined,
-                        color: forest,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      partner.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
+      ),
     ),
   );
 }
 
 class ProductLaunchScreen extends StatelessWidget {
-  const ProductLaunchScreen(this.content, {super.key});
-  final EventContent content;
+  const ProductLaunchScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Product launch')),
-    body: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-      children: [
-        Eyebrow(content.productLaunch.eyebrow.toUpperCase()),
-        const SizedBox(height: 8),
-        TitleText(content.productLaunch.title),
-        const SizedBox(height: 12),
-        Text(
-          content.productLaunch.description,
-          style: TextStyle(color: muted, height: 1.5),
+  Widget build(BuildContext context) {
+    final state = context.watch<ContentProvider>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Product launch')),
+      body: LiveRefresh(
+        onRefresh: state.load,
+        child: _body(context, state.content!),
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, EventContent content) => ListView(
+    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+    children: [
+      Eyebrow(content.productLaunch.eyebrow.toUpperCase()),
+      const SizedBox(height: 8),
+      TitleText(content.productLaunch.title),
+      const SizedBox(height: 12),
+      Text(
+        content.productLaunch.description,
+        style: TextStyle(color: muted, height: 1.5),
+      ),
+      const SizedBox(height: 22),
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: forest,
+          borderRadius: BorderRadius.circular(18),
         ),
-        const SizedBox(height: 22),
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: forest,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.event_available_outlined, color: lime),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'APPLICATION DEADLINE',
-                      style: TextStyle(
-                        color: lime,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      content.productLaunch.deadline,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'Manrope',
-                        fontSize: 21,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Eyebrow('WHO CAN APPLY'),
-        const SizedBox(height: 10),
-        for (var i = 0; i < content.productLaunch.eligibility.length; i++)
-          _InfoRow(
-            i == 0
-                ? Icons.rocket_launch_outlined
-                : Icons.business_center_outlined,
-            content.productLaunch.eligibility[i].title,
-            content.productLaunch.eligibility[i].description,
-          ),
-        const SizedBox(height: 20),
-        const Eyebrow('FOCUS AREAS'),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        child: Row(
           children: [
-            for (final item in content.productLaunch.focusAreas)
-              Chip(label: Text(item), backgroundColor: cream),
+            const Icon(Icons.event_available_outlined, color: lime),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'APPLICATION DEADLINE',
+                    style: TextStyle(
+                      color: lime,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    content.productLaunch.deadline,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Manrope',
+                      fontSize: 21,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 28),
-        FilledButton.icon(
-          onPressed: () => openLink(context, content.productLaunch.applyUrl),
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Apply via Kerala Startup Mission'),
+      ),
+      const SizedBox(height: 24),
+      const Eyebrow('WHO CAN APPLY'),
+      const SizedBox(height: 10),
+      for (var i = 0; i < content.productLaunch.eligibility.length; i++)
+        _InfoRow(
+          i == 0
+              ? Icons.rocket_launch_outlined
+              : Icons.business_center_outlined,
+          content.productLaunch.eligibility[i].title,
+          content.productLaunch.eligibility[i].description,
         ),
-      ],
-    ),
-  );
-}
-
-class _PersonCard extends StatelessWidget {
-  const _PersonCard({
-    required this.name,
-    required this.role,
-    required this.badge,
-  });
-  final String name, role, badge;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    margin: const EdgeInsets.only(bottom: 9),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      const SizedBox(height: 20),
+      const Eyebrow('FOCUS AREAS'),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
-          const CircleAvatar(
-            backgroundColor: cream,
-            foregroundColor: forest,
-            child: Icon(Icons.account_balance_outlined),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  badge.toUpperCase(),
-                  style: const TextStyle(
-                    color: forest,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  name,
-                  style: const TextStyle(fontFamily: 'Manrope', fontSize: 17),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  role,
-                  style: const TextStyle(
-                    color: muted,
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          for (final item in content.productLaunch.focusAreas)
+            Chip(label: Text(item), backgroundColor: cream),
         ],
       ),
-    ),
+      const SizedBox(height: 28),
+      FilledButton.icon(
+        onPressed: () => openLink(context, content.productLaunch.applyUrl),
+        icon: const Icon(Icons.open_in_new),
+        label: const Text('Apply via Kerala Startup Mission'),
+      ),
+    ],
   );
 }
 

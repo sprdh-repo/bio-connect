@@ -132,7 +132,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Venue & directions'));
     await tester.pumpAndSettle();
-    expect(find.text('Floor plan to be announced'), findsOneWidget);
+    // No floor plan is published, so nothing about one is shown.
+    expect(find.text('Arrival & check-in'), findsOneWidget);
+    expect(find.text('Open venue floor plan'), findsNothing);
+    expect(find.text('Floor plan to be announced'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.text('FAQs'));

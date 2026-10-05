@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
+import 'exhibitors_screen.dart';
 import 'my_passes_screen.dart';
+import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
 import '../models/event_content.dart';
 import '../models/event_guide.dart';
@@ -22,8 +24,8 @@ class AttendeeHomeScreen extends StatelessWidget {
   final EventContent content;
   final VoidCallback sessions, speakers;
   @override
-  Widget build(BuildContext context) => RefreshIndicator(
-    onRefresh: () => AppFeedback.refresh(context.read<ContentProvider>().load),
+  Widget build(BuildContext context) => LiveRefresh(
+    onRefresh: context.read<ContentProvider>().load,
     child: ListView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       physics: const AlwaysScrollableScrollPhysics(),
@@ -128,10 +130,7 @@ class AttendeeHomeScreen extends StatelessWidget {
                   Icons.storefront_outlined,
                   'Exhibitors',
                   'Explore the expo',
-                  () {
-                    context.read<ContentProvider>().loadExhibitors();
-                    showGuidePage(context, const ExhibitorsScreen());
-                  },
+                  () => showGuidePage(context, const ExhibitorsScreen()),
                   width,
                 ),
               ],
@@ -169,7 +168,7 @@ class AttendeeHomeScreen extends StatelessWidget {
             context,
             Scaffold(
               appBar: AppBar(title: const Text('Explore Bio Connect')),
-              body: ExploreScreen(content),
+              body: const ExploreScreen(),
             ),
           ),
         ),
@@ -291,8 +290,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ),
         )
         .toList();
-    return RefreshIndicator(
-      onRefresh: () => AppFeedback.refresh(state.load),
+    return LiveRefresh(
+      onRefresh: state.load,
       child: ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
@@ -381,50 +380,60 @@ class SessionDetailScreen extends StatelessWidget {
   final String id;
   @override
   Widget build(BuildContext context) {
-    final items = context
-        .watch<ContentProvider>()
-        .content!
-        .guide
-        .sessions
-        .where((s) => s.id == id);
+    final state = context.watch<ContentProvider>();
+    final items = state.content!.guide.sessions.where((s) => s.id == id);
     return Scaffold(
       appBar: AppBar(title: const Text('Session details')),
-      body: items.isEmpty
-          ? const Center(child: Text('This session is no longer published.'))
-          : Builder(
-              builder: (context) {
-                final s = items.first;
-                return ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    TitleText(s.title),
-                    const SizedBox(height: 20),
-                    _DetailBlock(
-                      'When',
-                      s.startsAt == null
-                          ? 'To be announced'
-                          : '${sessionDay(s.startsAt!)}\n${sessionTime(s.startsAt!)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
-                    ),
-                    _DetailBlock(
-                      'Where',
-                      s.location.isEmpty ? 'To be announced' : s.location,
-                    ),
-                    _DetailBlock(
-                      'Speakers',
-                      s.speakers.isEmpty ? 'To be announced' : s.speakers,
-                    ),
-                    _DetailBlock(
-                      'About the session',
-                      s.description.isEmpty
-                          ? 'Details to be announced'
-                          : s.description,
-                    ),
-                  ],
-                );
-              },
-            ),
+      body: LiveRefresh(
+        onRefresh: state.load,
+        child: items.isEmpty
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                children: const [
+                  GuideNotice(
+                    title: 'This session is no longer published',
+                    message: 'It may have been moved or withdrawn. Check the programme for the latest timetable.',
+                    icon: Icons.event_busy_outlined,
+                  ),
+                ],
+              )
+            : Builder(
+                builder: (context) {
+                  final s = items.first;
+                  return ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      TitleText(s.title),
+                      const SizedBox(height: 20),
+                      _DetailBlock(
+                        'When',
+                        s.startsAt == null
+                            ? 'To be announced'
+                            : '${sessionDay(s.startsAt!)}\n${sessionTime(s.startsAt!)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
+                      ),
+                      _DetailBlock(
+                        'Where',
+                        s.location.isEmpty ? 'To be announced' : s.location,
+                      ),
+                      _DetailBlock(
+                        'Speakers',
+                        s.speakers.isEmpty ? 'To be announced' : s.speakers,
+                      ),
+                      _DetailBlock(
+                        'About the session',
+                        s.description.isEmpty
+                            ? 'Details to be announced'
+                            : s.description,
+                      ),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }
@@ -437,8 +446,8 @@ class VenueScreen extends StatelessWidget {
     final event = state.content!.event, venue = state.content!.guide.venue;
     return Scaffold(
       appBar: AppBar(title: const Text('Venue & directions')),
-      body: RefreshIndicator(
-        onRefresh: () => AppFeedback.refresh(state.load),
+      body: LiveRefresh(
+        onRefresh: state.load,
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
@@ -468,13 +477,8 @@ class VenueScreen extends StatelessWidget {
                   ? 'Venue accessibility details to be announced.'
                   : venue.accessibility,
             ),
-            if (venue.floorPlanUrl.isEmpty)
-              const GuideNotice(
-                title: 'Floor plan to be announced',
-                message: 'Hall locations and the venue layout will appear here once confirmed.',
-                icon: Icons.map_outlined,
-              )
-            else
+            // Shown only once the organisers publish a floor plan.
+            if (venue.floorPlanUrl.isNotEmpty)
               OutlinedButton.icon(
                 onPressed: () => openLink(context, venue.floorPlanUrl),
                 icon: const Icon(Icons.map_outlined),
@@ -497,8 +501,8 @@ class ActivitiesScreen extends StatelessWidget {
     final content = state.content!;
     return Scaffold(
       appBar: AppBar(title: const Text('Activities')),
-      body: RefreshIndicator(
-        onRefresh: () => AppFeedback.refresh(state.load),
+      body: LiveRefresh(
+        onRefresh: state.load,
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),
@@ -590,8 +594,8 @@ class _FaqScreenState extends State<FaqScreen> {
     );
     return Scaffold(
       appBar: AppBar(title: const Text('FAQs')),
-      body: RefreshIndicator(
-        onRefresh: () => AppFeedback.refresh(state.load),
+      body: LiveRefresh(
+        onRefresh: state.load,
         child: ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           physics: const AlwaysScrollableScrollPhysics(),

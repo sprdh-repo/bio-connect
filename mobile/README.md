@@ -19,7 +19,13 @@ App IDs and release signing are still placeholders and must be set before store 
 - Home: attendee quick links, event dates, venue, registration and access to themes.
 - Sessions: published timetable, day filters, search and session details in India time.
 - Speakers: the backend's published profiles, search and LinkedIn links where supplied.
-- Guide: venue details, floor plan, activities, searchable FAQs, exhibitor directory, passes, brochure and partners.
+- Guide: venue details, activities, searchable FAQs, exhibitor directory, passes, brochure, sponsors and leadership.
+- Exhibitors: searchable directory with stall-type filters and a detail page per exhibitor.
+  Stall numbers, stall sorting and the floor plan link appear only once the backend publishes them.
+- Sponsors and Leadership: separate pages driven by app content (sponsors, ecosystem partners, state leadership and the advisory committee).
+- Pull to refresh on every page backed by live data; if the backend is unreachable the page keeps saved content and says so.
+- Store updates: release builds check the Play Store / App Store (India listing) with [`upgrader`](https://pub.dev/packages/upgrader) and offer Update or Later, at most once a day.
+  To force an update, add `[Minimum supported app version: x.y.z]` to the store description.
 - Backend event-guide editor with draft/published controls, public APIs and staff audit history.
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
 - My passes: email or WhatsApp OTP, optional admission QR scanning, secure saved passes and on-phone admission QR display.
@@ -43,7 +49,8 @@ The bundled JSON is a curated offline snapshot of the website.
 The backend `app_content` and `speakers` tables are the runtime sources of truth; update the snapshot as part of a release so offline users receive the same content.
 Speaker portraits and theme art are copied from the website's approved assets.
 The live content endpoint is `https://reg.bioconnect.kerala.gov.in/api/v1/public/app-content`.
-The live exhibitor endpoint is `https://reg.bioconnect.kerala.gov.in/api/v1/public/exhibitors` and returns an `exhibitors` array with `name`, `description` and `logo_url` fields.
+The live exhibitor endpoint is `https://reg.bioconnect.kerala.gov.in/api/v1/public/exhibitors` and returns an `exhibitors` array with `name`, `description`, `logo_url`, `stall_number` and `stall_type` fields.
+Staff allocate stall numbers on the admin registration page.
 Registration options and current prices come from `/api/v1/categories`. `free_only` invitation categories are intentionally excluded from public mobile flows; private complimentary links remain admin-generated web URLs.
 
 For local or staging backends, run with `--dart-define=BIO_CONNECT_API_BASE_URL=https://your-host`.
