@@ -37,7 +37,12 @@ func TestPublicSpeakers(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if len(out.Speakers) != 48 || out.Speakers[0].ID == "jayakrishna-ambati" {
-		t.Fatalf("unpublished speaker remains visible: %s", rr.Body.String())
+	if len(out.Speakers) != 55 {
+		t.Fatalf("got %d speakers after unpublishing one, want 55", len(out.Speakers))
+	}
+	for _, s := range out.Speakers {
+		if s.ID == "jayakrishna-ambati" {
+			t.Fatalf("unpublished speaker remains visible: %s", rr.Body.String())
+		}
 	}
 }
