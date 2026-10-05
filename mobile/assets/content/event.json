@@ -726,7 +726,7 @@
   "event_guide": {
     "activities": [],
     "faqs": [],
-    "revision": 2,
+    "revision": 3,
     "sessions": [],
     "venue": {
       "accessibility": "",
@@ -825,15 +825,9 @@
     ],
     "home_links": [
       {
-        "key": "my_passes",
-        "subtitle": "View your admission QR on this phone",
-        "title": "My passes",
-        "url": ""
-      },
-      {
-        "key": "registration",
-        "subtitle": "Register or review delegate options",
-        "title": "Registration & passes",
+        "key": "sponsors",
+        "subtitle": "",
+        "title": "Sponsors",
         "url": ""
       },
       {
@@ -843,9 +837,15 @@
         "url": ""
       },
       {
-        "key": "sponsors",
-        "subtitle": "",
-        "title": "Sponsors",
+        "key": "my_passes",
+        "subtitle": "View your admission QR on this phone",
+        "title": "My passes",
+        "url": ""
+      },
+      {
+        "key": "registration",
+        "subtitle": "Register or review delegate options",
+        "title": "Registration & passes",
         "url": ""
       }
     ],
