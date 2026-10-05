@@ -25,7 +25,7 @@ void main() {
     expect(find.text('The voices\ntaking the stage.'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Jayakrishna Ambati');
     await tester.pumpAndSettle();
-    expect(find.text('1 speakers'), findsOneWidget);
+    expect(find.text('1 speaker'), findsOneWidget);
     expect(find.text('Dr. Jayakrishna Ambati'), findsOneWidget);
   });
 }

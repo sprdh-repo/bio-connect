@@ -13,6 +13,7 @@ import 'widgets/motion.dart';
 import 'widgets/nav_bar.dart';
 
 import 'models/event_content.dart';
+import 'models/event_guide.dart';
 import 'providers/content_provider.dart';
 import 'screens/delegate_registration_screen.dart';
 import 'screens/event_guide_screens.dart';
@@ -574,56 +575,111 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
         .toList();
     final copy =
         context.watch<ContentProvider>().content?.text ?? (_, text) => text;
+    final textScale = MediaQuery.textScalerOf(context);
     return LiveRefresh(
       onRefresh: context.read<ContentProvider>().load,
-      child: ListView(
+      child: CustomScrollView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
-        children: [
-          Eyebrow(copy('speakers.eyebrow', 'CONCLAVE SPEAKERS')),
-          const SizedBox(height: 7),
-          TitleText(copy('speakers.title', 'The voices\ntaking the stage.')),
-          const SizedBox(height: 16),
-          TextField(
-            controller: queryController,
-            onTapOutside: (_) => FocusScope.of(context).unfocus(),
-            textInputAction: TextInputAction.search,
-            onSubmitted: (_) => FocusScope.of(context).unfocus(),
-            onChanged: (v) => setState(() => query = v),
-            decoration: InputDecoration(
-              hintText: 'Search name or organisation',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: query.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        AppFeedback.selection();
-                        queryController.clear();
-                        setState(() => query = '');
-                      },
-                      icon: const Icon(Icons.close),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            sliver: SliverList.list(
+              children: [
+                Eyebrow(copy('speakers.eyebrow', 'CONCLAVE SPEAKERS')),
+                const SizedBox(height: 7),
+                TitleText(
+                  copy('speakers.title', 'The voices\ntaking the stage.'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: queryController,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  onChanged: (v) => setState(() => query = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search name or organisation',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: query.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              AppFeedback.selection();
+                              queryController.clear();
+                              setState(() => query = '');
+                            },
+                            icon: const Icon(Icons.close),
+                          ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide.none,
-              ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cream,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      '${visible.length} ${visible.length == 1 ? 'speaker' : 'speakers'}',
+                      style: const TextStyle(
+                        color: forest,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (visible.isEmpty)
+                  const StateMessage(
+                    'No speakers match your search. Try another name or organisation.',
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            '${visible.length} speakers',
-            style: const TextStyle(color: muted, fontSize: 12),
-          ),
-          const SizedBox(height: 14),
-          if (visible.isEmpty)
-            const StateMessage(
-              'No speakers match your search. Try another name or organisation.',
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.crossAxisExtent > 560 ? 3 : 2;
+                const gap = 12.0;
+                final width =
+                    (constraints.crossAxisExtent - gap * (columns - 1)) /
+                    columns;
+                return SliverGrid.builder(
+                  itemCount: visible.length,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: gap,
+                    crossAxisSpacing: gap,
+                    // Portrait plus up to six lines of text.
+                    mainAxisExtent: width * 1.1 + textScale.scale(124),
+                  ),
+                  // Only the first screenful animates in; scrolling stays calm.
+                  itemBuilder: (context, i) => i < 6
+                      ? Reveal(
+                          key: ValueKey(visible[i].id),
+                          order: i,
+                          child: SpeakerCard(visible[i]),
+                        )
+                      : SpeakerCard(visible[i], key: ValueKey(visible[i].id)),
+                );
+              },
             ),
-          for (final s in visible) SpeakerRow(s),
+          ),
         ],
       ),
     );
@@ -953,70 +1009,237 @@ class _InfoRow extends StatelessWidget {
 class SpeakerDetailScreen extends StatelessWidget {
   const SpeakerDetailScreen(this.speaker, {super.key});
   final Speaker speaker;
+
+  /// Published sessions that name this speaker, ignoring honorifics.
+  List<GuideSession> _sessions(EventContent? content) {
+    if (content == null) return const [];
+    final name = speaker.name
+        .replaceFirst(
+          RegExp(
+            r'^((dr|prof|mr|mrs|ms|shri|smt)\.?\s+)+',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .toLowerCase()
+        .trim();
+    if (name.isEmpty) return const [];
+    return content.guide.sessions
+        .where((s) => s.speakers.toLowerCase().contains(name))
+        .toList();
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Speaker')),
-    body: ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240),
-              child: AspectRatio(
-                aspectRatio: 4 / 5,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: ColoredBox(
-                    color: cream,
-                    child: SpeakerImage(speaker, fit: BoxFit.contain),
+  Widget build(BuildContext context) {
+    final sessions = _sessions(context.watch<ContentProvider?>()?.content);
+    final width = MediaQuery.sizeOf(context).width;
+    final portrait = (width * .6).clamp(160.0, 240.0);
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            stretch: true,
+            // The clipped flexible space paints the header, so the bar itself
+            // stays transparent and flat while content scrolls under it.
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+            expandedHeight: portrait * 1.25 + kToolbarHeight + 36,
+            title: const Text('Speaker'),
+            // The flexible space is sized to the bar's current height, so the
+            // rounded clip follows the bottom edge as the header collapses.
+            flexibleSpace: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(28),
+              ),
+              child: FlexibleSpaceBar(
+                collapseMode: CollapseMode.parallax,
+                background: DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: forest,
+                    image: DecorationImage(
+                      image: AssetImage('assets/images/pass-texture.webp'),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                        Color(0x59051C17),
+                        BlendMode.srcOver,
+                      ),
+                    ),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        top: kToolbarHeight,
+                        bottom: 28,
+                      ),
+                      child: Center(
+                        child: Hero(
+                          tag: 'speaker-photo-${speaker.id}',
+                          child: Container(
+                            width: portrait,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: .14),
+                              borderRadius: BorderRadius.circular(26),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x40000000),
+                                  blurRadius: 24,
+                                  offset: Offset(0, 12),
+                                ),
+                              ],
+                            ),
+                            child: AspectRatio(
+                              aspectRatio: 4 / 5,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child: ColoredBox(
+                                  color: cream,
+                                  child: SpeakerImage(
+                                    speaker,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 26, 24, 36),
+            sliver: SliverList.list(
+              children: [
+                const Reveal(child: Eyebrow('CONCLAVE SPEAKER')),
+                const SizedBox(height: 10),
+                Reveal(
+                  order: 1,
+                  child: Text(
+                    speaker.name,
+                    style: const TextStyle(
+                      fontFamily: 'Manrope',
+                      fontSize: 30,
+                      height: 1.15,
+                    ),
+                  ),
+                ),
+                if (speaker.role.isNotEmpty || speaker.organization.isNotEmpty)
+                  Reveal(
+                    order: 2,
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 20),
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        children: [
+                          if (speaker.role.isNotEmpty)
+                            _SpeakerFact(
+                              Icons.work_outline_rounded,
+                              'Role',
+                              speaker.role,
+                            ),
+                          if (speaker.role.isNotEmpty &&
+                              speaker.organization.isNotEmpty)
+                            const Divider(height: 1, indent: 62, color: cream),
+                          if (speaker.organization.isNotEmpty)
+                            _SpeakerFact(
+                              Icons.apartment_rounded,
+                              'Organisation',
+                              speaker.organization,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (sessions.isNotEmpty) ...[
+                  const SizedBox(height: 28),
+                  const Eyebrow('ON STAGE'),
+                  const SizedBox(height: 10),
+                  for (final s in sessions)
+                    GuideCard(
+                      Icons.event_note_outlined,
+                      s.title,
+                      [
+                        if (s.startsAt case final start?)
+                          '${sessionDay(start)} · ${sessionTime(start)} IST',
+                        if (s.location.isNotEmpty) s.location,
+                      ].join('\n'),
+                      () => showGuidePage(context, SessionDetailScreen(s.id)),
+                    ),
+                ],
+                if (speaker.linkedin.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => openLink(context, speaker.linkedin),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('LinkedIn profile'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SpeakerFact extends StatelessWidget {
+  const _SpeakerFact(this.icon, this.label, this.value);
+  final IconData icon;
+  final String label, value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.all(10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: cream,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, color: forest, size: 20),
         ),
-        Padding(
-          padding: const EdgeInsets.all(24),
+        const SizedBox(width: 12),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Eyebrow('CONCLAVE SPEAKER'),
-              const SizedBox(height: 10),
               Text(
-                speaker.name,
-                style: const TextStyle(fontFamily: 'Manrope', fontSize: 30),
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
               ),
-              if (speaker.role.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  speaker.role,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
                 ),
-              ],
-              if (speaker.organization.isNotEmpty) ...[
-                const SizedBox(height: 5),
-                Text(
-                  speaker.organization,
-                  style: const TextStyle(
-                    color: muted,
-                    fontSize: 15,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-              if (speaker.linkedin.isNotEmpty) ...[
-                const SizedBox(height: 23),
-                OutlinedButton.icon(
-                  onPressed: () => openLink(context, speaker.linkedin),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('LinkedIn profile'),
-                ),
-              ],
+              ),
             ],
           ),
         ),
@@ -1342,63 +1565,81 @@ class _SpeakerFallback extends StatelessWidget {
   );
 }
 
-class SpeakerRow extends StatelessWidget {
-  const SpeakerRow(this.speaker, {super.key});
+/// A speaker in the directory grid: portrait first, then name and affiliation.
+class SpeakerCard extends StatelessWidget {
+  const SpeakerCard(this.speaker, {super.key});
   final Speaker speaker;
   @override
   Widget build(BuildContext context) => Pressable(
-    child: Card(
+    child: Material(
       color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 9),
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => SpeakerDetailScreen(speaker)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(9),
-                child: SizedBox(
-                  width: 70,
-                  height: 76,
-                  child: SpeakerImage(speaker, width: 70),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 1 / 1.1,
+              child: Hero(
+                tag: 'speaker-photo-${speaker.id}',
+                child: ColoredBox(
+                  color: cream,
+                  child: SpeakerImage(speaker, width: double.infinity),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       speaker.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 13.5,
+                        height: 1.25,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      speaker.role,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: muted, fontSize: 11),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      speaker.organization,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: muted, fontSize: 11),
-                    ),
+                    if (speaker.role.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        speaker.role,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: muted,
+                          fontSize: 11.5,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    if (speaker.organization.isNotEmpty)
+                      Text(
+                        speaker.organization,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: forest,
+                          fontSize: 11,
+                          height: 1.3,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: forest),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     ),
