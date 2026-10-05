@@ -382,6 +382,63 @@ func (a *App) packDownload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="Bio-Connect-4.0-passes.zip"`)
 	w.Write(b)
 }
+
+// adminPassDownload hands a reviewer one attendee's pass ("<pass id>.pdf") or
+// the whole registration's pack ("all.zip"), for officials who have no inbox
+// of their own. Same rules as the public links: approved registrations and
+// unrevoked passes only. Each download is audited before any bytes go out,
+// since the PDF carries the QR code that admits its holder.
+func (a *App) adminPassDownload(w http.ResponseWriter, r *http.Request, rid, file, staff string) {
+	var ok bool
+	var label, filename string // pass number, or the reference for a pack
+	if file == "all.zip" {
+		e := a.DB.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM passes p JOIN registrations r ON r.id=p.registration_id WHERE r.id=$1 AND r.status='approved' AND p.revoked_at IS NULL), (SELECT reference FROM registrations WHERE id=$1)", rid).Scan(&ok, &label)
+		if e != nil || !ok {
+			fail(w, 404, "no active passes for this registration")
+			return
+		}
+		filename = "Bio-Connect-4.0-passes-" + label + ".zip"
+	} else {
+		pid, isPDF := strings.CutSuffix(file, ".pdf")
+		e := a.DB.QueryRow(r.Context(), "SELECT p.number FROM passes p JOIN registrations r ON r.id=p.registration_id WHERE p.id=$1 AND r.id=$2 AND r.status='approved' AND p.revoked_at IS NULL", pid, rid).Scan(&label)
+		if !isPDF || e != nil {
+			fail(w, 404, "pass not found or revoked")
+			return
+		}
+		file, filename = pid, "Bio-Connect-4.0-pass-"+label+".pdf"
+	}
+	detail := label
+	if file == "all.zip" {
+		detail = "all passes"
+	}
+	tx, e := a.DB.Begin(r.Context())
+	if e == nil {
+		defer tx.Rollback(r.Context())
+		if e = audit(r.Context(), tx, staff, rid, "pass_downloaded", detail); e == nil {
+			e = tx.Commit(r.Context())
+		}
+	}
+	if e != nil {
+		fail(w, 503, "download unavailable")
+		return
+	}
+	var b []byte
+	mime := "application/pdf"
+	if file == "all.zip" {
+		mime = "application/zip"
+		b, e = a.pack(r.Context(), rid)
+	} else {
+		b, e = a.passPDF(r.Context(), file)
+	}
+	if e != nil {
+		fail(w, 503, "pass is being prepared; retry shortly")
+		return
+	}
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(b)
+}
 func safeCell(s string) string {
 	trim := strings.TrimLeft(s, " \t\r\n")
 	if len(trim) > 0 && strings.ContainsAny(trim[:1], "=+-@") || strings.HasPrefix(s, "\t") || strings.HasPrefix(s, "\r") {

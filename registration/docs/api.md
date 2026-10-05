@@ -186,6 +186,8 @@ Roles are disjoint:
 | `GET /admin/registrations/{id}` | full record: registration, category, payments, files, passes, deliveries, audit trail |
 | `POST /admin/registrations/{id}/review` | state transitions, see below |
 | `GET /admin/registrations/{id}/files/{file}` | private receipt/logo download |
+| `GET /admin/registrations/{id}/passes/{pass_id}.pdf` | one attendee's pass PDF, for attendees who cannot receive email; approved registrations and unrevoked passes only; audited as `pass_downloaded` |
+| `GET /admin/registrations/{id}/passes/all.zip` | every active pass on the registration as a ZIP; same rules and audit |
 | `POST /admin/registrations/{id}/attendees` | same body and rules as the registrant route; fills an unassigned pass on the exhibitor's behalf, attributed to the staff member in the audit trail. After approval the pass is issued at once but never sent; staff send it with the per-pass `send` review action |
 | `POST /admin/registrations/{id}/attendees/{attendee}` | `{name, designation, email, phone, whatsapp_consent}` corrects one attendee on any registration that is not `cancelled`. Emails stay unique within the registration. Their active pass keeps its number and QR and re-renders with the new name or designation; queued deliveries to a changed email or phone are cancelled. Nothing is sent. A delegate's contact details follow their one attendee |
 | `POST /admin/registrations/{id}/attendees/{attendee}/remove` | `{note}` (may be empty) removes the attendee and revokes their pass, cancelling its queued deliveries; their place becomes unassigned. A registration keeps at least one attendee. Removed attendees are retained (`removed_at`) for the pass history but leave every listing, count and export |

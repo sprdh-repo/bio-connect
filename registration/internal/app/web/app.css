@@ -130,6 +130,7 @@ button:hover, .button:hover { transform: translateY(-2px); background: #cce98f; 
 .danger:hover { background: #a5392a; }
 button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.pass-pack { margin-bottom: 22px; }
 
 /* ---- pay callout ---- */
 .pay-card { border-color: rgba(11, 51, 41, 0.3); box-shadow: 0 14px 34px -28px rgba(11, 51, 41, 0.85); }

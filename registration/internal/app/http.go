@@ -592,6 +592,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			a.downloadFile(w, r, rid, parts[3])
 			return
 		}
+		if len(parts) == 4 && parts[2] == "passes" && r.Method == "GET" {
+			a.adminPassDownload(w, r, rid, parts[3], p.ID)
+			return
+		}
 		if len(parts) == 3 && parts[2] == "files" && r.Method == "POST" {
 			a.adminUpload(w, r, rid, p)
 			return
