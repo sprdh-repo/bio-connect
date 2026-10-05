@@ -43,6 +43,7 @@ dependencies:
   upgrader: ^13.7.0
   cached_network_image: ^4.0.4
   flutter_cache_manager: ^3.4.5
+  custom_refresh_indicator: ^4.0.2
 
 dev_dependencies:
   flutter_test:

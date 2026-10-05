@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/registration_service.dart';
 import '../widgets/interaction.dart';
+import '../widgets/motion.dart';
 
 const _forest = Color(0xFF0B3329);
 const _cream = Color(0xFFF3F1E9);
@@ -251,7 +252,7 @@ class _DelegateRegistrationScreenState
             : null,
       ),
       body: _categories == null && _error == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: BioLoader(label: 'Loading pass categories'))
           : AbsorbPointer(
               absorbing: _submitting || _saved,
               child: Form(

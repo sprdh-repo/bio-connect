@@ -4,6 +4,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../main.dart';
 import 'interaction.dart';
+import 'motion.dart';
 
 /// Pull-to-refresh for pages backed by live data. [onRefresh] completes with
 /// whether the backend was reached; on failure the page keeps what it shows and
@@ -14,9 +15,7 @@ class LiveRefresh extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => RefreshIndicator(
-    color: forest,
-    backgroundColor: paper,
+  Widget build(BuildContext context) => BioRefresh(
     onRefresh: () async {
       AppFeedback.selection();
       final ok = await onRefresh();
@@ -25,7 +24,6 @@ class LiveRefresh extends StatelessWidget {
           ..hideCurrentSnackBar()
           ..showSnackBar(
             const SnackBar(
-              behavior: SnackBarBehavior.floating,
               content: Text(
                 'Could not reach Bio Connect. Showing saved information.',
               ),

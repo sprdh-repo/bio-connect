@@ -4,7 +4,7 @@ Home and Guide include **My passes**.
 The fixed header on all four main tabs also has a **My passes** button at the top right, available while scrolling and when event content is loading or unavailable.
 Attendees can retrieve their issued pass using email OTP or WhatsApp OTP.
 They can optionally scan an existing printed or downloaded admission QR before verifying its attendee email or mobile.
-The scanner accepts the raw 43-character admission identifier printed on the existing pass, not a registration link or a PDF download URL.
+The scanner accepts the raw 43-character admission identifier printed on the existing pass, or a printed badge's profile URL (`https://<host>/p/<identifier>`), not a registration link or a PDF download URL.
 Scanning does not disclose attendee details or grant access by itself.
 
 After verification, the app displays the attendee name, organisation, designation, category, pass number and admission QR.
@@ -82,3 +82,9 @@ Backend integration tests use only a disposable PostgreSQL database and fake/loc
 They cover attendee isolation within exhibitor groups, scan scope, consent, rate limits, wrong codes, expiry, resend invalidation, replay, session deletion, provider payloads and cancellation of stale queued OTPs.
 Android build and static analysis are part of the existing mobile checks.
 Physical camera scanning, real Postmark delivery, real WhatsApp delivery and iOS signing must be verified on devices with the configured production providers before release.
+
+## Design preview
+
+Debug builds running on a device show a sample pass on My passes while no real passes are saved.
+It is labelled as a sample, its QR is not valid for admission, and it never appears in release builds or widget tests.
+Tap a pass QR to enlarge it for scanning; the code keeps standard square modules so entrance scanners read it reliably.

@@ -5,6 +5,7 @@ import '../main.dart';
 import '../widgets/destinations.dart';
 import '../widgets/directory.dart';
 import '../widgets/interaction.dart';
+import '../widgets/motion.dart';
 import '../models/event_content.dart';
 import '../models/event_guide.dart';
 import '../providers/content_provider.dart';
@@ -34,64 +35,69 @@ class AttendeeHomeScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: forest,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  content.text('home.eyebrow', 'YOUR CONCLAVE COMPANION'),
-                  style: const TextStyle(
-                    color: lime,
-                    fontSize: 11,
-                    letterSpacing: 1.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  content.text('home.title', 'Make the most\nof Bio Connect.'),
-                  style: const TextStyle(
-                    fontFamily: 'Manrope',
-                    color: Colors.white,
-                    fontSize: 30,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                IconText(
-                  Icons.calendar_today_outlined,
-                  eventDateRange(content.event),
-                ),
-                if (content.event.venue.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  IconText(Icons.place_outlined, content.event.venue),
-                ],
-                if (visibleTabs(content).any((t) => t.key == 'sessions') ||
-                    count > 0) ...[
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: () =>
-                        openDestination(context, content, sessions),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: lime,
-                      foregroundColor: forest,
+          Reveal(
+            child: _HomeHero(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    content.text('home.eyebrow', 'YOUR CONCLAVE COMPANION'),
+                    style: const TextStyle(
+                      color: lime,
+                      fontSize: 11,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.bold,
                     ),
-                    icon: const Icon(Icons.view_agenda_outlined),
-                    label: Text(sessions.title),
                   ),
+                  const SizedBox(height: 12),
+                  Text(
+                    content.text(
+                      'home.title',
+                      'Make the most\nof Bio Connect.',
+                    ),
+                    style: const TextStyle(
+                      fontFamily: 'Manrope',
+                      color: Colors.white,
+                      fontSize: 30,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  IconText(
+                    Icons.calendar_today_outlined,
+                    eventDateRange(content.event),
+                  ),
+                  if (content.event.venue.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    IconText(Icons.place_outlined, content.event.venue),
+                  ],
+                  if (visibleTabs(content).any((t) => t.key == 'sessions') ||
+                      count > 0) ...[
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () =>
+                          openDestination(context, content, sessions),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: lime,
+                        foregroundColor: forest,
+                      ),
+                      icon: const Icon(Icons.view_agenda_outlined),
+                      label: Text(sessions.title),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           if (shortcuts.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            TitleText(content.text('home.glance', 'Your event, at a glance.')),
-            const SizedBox(height: 12),
+            const SizedBox(height: 28),
+            Reveal(
+              order: 1,
+              child: TitleText(
+                content.text('home.glance', 'Your event, at a glance.'),
+              ),
+            ),
+            const SizedBox(height: 14),
             LayoutBuilder(
               builder: (context, constraints) {
                 final width = constraints.maxWidth > 600
@@ -101,13 +107,16 @@ class AttendeeHomeScreen extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    for (final entry in shortcuts)
-                      _QuickLink(
-                        entryIcon(entry),
-                        entryTitle(entry),
-                        entrySubtitle(entry, content),
-                        () => openDestination(context, content, entry),
-                        width,
+                    for (final (i, entry) in shortcuts.indexed)
+                      Reveal(
+                        order: 2 + i,
+                        child: _QuickLink(
+                          entryIcon(entry),
+                          entryTitle(entry),
+                          entrySubtitle(entry, content),
+                          () => openDestination(context, content, entry),
+                          width,
+                        ),
                       ),
                   ],
                 );
@@ -159,33 +168,76 @@ class _QuickLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: width,
-    child: Material(
-      color: cream,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: forest, size: 26),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(fontFamily: 'Manrope', fontSize: 16),
-              ),
-              if (subtitle.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: muted, fontSize: 12),
+    child: Pressable(
+      child: Material(
+        color: cream,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: forest, size: 23),
                 ),
+                const SizedBox(height: 14),
+                Text(
+                  title,
+                  style: const TextStyle(fontFamily: 'Manrope', fontSize: 16),
+                ),
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: muted, fontSize: 12),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    ),
+  );
+}
+
+/// The home banner: the event's artwork behind a forest wash that keeps the
+/// copy readable.
+class _HomeHero extends StatelessWidget {
+  const _HomeHero({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(28),
+    child: DecoratedBox(
+      decoration: const BoxDecoration(
+        color: forest,
+        image: DecorationImage(
+          image: AssetImage('assets/images/home-hero.webp'),
+          fit: BoxFit.cover,
+          alignment: Alignment(.7, 0),
+        ),
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [Color(0xF2051C17), Color(0xB30B3329), Color(0x1A0B3329)],
+            stops: [0, .55, 1],
+          ),
+        ),
+        child: Padding(padding: const EdgeInsets.all(24), child: child),
       ),
     ),
   );

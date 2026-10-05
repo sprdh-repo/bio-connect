@@ -4,6 +4,7 @@ import 'package:bio_connect_app/providers/content_provider.dart';
 import 'package:bio_connect_app/services/content_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:bio_connect_app/widgets/nav_bar.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -70,10 +71,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-        0,
-      );
+      expect(tester.widget<BioNavBar>(find.byType(BioNavBar)).selectedIndex, 0);
       expect(find.text('Exit Bio Connect?'), findsNothing);
     }
     await tester.binding.handlePopRoute();
@@ -111,10 +109,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
-      3,
-    );
+    expect(tester.widget<BioNavBar>(find.byType(BioNavBar)).selectedIndex, 3);
     await tester.tap(find.text('Speakers').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'nonexistent');

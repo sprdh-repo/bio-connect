@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'widgets/destinations.dart';
 import 'widgets/directory.dart';
 import 'widgets/interaction.dart';
+import 'widgets/motion.dart';
+import 'widgets/nav_bar.dart';
 
 import 'models/event_content.dart';
 import 'providers/content_provider.dart';
@@ -118,9 +121,80 @@ class BioConnectApp extends StatelessWidget {
         centerTitle: false,
         scrolledUnderElevation: 0,
       ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(
+            backgroundColor: paper,
+          ),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       cardTheme: CardThemeData(
         elevation: 0,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 52),
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'DM Sans',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 50),
+          foregroundColor: forest,
+          side: BorderSide(color: forest.withValues(alpha: .28)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: 'DM Sans',
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: cream,
+        selectedColor: forest,
+        checkmarkColor: lime,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
+        labelStyle: TextStyle(
+          fontFamily: 'DM Sans',
+          fontWeight: FontWeight.w600,
+          color: WidgetStateColor.resolveWith(
+            (states) =>
+                states.contains(WidgetState.selected) ? Colors.white : ink,
+          ),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: deepForest,
+        actionTextColor: lime,
+        contentTextStyle: const TextStyle(
+          fontFamily: 'DM Sans',
+          color: Colors.white,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: paper,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: forest,
+        linearTrackColor: cream,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -287,7 +361,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         appBar: header,
         body: Center(
           child: state.loading
-              ? const CircularProgressIndicator()
+              ? const BioLoader(label: 'Preparing your event guide')
               : StateMessage(
                   state.error ?? 'Event content unavailable.',
                   action: 'Try again',
@@ -318,47 +392,93 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 TickerMode(
                   key: ValueKey(key),
                   enabled: selected == key,
-                  child: PrimaryScrollController(
-                    controller: _scroll(key),
-                    child: pages[key]!,
+                  child: _TabFade(
+                    active: selected == key,
+                    child: PrimaryScrollController(
+                      controller: _scroll(key),
+                      child: pages[key]!,
+                    ),
                   ),
                 ),
             ],
           ),
         ),
-        bottomNavigationBar: NavigationBar(
+        bottomNavigationBar: BioNavBar(
           selectedIndex: _tabs.indexOf(selected),
-          onDestinationSelected: (index) => _selectTab(_tabs[index]),
-          backgroundColor: paper,
-          indicatorColor: lime.withValues(alpha: .42),
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
+          onSelected: (index) => _selectTab(_tabs[index]),
+          items: [
+            const BioNavItem(Icons.home_outlined, Icons.home_rounded, 'Home'),
             for (final tab in tabs)
               tab.key == 'sessions'
-                  ? NavigationDestination(
-                      icon: const Icon(Icons.calendar_month_outlined),
-                      selectedIcon: const Icon(Icons.calendar_month),
-                      label: entryTitle(tab),
+                  ? BioNavItem(
+                      Icons.calendar_month_outlined,
+                      Icons.calendar_month_rounded,
+                      entryTitle(tab),
                     )
-                  : NavigationDestination(
-                      icon: const Icon(Icons.people_outline),
-                      selectedIcon: const Icon(Icons.people),
-                      label: entryTitle(tab),
+                  : BioNavItem(
+                      Icons.people_outline_rounded,
+                      Icons.people_alt_rounded,
+                      entryTitle(tab),
                     ),
-            const NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view),
-              label: 'Guide',
+            const BioNavItem(
+              Icons.grid_view_outlined,
+              Icons.grid_view_rounded,
+              'Guide',
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// Fades a tab in and lifts it slightly each time it becomes the active tab.
+class _TabFade extends StatefulWidget {
+  const _TabFade({required this.active, required this.child});
+  final bool active;
+  final Widget child;
+  @override
+  State<_TabFade> createState() => _TabFadeState();
+}
+
+class _TabFadeState extends State<_TabFade>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+    value: 1,
+  );
+  late final _curve = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+  );
+
+  @override
+  void didUpdateWidget(_TabFade old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: _curve,
+    child: SlideTransition(
+      position: Tween(
+        begin: const Offset(0, .015),
+        end: Offset.zero,
+      ).animate(_curve),
+      child: widget.child,
+    ),
+  );
 }
 
 class ExploreScreen extends StatelessWidget {
@@ -599,7 +719,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ),
             const SizedBox(height: 24),
             if (_options == null && _error == null)
-              const Center(child: CircularProgressIndicator()),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Center(
+                  child: BioLoader(label: 'Loading live pass options'),
+                ),
+              ),
             if (_error != null)
               StateMessage(
                 'Live registration options are unavailable. Please try again.',
@@ -1221,57 +1346,59 @@ class SpeakerRow extends StatelessWidget {
   const SpeakerRow(this.speaker, {super.key});
   final Speaker speaker;
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    margin: const EdgeInsets.only(bottom: 9),
-    child: InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SpeakerDetailScreen(speaker)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(9),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: SizedBox(
-                width: 70,
-                height: 76,
-                child: SpeakerImage(speaker, width: 70),
+  Widget build(BuildContext context) => Pressable(
+    child: Card(
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => SpeakerDetailScreen(speaker)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox(
+                  width: 70,
+                  height: 76,
+                  child: SpeakerImage(speaker, width: 70),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    speaker.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      speaker.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    speaker.role,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: muted, fontSize: 11),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    speaker.organization,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: muted, fontSize: 11),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      speaker.role,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 11),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      speaker.organization,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 11),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: forest),
-          ],
+              const Icon(Icons.chevron_right, color: forest),
+            ],
+          ),
         ),
       ),
     ),
@@ -1290,44 +1417,50 @@ class GuideCard extends StatelessWidget {
   final String title, subtitle;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    margin: const EdgeInsets.only(bottom: 9),
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: cream,
-              foregroundColor: forest,
-              child: Icon(icon),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: muted, fontSize: 11),
-                    ),
-                  ],
-                ],
+  Widget build(BuildContext context) => Pressable(
+    child: Card(
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 9),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: cream,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: forest, size: 22),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: forest),
-          ],
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(color: muted, fontSize: 11),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: forest),
+            ],
+          ),
         ),
       ),
     ),

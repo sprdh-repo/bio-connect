@@ -8,6 +8,7 @@ import 'package:bio_connect_app/screens/event_guide_screens.dart';
 import 'package:bio_connect_app/services/content_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:bio_connect_app/widgets/nav_bar.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
@@ -114,12 +115,8 @@ void main() {
     };
     await pumpApp(tester, json);
 
-    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(bar.destinations.map((d) => (d as NavigationDestination).label), [
-      'Home',
-      'Agenda',
-      'Guide',
-    ]);
+    final bar = tester.widget<BioNavBar>(find.byType(BioNavBar));
+    expect(bar.items.map((d) => d.label), ['Home', 'Agenda', 'Guide']);
     expect(find.text('Welcome to day two.'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Hall B is now open'),

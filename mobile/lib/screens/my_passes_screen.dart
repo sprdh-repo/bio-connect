@@ -1,14 +1,37 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../main.dart';
+import '../providers/content_provider.dart';
 import '../providers/pass_wallet.dart';
+import '../services/content_service.dart';
 import '../services/pass_service.dart';
 import '../widgets/interaction.dart';
+import '../widgets/motion.dart';
+
+/// Debug builds on a device show a sample pass while none are saved, so the
+/// pass design can be checked without an issued registration. Never in release
+/// builds or widget tests.
+final bool _showSamplePass =
+    kDebugMode && !Platform.environment.containsKey('FLUTTER_TEST');
+
+final _samplePass = AdmissionPass(
+  id: 'sample',
+  name: 'Ananya Menon',
+  institution: 'Rajiv Gandhi Centre for Biotechnology',
+  designation: 'Senior Scientist',
+  category: 'Delegate · Academia',
+  number: 'BC4-DEL-000042',
+  qrId: 'SAMPLE-NOT-VALID-FOR-ADMISSION',
+  downloadUrl: CurrentContentService.defaultApiBaseUrl,
+);
 
 class MyPassesScreen extends StatefulWidget {
   const MyPassesScreen({super.key, this.wallet});
@@ -81,7 +104,7 @@ class _MyPassesScreenState extends State<MyPassesScreen>
         ),
       ],
     ),
-    body: RefreshIndicator(
+    body: BioRefresh(
       onRefresh: () =>
           AppFeedback.refresh(_wallet.loaded ? _wallet.refresh : _wallet.load),
       child: ListView(
@@ -108,10 +131,21 @@ class _MyPassesScreenState extends State<MyPassesScreen>
             icon: const Icon(Icons.add),
             label: const Text('Add a pass'),
           ),
-          if (_wallet.busy) ...[
-            const SizedBox(height: 16),
-            const LinearProgressIndicator(),
-          ],
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            child: _wallet.busy
+                ? const Padding(
+                    padding: EdgeInsets.only(top: 22),
+                    child: Center(
+                      child: BioLoader(
+                        width: 60,
+                        label: 'Checking your passes',
+                      ),
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
           if (_wallet.error != null) ...[
             const SizedBox(height: 16),
             Text(_wallet.error!, style: const TextStyle(color: muted)),
@@ -124,7 +158,21 @@ class _MyPassesScreenState extends State<MyPassesScreen>
             ),
           ],
           const SizedBox(height: 20),
-          if (_wallet.passes.isEmpty && !_wallet.busy && _wallet.loaded)
+          if (_showSamplePass &&
+              _wallet.passes.isEmpty &&
+              !_wallet.busy &&
+              _wallet.loaded) ...[
+            const _SampleBadge(),
+            const SizedBox(height: 10),
+            Reveal(
+              child: _PassCard(
+                pass: _samplePass,
+                checkedAt: null,
+                offline: false,
+              ),
+            ),
+            const SizedBox(height: 18),
+          ] else if (_wallet.passes.isEmpty && !_wallet.busy && _wallet.loaded)
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(20),
@@ -152,11 +200,14 @@ class _MyPassesScreenState extends State<MyPassesScreen>
                 ),
               ),
             ),
-          for (final pass in _wallet.passes) ...[
-            _PassCard(
-              pass: pass,
-              checkedAt: _wallet.checkedAt(pass.id),
-              offline: _wallet.offline,
+          for (final (i, pass) in _wallet.passes.indexed) ...[
+            Reveal(
+              order: i,
+              child: _PassCard(
+                pass: pass,
+                checkedAt: _wallet.checkedAt(pass.id),
+                offline: _wallet.offline,
+              ),
             ),
             const SizedBox(height: 18),
           ],
@@ -170,6 +221,32 @@ class _MyPassesScreenState extends State<MyPassesScreen>
   );
 }
 
+class _SampleBadge extends StatelessWidget {
+  const _SampleBadge();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    decoration: BoxDecoration(
+      color: gold.withValues(alpha: .18),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: const Row(
+      children: [
+        Icon(Icons.science_outlined, size: 18, color: ink),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Sample pass for design preview. Shown in debug builds only and not valid for admission.',
+            style: TextStyle(fontSize: 12, height: 1.35),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// An admission pass drawn as a ticket: the attendee on a forest header, a
+/// perforated tear line, then the admission QR.
 class _PassCard extends StatelessWidget {
   const _PassCard({
     required this.pass,
@@ -179,95 +256,433 @@ class _PassCard extends StatelessWidget {
   final AdmissionPass pass;
   final DateTime? checkedAt;
   final bool offline;
+
+  void _enlarge(BuildContext context) {
+    AppFeedback.action();
+    Navigator.push(
+      context,
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: deepForest.withValues(alpha: .7),
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 240),
+        pageBuilder: (_, _, _) => _QrFullScreen(pass),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    clipBehavior: Clip.antiAlias,
-    child: Column(
+  Widget build(BuildContext context) {
+    final event = context.watch<ContentProvider?>()?.content?.event;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          color: forest,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                pass.category,
-                style: const TextStyle(
-                  color: lime,
-                  fontWeight: FontWeight.w700,
+        DecoratedBox(
+          decoration: const ShapeDecoration(
+            shape: _TicketHalf(notchBottom: true),
+            color: forest,
+            shadows: _ticketShadow,
+            image: DecorationImage(
+              image: AssetImage('assets/images/pass-texture.webp'),
+              fit: BoxFit.cover,
+              // Tones down the texture's light sheen so copy stays legible.
+              colorFilter: ColorFilter.mode(
+                Color(0x73051C17),
+                BlendMode.srcOver,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'BIO CONNECT 4.0',
+                  style: TextStyle(
+                    color: lime,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.6,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                pass.name,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontFamily: 'Manrope',
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: lime,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    pass.category,
+                    style: const TextStyle(
+                      color: forest,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                pass.institution,
-                style: const TextStyle(color: Colors.white),
-              ),
-              if (pass.designation.isNotEmpty)
+                const SizedBox(height: 16),
                 Text(
-                  pass.designation,
-                  style: const TextStyle(color: Colors.white70),
+                  pass.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 27,
+                    height: 1.12,
+                    fontFamily: 'Manrope',
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-            ],
+                if (pass.designation.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    pass.designation,
+                    style: const TextStyle(color: Color(0xE6FFFFFF)),
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  pass.institution,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (event != null) ...[
+                  const SizedBox(height: 18),
+                  IconText(
+                    Icons.calendar_today_outlined,
+                    eventDateRange(event),
+                  ),
+                  if (event.venue.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    IconText(Icons.place_outlined, event.venue),
+                  ],
+                ],
+              ],
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(20),
+        DecoratedBox(
+          decoration: const ShapeDecoration(
+            shape: _TicketHalf(notchTop: true, edge: _ticketEdge),
+            color: Colors.white,
+            shadows: _ticketShadow,
+          ),
           child: Column(
             children: [
-              const Text(
-                'ADMISSION PASS',
-                style: TextStyle(color: muted, letterSpacing: 1.5),
-              ),
-              const SizedBox(height: 12),
-              Semantics(
-                label:
-                    'Admission QR for ${pass.name}. Show this code at the entrance.',
-                child: QrImageView(
-                  data: pass.qrId,
-                  size: 240,
-                  padding: const EdgeInsets.all(16),
-                  backgroundColor: Colors.white,
+              const Padding(
+                padding: EdgeInsets.fromLTRB(
+                  _TicketHalf.notch + 8,
+                  2,
+                  _TicketHalf.notch + 8,
+                  0,
+                ),
+                child: CustomPaint(
+                  size: Size(double.infinity, 1),
+                  painter: _TearLine(),
                 ),
               ),
-              SelectableText(
-                pass.number,
-                style: const TextStyle(
-                  fontFamily: 'Manrope',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+                child: Column(
+                  children: [
+                    const Text(
+                      'ADMISSION PASS',
+                      style: TextStyle(
+                        color: muted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Semantics(
+                      button: true,
+                      label:
+                          'Admission QR for ${pass.name}. Show this code at the entrance. Double tap to enlarge.',
+                      excludeSemantics: true,
+                      child: GestureDetector(
+                        onTap: () => _enlarge(context),
+                        child: Hero(
+                          tag: 'pass-qr-${pass.id}',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: _ticketEdge,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: QrImageView(
+                              data: pass.qrId,
+                              size: 220,
+                              padding: const EdgeInsets.all(16),
+                              backgroundColor: Colors.white,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: forest,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: ink,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.zoom_out_map_rounded,
+                          size: 14,
+                          color: muted,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Tap to enlarge for scanning',
+                          style: TextStyle(color: muted, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cream,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'PASS NUMBER',
+                            style: TextStyle(
+                              color: muted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          SelectableText(
+                            pass.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Manrope',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 19,
+                              letterSpacing: 1.6,
+                              color: forest,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (checkedAt != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            offline
+                                ? Icons.cloud_off_outlined
+                                : Icons.verified_outlined,
+                            size: 15,
+                            color: offline ? muted : forest,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Last checked ${_checkedTime(checkedAt!)}${offline ? ' · Saved copy' : ''}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => openLink(context, pass.downloadUrl),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('Open official PDF'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              if (checkedAt != null)
-                Text(
-                  'Last checked ${_checkedTime(checkedAt!)}${offline ? ' · Saved copy' : ''}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: muted, fontSize: 12),
-                ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => openLink(context, pass.downloadUrl),
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('Open official PDF'),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The QR alone on a bright card, large enough for any entrance scanner.
+class _QrFullScreen extends StatelessWidget {
+  const _QrFullScreen(this.pass);
+  final AdmissionPass pass;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: () => Navigator.pop(context),
+    behavior: HitTestBehavior.opaque,
+    child: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    pass.name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Manrope',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 22,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    pass.number,
+                    style: const TextStyle(
+                      color: muted,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  LayoutBuilder(
+                    builder: (context, box) => Hero(
+                      tag: 'pass-qr-${pass.id}',
+                      child: QrImageView(
+                        data: pass.qrId,
+                        size: box.maxWidth.clamp(0, 360),
+                        padding: const EdgeInsets.all(12),
+                        backgroundColor: Colors.white,
+                        semanticsLabel: 'Admission QR for ${pass.name}',
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Close'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
+}
+
+const _ticketEdge = Color(0xFFE2DECF);
+const _ticketShadow = [
+  BoxShadow(color: Color(0x1A051C17), blurRadius: 18, offset: Offset(0, 8)),
+];
+
+/// One half of a ticket: rounded outer corners and a semicircle bitten out of
+/// each side where the two halves meet.
+class _TicketHalf extends ShapeBorder {
+  const _TicketHalf({
+    this.notchTop = false,
+    this.notchBottom = false,
+    this.edge,
+  });
+  final bool notchTop, notchBottom;
+
+  /// A hairline around the half, so a white half stands off the paper page.
+  final Color? edge;
+  static const radius = 24.0, notch = 13.0;
+
+  @override
+  EdgeInsetsGeometry get dimensions => EdgeInsets.zero;
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) =>
+      getOuterPath(rect, textDirection: textDirection);
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    const outer = Radius.circular(radius);
+    final body = Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          rect,
+          topLeft: notchTop ? Radius.zero : outer,
+          topRight: notchTop ? Radius.zero : outer,
+          bottomLeft: notchBottom ? Radius.zero : outer,
+          bottomRight: notchBottom ? Radius.zero : outer,
+        ),
+      );
+    final y = notchTop ? rect.top : rect.bottom;
+    final bites = Path()
+      ..addOval(Rect.fromCircle(center: Offset(rect.left, y), radius: notch))
+      ..addOval(Rect.fromCircle(center: Offset(rect.right, y), radius: notch));
+    return Path.combine(PathOperation.difference, body, bites);
+  }
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    if (edge == null) return;
+    canvas.drawPath(
+      getOuterPath(rect.deflate(.5)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = edge!,
+    );
+  }
+
+  @override
+  ShapeBorder scale(double t) => this;
+}
+
+class _TearLine extends CustomPainter {
+  const _TearLine();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFC9C5B4)
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round;
+    const dash = 6.0, gap = 6.0;
+    for (var x = 0.0; x < size.width; x += dash + gap) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dash, 0), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TearLine old) => false;
 }
 
 String _checkedTime(DateTime value) {
@@ -570,8 +985,8 @@ class _AddPassScreenState extends State<AddPassScreen> {
               ],
             ],
             if (_busy) ...[
-              const SizedBox(height: 16),
-              const LinearProgressIndicator(),
+              const SizedBox(height: 20),
+              const Center(child: BioLoader(width: 56)),
             ],
             if (_error != null) ...[
               const SizedBox(height: 16),
