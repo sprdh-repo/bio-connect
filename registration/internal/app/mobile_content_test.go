@@ -126,7 +126,7 @@ func TestMobileContentAPI(t *testing.T) {
 	// menus; 033 adds My agenda and Contacts, and the feedback pages switched off.
 	guide := m.Content.Menus["guide"]
 	if len(m.Speakers) != 56 || m.Speakers[0].ImageURL == "" || len(m.Content.Sponsors) != 9 || !m.Content.Sponsors[0].Published ||
-		len(m.Content.Leadership.Committee.Members) != 14 || !m.Content.Leadership.Committee.Members[0].Published || m.Content.Event.MomentsAlbumID != "" ||
+		len(m.Content.Leadership.Committee.Members) != 14 || !m.Content.Leadership.Committee.Members[0].Published || m.Content.Event.MomentsAlbumID != "" || m.Content.Event.ShowExhibitorRegistration ||
 		len(guide) != 16 || guide[0].Key != "agenda" || !guide[0].Published || guide[13].Key != "moments" ||
 		guide[14].Key != "feedback" || guide[14].Published || guide[15].Key != "hub" ||
 		len(m.Content.Menus["tabs"]) != 3 || m.Content.Menus["tabs"][2].Key != "agenda" || len(m.Content.Menus["home_shortcuts"]) != 8 ||
@@ -140,6 +140,7 @@ func TestMobileContentAPI(t *testing.T) {
 	hiddenSponsor := m.Content.Sponsors[1].Name
 	m.Content.Event.Hidden = []string{"brochure_url"}
 	m.Content.Event.MomentsAlbumID = "42"
+	m.Content.Event.ShowExhibitorRegistration = true
 	m.Content.Copy["sessions.title"] = "Today on stage"
 	m.Content.Menus["tabs"][1].Published = false
 	m.Speakers = append([]adminSpeaker{{ID: "new-speaker", Name: "New Speaker", Role: "Chair", Organization: "Lab", Published: true}}, m.Speakers[1:]...)
@@ -192,7 +193,7 @@ func TestMobileContentAPI(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Event["brochure_url"] != "" || out.Event["start_date"] != "2026-10-08" || out.Event["moments_album_id"] != "42" || out.Copy["sessions.title"] != "Today on stage" ||
+	if out.Event["brochure_url"] != "" || out.Event["start_date"] != "2026-10-08" || out.Event["moments_album_id"] != "42" || out.Event["show_exhibitor_registration"] != true || out.Copy["sessions.title"] != "Today on stage" ||
 		len(out.Menus["tabs"]) != 2 || len(out.Sponsors) != 8 || out.Sponsor["name"] != out.Sponsors[0]["name"] ||
 		out.Speakers[0].ID != "new-speaker" || len(out.EventGuide.Sessions) != 1 ||
 		out.EventGuide.Venue.HelpWhatsApp != "+91 88888 00000" || out.EventGuide.Venue.HelpPhone != "" {

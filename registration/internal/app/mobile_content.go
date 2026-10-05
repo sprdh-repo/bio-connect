@@ -22,19 +22,20 @@ import (
 // app_content's revision.
 
 type contentEvent struct {
-	Title            string   `json:"title"`
-	Tagline          string   `json:"tagline"`
-	HeroTitle        string   `json:"hero_title"`
-	Description      string   `json:"description"`
-	StartDate        string   `json:"start_date"`
-	EndDate          string   `json:"end_date"`
-	Venue            string   `json:"venue"`
-	City             string   `json:"city"`
-	BrochureURL      string   `json:"brochure_url"`
-	SponsorshipEmail string   `json:"sponsorship_email"`
-	PrivacyURL       string   `json:"privacy_url"`
-	MomentsAlbumID   string   `json:"moments_album_id"`
-	Hidden           []string `json:"hidden"`
+	Title                     string   `json:"title"`
+	Tagline                   string   `json:"tagline"`
+	HeroTitle                 string   `json:"hero_title"`
+	Description               string   `json:"description"`
+	StartDate                 string   `json:"start_date"`
+	EndDate                   string   `json:"end_date"`
+	Venue                     string   `json:"venue"`
+	City                      string   `json:"city"`
+	BrochureURL               string   `json:"brochure_url"`
+	SponsorshipEmail          string   `json:"sponsorship_email"`
+	PrivacyURL                string   `json:"privacy_url"`
+	MomentsAlbumID            string   `json:"moments_album_id"`
+	ShowExhibitorRegistration bool     `json:"show_exhibitor_registration"`
+	Hidden                    []string `json:"hidden"`
 }
 type contentTheme struct {
 	Title       string `json:"title"`

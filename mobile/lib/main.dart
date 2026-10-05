@@ -866,12 +866,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           children: [
-            TitleText(copy('registration.title', 'Three ways\nto take part.')),
+            TitleText(
+              copy(
+                'registration.title',
+                widget.event.showExhibitorRegistration
+                    ? 'Three ways\nto take part.'
+                    : 'Register for\nBio Connect.',
+              ),
+            ),
             const SizedBox(height: 9),
             Text(
               copy(
                 'registration.intro',
-                'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.',
+                widget.event.showExhibitorRegistration
+                    ? 'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.'
+                    : 'Register for a delegate pass without leaving the app.',
               ),
               style: const TextStyle(color: muted, height: 1.5),
             ),
@@ -923,22 +932,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   : null,
               child: const Text('Register in the app'),
             ),
-            const SizedBox(height: 27),
-            const Eyebrow('EXHIBITION SPACE'),
-            const SizedBox(height: 9),
-            if (_options case final options?)
-              for (final category in options.categories.where(
-                (category) => category.kind == 'exhibitor',
-              ))
-                _CategoryRow(category),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => openLink(
-                context,
-                '${RegistrationService.apiBaseUrl}/exhibitors',
+            if (widget.event.showExhibitorRegistration) ...[
+              const SizedBox(height: 27),
+              const Eyebrow('EXHIBITION SPACE'),
+              const SizedBox(height: 9),
+              if (_options case final options?)
+                for (final category in options.categories.where(
+                  (category) => category.kind == 'exhibitor',
+                ))
+                  _CategoryRow(category),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => openLink(
+                  context,
+                  '${RegistrationService.apiBaseUrl}/exhibitors',
+                ),
+                child: const Text('Book exhibition space'),
               ),
-              child: const Text('Book exhibition space'),
-            ),
+            ],
             if (widget.event.sponsorshipEmail.isNotEmpty) ...[
               const SizedBox(height: 27),
               const Eyebrow('SPONSORSHIP'),

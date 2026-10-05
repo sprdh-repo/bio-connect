@@ -39,6 +39,7 @@ App IDs and release signing are still placeholders and must be set before store 
 Unpublished event-day sections show “To be announced”.
 Staff can add and publish content from the registration backend at `/admin?view=event-guide`.
 For Moments, staff set the provider's numeric album ID under Event details and publish a Guide menu entry with the `moments` destination.
+Staff can independently show or hide exhibitor registration under Event details without removing delegate registration or the exhibitor directory.
 Debug builds also show Moments in Guide and provide a sample state when no pass has been saved, so the screen can be reviewed during local development.
 See [Event-day guide](docs/event-guide.md) for the API contract, publishing workflow and offline behavior.
 See [My passes](docs/my-passes.md) for attendee verification, WhatsApp template setup and saved pass behavior.

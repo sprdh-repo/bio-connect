@@ -131,6 +131,7 @@ async function mobileContentPage() {
       ${input('content.event.brochure_url', 'Brochure link (HTTPS)', 'url', { hide: 'content.event.hidden' })}${input('content.event.privacy_url', 'Privacy policy link (HTTPS)', 'url', { hide: 'content.event.hidden' })}
       ${input('content.event.sponsorship_email', 'Sponsorship and organiser email', 'email', { hide: 'content.event.hidden', help: 'Used by the “Enquire” buttons. Hidden buttons disappear.' })}
       ${input('content.event.moments_album_id', 'Moments album ID', 'number', { help: 'Leave blank until the Moments album is ready. Setting it makes published Moments menu entries available.' })}
+      <div class="mc-field full">${shown('content.event.show_exhibitor_registration', 'Show exhibitor registration in the mobile app')}<p class="help">Turn this off when exhibition bookings close. The exhibitor directory and delegate registration stay available.</p></div>
     </div></section>`,
     menus: () => mobileMenus.map(([name, label, help]) => {
       if (!state.content.menus[name]) state.content.menus[name] = [];

@@ -420,6 +420,7 @@ class EventDetails {
     this.sponsorshipEmail = '',
     this.privacyUrl = '',
     this.momentsAlbumId = '',
+    this.showExhibitorRegistration = true,
   });
   final String title,
       tagline,
@@ -432,6 +433,7 @@ class EventDetails {
       privacyUrl,
       momentsAlbumId;
   final DateTime startDate, endDate;
+  final bool showExhibitorRegistration;
 
   factory EventDetails.fromJson(Map<String, dynamic> json) {
     // Dates are required by the console; a malformed one cannot hide the guide.
@@ -457,6 +459,7 @@ class EventDetails {
       sponsorshipEmail: str(json['sponsorship_email']),
       privacyUrl: str(json['privacy_url']),
       momentsAlbumId: momentsAlbumId,
+      showExhibitorRegistration: json['show_exhibitor_registration'] != false,
     );
   }
 }
