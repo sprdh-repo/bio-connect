@@ -57,7 +57,7 @@ func TestPublicExhibitors(t *testing.T) {
 		t.Fatalf("exposed non-approved exhibitor or delegate: %s", rr.Body.String())
 	}
 	entry := out.Exhibitors[0]
-	if len(entry) != 3 || entry["name"] != "approved" || entry["description"] != "Molecular diagnostics" {
+	if len(entry) != 5 || entry["name"] != "approved" || entry["description"] != "Molecular diagnostics" || entry["stall_number"] != "" || entry["stall_type"] != "Table space" {
 		t.Fatalf("unexpected public fields: %v", entry)
 	}
 	if rr.Header().Get("Access-Control-Allow-Origin") != "*" {

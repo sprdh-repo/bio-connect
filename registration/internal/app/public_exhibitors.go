@@ -13,11 +13,15 @@ type publicExhibitor struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	LogoURL     string `json:"logo_url"`
+	// StallNumber is empty until staff allocate one; StallType is the
+	// exhibitor category's public label, such as "Premium stall".
+	StallNumber string `json:"stall_number"`
+	StallType   string `json:"stall_type"`
 }
 
 func (a *App) publicExhibitors(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	rows, err := a.DB.Query(r.Context(), `SELECT r.institution, r.description, COALESCE(f.id,'')
+	rows, err := a.DB.Query(r.Context(), `SELECT r.institution, r.description, COALESCE(f.id,''), r.stall_number, c.label
  FROM registrations r JOIN categories c ON c.id=r.category_id
  LEFT JOIN LATERAL (SELECT id FROM files WHERE registration_id=r.id AND kind='logo'
  ORDER BY created_at DESC,id DESC LIMIT 1) f ON true
@@ -32,7 +36,7 @@ func (a *App) publicExhibitors(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var item publicExhibitor
 		var logo string
-		if err := rows.Scan(&item.Name, &item.Description, &logo); err != nil {
+		if err := rows.Scan(&item.Name, &item.Description, &logo, &item.StallNumber, &item.StallType); err != nil {
 			fail(w, 503, "exhibitors unavailable; please retry")
 			return
 		}

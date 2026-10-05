@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -276,6 +277,57 @@ func (a *App) SetAllowance(ctx context.Context, rid, staff string, n int, note s
 		detail += ": " + t
 	}
 	if e = audit(ctx, tx, staff, rid, "allowance_changed", detail); e != nil {
+		return e
+	}
+	return tx.Commit(ctx)
+}
+
+var stallNumberRE = regexp.MustCompile(`^[A-Z0-9][A-Z0-9 /-]{0,15}$`)
+
+// SetStallNumber assigns, changes or clears (empty) an exhibitor's stall on
+// the expo floor. Numbers are trimmed and upper-cased so "a-12" and "A-12" are
+// the same stall. Only approved exhibitors appear in the public directory, but
+// staff may allocate earlier. Nothing is sent and passes are unchanged.
+func (a *App) SetStallNumber(ctx context.Context, rid, staff, number, note string) error {
+	if len(note) > 2000 {
+		return errors.New("note is too long")
+	}
+	number = strings.ToUpper(strings.Join(strings.Fields(number), " "))
+	if number != "" && !stallNumberRE.MatchString(number) {
+		return errors.New("use up to 16 letters, numbers, spaces, hyphens or slashes for the stall number")
+	}
+	tx, e := a.DB.Begin(ctx)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback(ctx)
+	var status, kind, current string
+	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind,r.stall_number FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &current); e != nil {
+		return e
+	}
+	if status == "cancelled" {
+		return ErrConflict
+	}
+	if kind != "exhibitor" {
+		return errors.New("only exhibitor registrations have a stall")
+	}
+	if number == current {
+		return errors.New("the stall number is unchanged")
+	}
+	if _, e = tx.Exec(ctx, "UPDATE registrations SET stall_number=$2,updated_at=now() WHERE id=$1", rid, number); e != nil {
+		return e
+	}
+	label := func(s string) string {
+		if s == "" {
+			return "unassigned"
+		}
+		return s
+	}
+	detail := label(current) + " -> " + label(number)
+	if t := strings.TrimSpace(note); t != "" {
+		detail += ": " + t
+	}
+	if e = audit(ctx, tx, staff, rid, "stall_number_changed", detail); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)

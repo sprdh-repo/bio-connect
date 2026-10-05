@@ -19,9 +19,30 @@ These sessions are separate from staff and registration-management access.
 
 ### `GET /public/app-content`
 
-Returns the database-managed attendee guide used by the mobile app. The document includes `event`, `themes`, `programme_highlights`, `product_launch`, `leadership`, `sponsor`, `ecosystem_partners`, and the current published `speakers` array. Speaker rows are injected from the speaker directory at request time so both endpoints share one source of truth.
+Returns the database-managed attendee guide used by the mobile app. The document includes `event`, `themes`, `programme_highlights`, `product_launch`, `leadership`, `sponsors_intro`, `sponsors`, `sponsor`, `ecosystem_partners`, and the current published `speakers` array.
+`sponsors` lists every sponsor as `{name, category, description, logo_url, website_url}`; `sponsor` is the original single sponsor, kept for app versions released before the list.
+`leadership` holds `intro`, `advisory_note`, `convened_by {name, note}`, `people` (`name`, `role`, `badge`, optional `image_url`, `image_credit`, `image_credit_url`) and `committee {title, order_note, members[{role, name, organization}]}`. Speaker rows are injected from the speaker directory at request time so both endpoints share one source of truth.
 
 The endpoint permits anonymous cross-origin reads. If the content document is unpublished, it returns 503 and the app retains its bundled offline snapshot.
+
+### `GET /public/exhibitors`
+
+Returns approved exhibitors, ordered by name, without contact, payment or attendee data:
+
+```json
+{
+  "exhibitors": [{
+    "name": "Biotech Labs Pvt Ltd",
+    "description": "Molecular diagnostics",
+    "logo_url": "/api/v1/public/exhibitors/logos/5c74c0f6a86b38b82962912af36e8931",
+    "stall_number": "B-12",
+    "stall_type": "Standard stall"
+  }]
+}
+```
+
+`logo_url` is empty when no logo was uploaded, and `stall_number` is empty until staff allocate one.
+Logo URLs are relative and re-check approval on every request.
 
 ### `GET /public/speakers`
 
@@ -198,6 +219,7 @@ Roles are disjoint:
 | `POST /admin/registrations/{id}/attendees/{attendee}` | `{name, designation, email, phone, whatsapp_consent}` corrects one attendee on any registration that is not `cancelled`. Emails stay unique within the registration. Their active pass keeps its number and QR and re-renders with the new name or designation; queued deliveries to a changed email or phone are cancelled. Nothing is sent. A delegate's contact details follow their one attendee |
 | `POST /admin/registrations/{id}/attendees/{attendee}/remove` | `{note}` (may be empty) removes the attendee and revokes their pass, cancelling its queued deliveries; their place becomes unassigned. A registration keeps at least one attendee. Removed attendees are retained (`removed_at`) for the pass history but leave every listing, count and export |
 | `POST /admin/registrations/{id}/allowance` | `{roster_count, note}` sets an exhibitor registration's pass allowance (1-50), including more passes than its stall type includes. It cannot go below the attendees already on it. The new places are filled like any unassigned place; nothing is sent. A later stall change carries the extra passes over |
+| `POST /admin/registrations/{id}/stall-number` | `{stall_number, note}` sets, changes or (with an empty value) clears the stall allocated to an exhibitor registration that is not `cancelled`. Values are trimmed and upper-cased; up to 16 letters, digits, spaces, hyphens or slashes, starting with a letter or digit. Audited as `stall_number_changed`. Nothing is sent |
 | `POST /admin/registrations/{id}/category` | `{category_id, note}` moves an exhibitor registration that is not `cancelled` to another stall type. The pass allowance becomes the new stall's plus any extra passes granted earlier, and never drops below the attendees on the registration: moving to a smaller stall removes nobody, and the places beyond the new stall's allowance are kept as extra passes. The reference, issued passes and payments are unchanged; the fee due before approval follows the new stall. Nothing is sent |
 | `GET /admin/export?format=csv\|xlsx&sheet=&<same filters>` | CSV is one `sheet` (`Registrations`, `Attendees`, `Payments`, `Deliveries`); XLSX has all four. Cells that begin with `= + - @` are prefixed with `'`. 50,000-row cap. |
 | `POST /admin/categories` | `{id, open, free_open}` opens or closes a category; `open` governs paid registration and `free_open` governs free registration links. Omit either to leave it unchanged |

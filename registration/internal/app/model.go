@@ -113,7 +113,10 @@ type Registration struct {
 	DiscountPercent int `json:"discount_percent"`
 	// RosterCount is this registration's pass allowance; fewer attendees than
 	// this means open places (see AddAttendee).
-	RosterCount int        `json:"roster_count"`
+	RosterCount int `json:"roster_count"`
+	// StallNumber is the exhibitor's staff-assigned place on the expo floor;
+	// empty until allocated (SetStallNumber).
+	StallNumber string     `json:"stall_number"`
 	Attendees   []Attendee `json:"attendees"`
 }
 
@@ -283,7 +286,7 @@ func audit(ctx context.Context, tx pgx.Tx, staff, reg, action, detail string) er
 }
 func (a *App) registration(ctx context.Context, key string) (Registration, error) {
 	var r Registration
-	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL OR complimentary,complimentary,discount_percent,roster_count FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.Complimentary, &r.DiscountPercent, &r.RosterCount)
+	e := a.DB.QueryRow(ctx, `SELECT id,reference,category_id,institution,contact_name,email,phone,description,status,quoted_paise,created_at,review_note,coupon_code,free_link_id IS NOT NULL OR complimentary,complimentary,discount_percent,roster_count,stall_number FROM registrations WHERE id=$1`, key).Scan(&r.ID, &r.Reference, &r.CategoryID, &r.Institution, &r.ContactName, &r.Email, &r.Phone, &r.Description, &r.Status, &r.QuotedPaise, &r.CreatedAt, &r.ReviewNote, &r.CouponCode, &r.Free, &r.Complimentary, &r.DiscountPercent, &r.RosterCount, &r.StallNumber)
 	if e != nil {
 		return r, e
 	}

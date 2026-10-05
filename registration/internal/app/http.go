@@ -649,6 +649,21 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			respond(w, 200, map[string]bool{"ok": true})
 			return
 		}
+		if len(parts) == 3 && parts[2] == "stall-number" && r.Method == "POST" {
+			var in struct {
+				StallNumber string `json:"stall_number"`
+				Note        string `json:"note"`
+			}
+			if !decode(w, r, &in) {
+				return
+			}
+			if e = a.SetStallNumber(r.Context(), rid, p.ID, in.StallNumber, in.Note); e != nil {
+				fail(w, 409, publicError(e))
+				return
+			}
+			respond(w, 200, map[string]bool{"ok": true})
+			return
+		}
 		if len(parts) == 3 && parts[2] == "category" && r.Method == "POST" {
 			var in struct {
 				CategoryID string `json:"category_id"`

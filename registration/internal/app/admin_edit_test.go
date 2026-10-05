@@ -419,3 +419,54 @@ func TestStaffCanGrantExtraPasses(t *testing.T) {
 		t.Fatal("granted extra passes to a delegate")
 	}
 }
+
+func TestSetStallNumber(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "stalls@example.com", "manager")
+	rid, _, err := a.Create(ctx, exhibitorInput("standard", rosterOf(t, a, "standard")), key(1), tinyPNG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetStallNumber(ctx, rid, sid, "  b-12 ", "floor plan v2"); err != nil {
+		t.Fatal(err)
+	}
+	reg, err := a.registration(ctx, rid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reg.StallNumber != "B-12" {
+		t.Fatalf("stall number not normalised: %q", reg.StallNumber)
+	}
+	if err := a.SetStallNumber(ctx, rid, sid, "B-12", ""); err == nil {
+		t.Fatal("unchanged stall number accepted")
+	}
+	for _, bad := range []string{"-12", "B12!", "ABCDEFGHIJKLMNOPQ"} {
+		if err := a.SetStallNumber(ctx, rid, sid, bad, ""); err == nil {
+			t.Fatalf("invalid stall number %q accepted", bad)
+		}
+	}
+	var detail string
+	if err := a.DB.QueryRow(ctx, "SELECT detail FROM audit_events WHERE registration_id=$1 AND action='stall_number_changed'", rid).Scan(&detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail != "unassigned -> B-12: floor plan v2" {
+		t.Fatalf("audit detail: %q", detail)
+	}
+	if err := a.SetStallNumber(ctx, rid, sid, "", ""); err != nil {
+		t.Fatalf("clearing stall number: %v", err)
+	}
+	delegate, _, err := a.Create(ctx, delegateInput("industry"), key(2), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetStallNumber(ctx, delegate, sid, "A1", ""); err == nil {
+		t.Fatal("delegate given a stall")
+	}
+	if _, err := a.DB.Exec(ctx, "UPDATE registrations SET status='cancelled' WHERE id=$1", rid); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SetStallNumber(ctx, rid, sid, "A1", ""); err == nil {
+		t.Fatal("cancelled exhibitor given a stall")
+	}
+}
