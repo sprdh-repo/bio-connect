@@ -1133,12 +1133,13 @@ class SpeakerImage extends StatelessWidget {
     final fallback = _SpeakerFallback(speaker, fit: fit);
     if (speaker.image.isEmpty) return SizedBox(width: width, child: fallback);
     if (speaker.image.startsWith('http')) {
-      return Image.network(
+      return CachedPicture(
         speaker.image,
         width: width,
         fit: fit,
         alignment: Alignment.topCenter,
-        errorBuilder: (_, _, _) => fallback,
+        decodeWidth: width,
+        fallback: fallback,
       );
     }
     return Image.asset(

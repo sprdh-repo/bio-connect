@@ -1,4 +1,6 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../main.dart';
 import 'interaction.dart';
@@ -77,16 +79,77 @@ class LogoBox extends StatelessWidget {
       ),
       child: url.isEmpty
           ? fallback
-          : Image.network(
+          : CachedPicture(
               url,
               fit: BoxFit.contain,
               semanticLabel: '$name logo',
-              frameBuilder: (_, child, frame, sync) => sync || frame != null
-                  ? child
-                  : const SkeletonBlock(radius: 8),
-              errorBuilder: (_, _, _) => fallback,
+              // Logos are contained by height; decode no larger than shown.
+              decodeHeight: h - padding * 2,
+              placeholderRadius: 8,
+              fallback: fallback,
             ),
     );
+  }
+}
+
+/// The app's image cache: logos, portraits and speaker photos stay on disk for
+/// 30 days after last use, capped at 500 files. Tests swap in an in-memory one.
+BaseCacheManager imageCacheManager = CacheManager(
+  Config(
+    'bioConnectImages',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 500,
+  ),
+);
+
+/// A remote image kept in the on-disk cache, so it shows instantly on later
+/// launches and offline at the venue. [fallback] covers missing or failed
+/// images; a pulsing placeholder covers the first download.
+class CachedPicture extends StatelessWidget {
+  const CachedPicture(
+    this.url, {
+    super.key,
+    required this.fallback,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
+    this.width,
+    this.decodeWidth,
+    this.decodeHeight,
+    this.semanticLabel,
+    this.placeholderRadius = 0,
+  });
+  final String url;
+  final Widget fallback;
+  final BoxFit fit;
+  final Alignment alignment;
+  final double? width;
+
+  /// Logical size to decode at. Set one side only, so the aspect ratio holds.
+  final double? decodeWidth, decodeHeight;
+  final String? semanticLabel;
+  final double placeholderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    int? px(double? v) =>
+        v == null || !v.isFinite || v <= 0 ? null : (v * ratio).ceil();
+    final image = CachedNetworkImage(
+      imageUrl: url,
+      cacheManager: imageCacheManager,
+      width: width,
+      fit: fit,
+      alignment: alignment,
+      memCacheWidth: px(decodeWidth),
+      memCacheHeight: px(decodeHeight),
+      fadeInDuration: const Duration(milliseconds: 180),
+      fadeOutDuration: Duration.zero,
+      placeholder: (_, _) => SkeletonBlock(radius: placeholderRadius),
+      errorWidget: (_, _, _) => fallback,
+    );
+    return semanticLabel == null
+        ? image
+        : Semantics(label: semanticLabel, image: true, child: image);
   }
 }
 

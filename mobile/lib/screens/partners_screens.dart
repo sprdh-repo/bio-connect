@@ -408,16 +408,14 @@ class LeaderCard extends StatelessWidget {
             aspectRatio: 4 / 5,
             child: leader.imageUrl.isEmpty
                 ? fallback
-                : Image.network(
-                    leader.imageUrl,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                    semanticLabel: 'Portrait of ${leader.name}',
-                    frameBuilder: (_, child, frame, sync) =>
-                        sync || frame != null
-                        ? child
-                        : const SkeletonBlock(radius: 0),
-                    errorBuilder: (_, _, _) => fallback,
+                : LayoutBuilder(
+                    builder: (context, constraints) => CachedPicture(
+                      leader.imageUrl,
+                      alignment: Alignment.topCenter,
+                      semanticLabel: 'Portrait of ${leader.name}',
+                      decodeWidth: constraints.maxWidth,
+                      fallback: fallback,
+                    ),
                   ),
           ),
           Padding(

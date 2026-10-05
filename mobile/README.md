@@ -24,6 +24,7 @@ App IDs and release signing are still placeholders and must be set before store 
   Stall numbers, stall sorting and the floor plan link appear only once the backend publishes them.
 - Sponsors and Leadership: separate pages driven by app content (sponsors, ecosystem partners, state leadership and the advisory committee).
 - Pull to refresh on every page backed by live data; if the backend is unreachable the page keeps saved content and says so.
+- Remote images (exhibitor and sponsor logos, leadership portraits, speaker photos) use a disk cache (`imageCacheManager` in `lib/widgets/directory.dart`, 30 days, 500 files), so they show instantly on later launches and offline at the venue.
 - Store updates: release builds check the Play Store / App Store (India listing) with [`upgrader`](https://pub.dev/packages/upgrader) and offer Update or Later, at most once a day.
   To force an update, add `[Minimum supported app version: x.y.z]` to the store description.
 - Backend event-guide editor with draft/published controls, public APIs and staff audit history.
