@@ -5,6 +5,7 @@
     "description": "Kerala's international life sciences conclave and expo. A platform for science, enterprise and policy to meet.",
     "end_date": "2026-10-09",
     "hero_title": "Where science\nmeets what’s next.",
+    "moments_album_id": "",
     "privacy_url": "https://bioconnect.kerala.gov.in/privacy-policy",
     "sponsorship_email": "bioconnect@bio360.in",
     "start_date": "2026-10-08",
@@ -277,454 +278,454 @@
       "name": "Dr. Jayakrishna Ambati",
       "role": "Center Director & Professor",
       "organization": "University of Virginia Health System",
-      "linkedin": "",
-      "image": "assets/images/speakers/jayakrishna-ambati.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/jayakrishna-ambati.webp",
+      "linkedin": ""
     },
     {
       "id": "thirumalachari-ramasami",
       "name": "Dr. Thirumalachari Ramasami",
       "role": "Former Secretary",
       "organization": "Department of Science & Technology, Government of India",
-      "linkedin": "https://www.linkedin.com/in/thirumalachari-ramasami-b62192175/",
-      "image": "assets/images/speakers/thirumalachari-ramasami.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/thirumalachari-ramasami.webp",
+      "linkedin": "https://www.linkedin.com/in/thirumalachari-ramasami-b62192175/"
     },
     {
       "id": "t-p-singh",
       "name": "Prof. T. P. Singh",
       "role": "Distinguished Professor",
       "organization": "AIIMS, New Delhi",
-      "linkedin": "",
-      "image": "assets/images/speakers/t-p-singh.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/t-p-singh.webp",
+      "linkedin": ""
     },
     {
       "id": "ron-geyer",
       "name": "Prof. Ron Geyer",
       "role": "Professor, Department of Pathology and Laboratory Medicine",
       "organization": "University of Saskatchewan, Canada",
-      "linkedin": "https://www.linkedin.com/in/ron-geyer-69010939/",
-      "image": "assets/images/speakers/ron-geyer.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/ron-geyer.webp",
+      "linkedin": "https://www.linkedin.com/in/ron-geyer-69010939/"
     },
     {
       "id": "shane-miersch",
       "name": "Dr. Shane Miersch",
       "role": "Chief Scientific Officer",
       "organization": "Simisco Biologics",
-      "linkedin": "https://www.linkedin.com/in/shane-miersch-89932b9/",
-      "image": "assets/images/speakers/shane-miersch.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/shane-miersch.webp",
+      "linkedin": "https://www.linkedin.com/in/shane-miersch-89932b9/"
     },
     {
       "id": "g-m-nair",
       "name": "Prof. G. M. Nair",
       "role": "Director",
       "organization": "Kerala Academy of Sciences",
-      "linkedin": "",
-      "image": "assets/images/speakers/g-m-nair.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/g-m-nair.webp",
+      "linkedin": ""
     },
     {
       "id": "beena-pillai",
       "name": "Dr. Beena Pillai",
       "role": "Director",
       "organization": "BRIC-Rajiv Gandhi Centre for Biotechnology",
-      "linkedin": "https://www.linkedin.com/in/beena-pillai-99597675/",
-      "image": "assets/images/speakers/beena-pillai.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/beena-pillai.webp",
+      "linkedin": "https://www.linkedin.com/in/beena-pillai-99597675/"
     },
     {
       "id": "raj-shirumalla",
       "name": "Dr. Raj Shirumalla",
       "role": "Mission Director, National Biopharma Mission",
       "organization": "BIRAC",
-      "linkedin": "https://www.linkedin.com/in/dr-raj-k-shirumalla-25289415/",
-      "image": "assets/images/speakers/raj-shirumalla.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/raj-shirumalla.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-raj-k-shirumalla-25289415/"
     },
     {
       "id": "b-meenakumari",
       "name": "Dr. B. Meenakumari",
       "role": "Former Chairperson, National Biodiversity Authority",
       "organization": "Former Deputy Director General (Fisheries), ICAR",
-      "linkedin": "",
-      "image": "assets/images/speakers/b-meenakumari.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/b-meenakumari.webp",
+      "linkedin": ""
     },
     {
       "id": "murali-neelakantan",
       "name": "Murali Neelakantan",
       "role": "Principal Lawyer",
       "organization": "Amicus",
-      "linkedin": "https://www.linkedin.com/in/muralineelakantan/",
-      "image": "assets/images/speakers/murali-neelakantan.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/murali-neelakantan.webp",
+      "linkedin": "https://www.linkedin.com/in/muralineelakantan/"
     },
     {
       "id": "ravi-trivedi",
       "name": "Dr. Ravi Trivedi",
       "role": "Vice President",
       "organization": "Zydus Lifesciences",
-      "linkedin": "https://www.linkedin.com/in/ravi-kumar-t-2928639/",
-      "image": "assets/images/speakers/ravi-trivedi.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/ravi-trivedi.webp",
+      "linkedin": "https://www.linkedin.com/in/ravi-kumar-t-2928639/"
     },
     {
       "id": "jayashankar-das",
       "name": "Dr. Jayashankar Das",
       "role": "Founder & CEO",
       "organization": "ELMENTOZ RESEARCH",
-      "linkedin": "https://www.linkedin.com/in/dr-jayashankar-das-/",
-      "image": "assets/images/speakers/jayashankar-das.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/jayashankar-das.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-jayashankar-das-/"
     },
     {
       "id": "preveen-ramamoorthy",
       "name": "Preveen Ramamoorthy",
       "role": "Founder & Chief Scientific Officer",
       "organization": "T Therapeutics, USA",
-      "linkedin": "https://www.linkedin.com/in/preveen-ramamoorthy-818267/",
-      "image": "assets/images/speakers/preveen-ramamoorthy.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/preveen-ramamoorthy.webp",
+      "linkedin": "https://www.linkedin.com/in/preveen-ramamoorthy-818267/"
     },
     {
       "id": "c-s-mani",
       "name": "Dr. C. S. Mani",
       "role": "Surgical Oncologist",
       "organization": "Apollo Hospitals, Chennai",
-      "linkedin": "",
-      "image": "assets/images/speakers/c-s-mani.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/c-s-mani.webp",
+      "linkedin": ""
     },
     {
       "id": "aju-mathew",
       "name": "Dr. Aju Mathew",
       "role": "Oncologist",
       "organization": "Kerala Cancer Care, Ernakulam",
-      "linkedin": "https://www.linkedin.com/in/aju-mathew-00b384242/",
-      "image": "assets/images/speakers/aju-mathew.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/aju-mathew.webp",
+      "linkedin": "https://www.linkedin.com/in/aju-mathew-00b384242/"
     },
     {
       "id": "ashish-m-kumar",
       "name": "Ashish M. Kumar",
       "role": "Senior Vice President & Cluster Head",
       "organization": "Zydus Lifesciences",
-      "linkedin": "https://www.linkedin.com/in/ashish-kumar-43909664/",
-      "image": "assets/images/speakers/ashish-m-kumar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/ashish-m-kumar.webp",
+      "linkedin": "https://www.linkedin.com/in/ashish-kumar-43909664/"
     },
     {
       "id": "aniruddha-bhati",
       "name": "Dr. Aniruddha Bhati",
       "role": "Principal Scientist & Business Lead",
       "organization": "Takara Bio",
-      "linkedin": "https://www.linkedin.com/in/aniruddha-bhati/",
-      "image": "assets/images/speakers/aniruddha-bhati.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/aniruddha-bhati.webp",
+      "linkedin": "https://www.linkedin.com/in/aniruddha-bhati/"
     },
     {
       "id": "girish-chundayil-madathil",
       "name": "Dr. Girish Chundayil Madathil",
       "role": "Co-founder & CEO",
       "organization": "Luxmatra Innovations",
-      "linkedin": "https://www.linkedin.com/in/girishcm/",
-      "image": "assets/images/speakers/girish-chundayil-madathil.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/girish-chundayil-madathil.webp",
+      "linkedin": "https://www.linkedin.com/in/girishcm/"
     },
     {
       "id": "rahul-purwar",
       "name": "Dr. Rahul Purwar",
       "role": "Professor, Department of Biosciences and Bioengineering",
       "organization": "Indian Institute of Technology Bombay",
-      "linkedin": "https://www.linkedin.com/in/rahul-purwar-3187608a/",
-      "image": "assets/images/speakers/rahul-purwar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/rahul-purwar.webp",
+      "linkedin": "https://www.linkedin.com/in/rahul-purwar-3187608a/"
     },
     {
       "id": "p-sanjeev-kumar",
       "name": "Dr. P. Sanjeev Kumar",
       "role": "Former Senior Research Officer, DSU",
       "organization": "Government Ayurveda College",
-      "linkedin": "",
-      "image": "assets/images/speakers/p-sanjeev-kumar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/p-sanjeev-kumar.webp",
+      "linkedin": ""
     },
     {
       "id": "vinodh-kumar-adithya",
       "name": "Vinodh Kumar Adithya",
       "role": "Co-founder",
       "organization": "Capla GmbH, Germany",
-      "linkedin": "https://www.linkedin.com/in/adithyaavka/",
-      "image": "assets/images/speakers/vinodh-kumar-adithya.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/vinodh-kumar-adithya.webp",
+      "linkedin": "https://www.linkedin.com/in/adithyaavka/"
     },
     {
       "id": "s-chandrashekaran",
       "name": "Dr. S. Chandrashekaran",
       "role": "Founder, Chairman & Managing Director",
       "organization": "Vipragen Biosciences",
-      "linkedin": "",
-      "image": "assets/images/speakers/s-chandrashekaran.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/s-chandrashekaran.webp",
+      "linkedin": ""
     },
     {
       "id": "vinaya-k-k",
       "name": "Dr. Vinaya K. K.",
       "role": "Head of R&D Operations",
       "organization": "WellGenome Biotechnology",
-      "linkedin": "",
-      "image": "assets/images/speakers/vinaya-k-k.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/vinaya-k-k.webp",
+      "linkedin": ""
     },
     {
       "id": "sujith-subash-eranezhath",
       "name": "Sujith Subash Eranezhath",
       "role": "Chief Executive Officer, iCAINE",
       "organization": "All India Institute of Ayurveda, New Delhi",
-      "linkedin": "https://www.linkedin.com/in/sujitheranezhath/",
-      "image": "assets/images/speakers/sujith-subash-eranezhath.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/sujith-subash-eranezhath.webp",
+      "linkedin": "https://www.linkedin.com/in/sujitheranezhath/"
     },
     {
       "id": "yadu-narayanan-mooss",
       "name": "Dr. Yadu Narayanan Mooss E. T.",
       "role": "Executive Director",
       "organization": "Vaidyaratnam Group",
-      "linkedin": "",
-      "image": "assets/images/speakers/yadu-narayanan-mooss.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/yadu-narayanan-mooss.webp",
+      "linkedin": ""
     },
     {
       "id": "sreekumar-appukuttan-nair",
       "name": "Dr. Sreekumar Appukuttan Nair",
       "role": "Chairman & Director",
       "organization": "Wellness Solutions",
-      "linkedin": "https://www.linkedin.com/in/dr-sreekumar-appukuttan-nair-06511a20/",
-      "image": "assets/images/speakers/sreekumar-appukuttan-nair.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/sreekumar-appukuttan-nair.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-sreekumar-appukuttan-nair-06511a20/"
     },
     {
       "id": "siddharth-m-joshi",
       "name": "Dr. Siddharth M. Joshi",
       "role": "Associate Vice President",
       "organization": "LTM",
-      "linkedin": "",
-      "image": "assets/images/speakers/siddharth-m-joshi.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/siddharth-m-joshi.webp",
+      "linkedin": ""
     },
     {
       "id": "harkaran-dhingra",
       "name": "Harkaran Dhingra",
       "role": "Chief Executive Officer",
       "organization": "DSS Takara Bio India",
-      "linkedin": "https://www.linkedin.com/in/harkaran-dhingra/",
-      "image": "assets/images/speakers/harkaran-dhingra.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/harkaran-dhingra.webp",
+      "linkedin": "https://www.linkedin.com/in/harkaran-dhingra/"
     },
     {
       "id": "ajitesh-harihar-lunge",
       "name": "Dr. Ajitesh Harihar Lunge",
       "role": "Co-founder & CEO",
       "organization": "Locksmith Bio",
-      "linkedin": "",
-      "image": "assets/images/speakers/ajitesh-harihar-lunge.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/ajitesh-harihar-lunge.webp",
+      "linkedin": ""
     },
     {
       "id": "vaidya-m-prasad",
       "name": "Dr. Vaidya M. Prasad",
       "role": "Director",
       "organization": "Sunethri Ayurvedashramam, Thrissur",
-      "linkedin": "",
-      "image": "assets/images/speakers/vaidya-m-prasad.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/vaidya-m-prasad.webp",
+      "linkedin": ""
     },
     {
       "id": "mahesh-iyer",
       "name": "Dr. Mahesh Iyer",
       "role": "Head of Data and Quantitative Sciences",
       "organization": "Bristol Myers Squibb, India",
-      "linkedin": "https://www.linkedin.com/in/mahesh-iyer-9b5ba64/",
-      "image": "assets/images/speakers/mahesh-iyer.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/mahesh-iyer.webp",
+      "linkedin": "https://www.linkedin.com/in/mahesh-iyer-9b5ba64/"
     },
     {
       "id": "naveen-sivadasan",
       "name": "Dr. Naveen Sivadasan",
       "role": "Principal Scientist & Head of Life Sciences Research",
       "organization": "TCS Research",
-      "linkedin": "https://www.linkedin.com/in/naveen-sivadasan-b71027b2/",
-      "image": "assets/images/speakers/naveen-sivadasan.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/naveen-sivadasan.webp",
+      "linkedin": "https://www.linkedin.com/in/naveen-sivadasan-b71027b2/"
     },
     {
       "id": "s-k-menon",
       "name": "Shashikumar Menon",
       "role": "Former CEO",
       "organization": "Muralya",
-      "linkedin": "",
-      "image": "assets/images/speakers/s-k-menon.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/s-k-menon.webp",
+      "linkedin": ""
     },
     {
       "id": "d-g-namboothiri",
       "name": "D. G. Namboothiri",
       "role": "General Manager (R&D)",
       "organization": "Sreedhareeyam Ayurvedic Eye Hospital & Research Centre",
-      "linkedin": "https://www.linkedin.com/in/d-g-namboodiri-6520b319/",
-      "image": "assets/images/speakers/d-g-namboothiri.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/d-g-namboothiri.webp",
+      "linkedin": "https://www.linkedin.com/in/d-g-namboodiri-6520b319/"
     },
     {
       "id": "rajmohan-v",
       "name": "Dr. Rajmohan V.",
       "role": "Associate Professor",
       "organization": "Government Ayurveda College, Thiruvananthapuram",
-      "linkedin": "https://www.linkedin.com/in/dr-rajmohan-v-520447206/",
-      "image": "assets/images/speakers/rajmohan-v.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/rajmohan-v.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-rajmohan-v-520447206/"
     },
     {
       "id": "venkatachalam",
       "name": "Venkatachalam",
       "role": "Founder & CEO",
       "organization": "Certitude Farms",
-      "linkedin": "https://www.linkedin.com/in/balasubramaniam-v-66603639/",
-      "image": "assets/images/speakers/venkatachalam.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/venkatachalam.webp",
+      "linkedin": "https://www.linkedin.com/in/balasubramaniam-v-66603639/"
     },
     {
       "id": "mrutyunjay-suar",
       "name": "Dr. Mrutyunjay Suar",
       "role": "Director General, Industry Institute Innovation Interface",
       "organization": "KIIT University",
-      "linkedin": "https://www.linkedin.com/in/mrutyunjay-suar-phd-7981a114/",
-      "image": "assets/images/speakers/mrutyunjay-suar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/mrutyunjay-suar.webp",
+      "linkedin": "https://www.linkedin.com/in/mrutyunjay-suar-phd-7981a114/"
     },
     {
       "id": "k-ampady",
       "name": "Dr. K. Ampady",
       "role": "Chief Executive Officer",
       "organization": "KRIBS-BioNest",
-      "linkedin": "https://www.linkedin.com/in/ampady-k-7606b3119/",
-      "image": "assets/images/speakers/k-ampady.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/k-ampady.webp",
+      "linkedin": "https://www.linkedin.com/in/ampady-k-7606b3119/"
     },
     {
       "id": "ashish-g-r",
       "name": "Dr. Ashish G. R.",
       "role": "Principal Scientist",
       "organization": "Vaidyaratnam Group",
-      "linkedin": "",
-      "image": "assets/images/speakers/ashish-g-r.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/ashish-g-r.webp",
+      "linkedin": ""
     },
     {
       "id": "satheesan-b",
       "name": "Dr. Satheesan B.",
       "role": "Director",
       "organization": "Malabar Cancer Centre, Thalassery",
-      "linkedin": "https://www.linkedin.com/in/satheesan-balasubramanian-832b8810/",
-      "image": "assets/images/speakers/satheesan-b.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/satheesan-b.webp",
+      "linkedin": "https://www.linkedin.com/in/satheesan-balasubramanian-832b8810/"
     },
     {
       "id": "philip-mathew",
       "name": "Dr. Philip Mathew",
       "role": "Head of Department, Adult Critical Care Services",
       "organization": "Believers Church Medical College Hospital",
-      "linkedin": "https://www.linkedin.com/in/dr-philip-mathew-15148bb7/",
-      "image": "assets/images/speakers/philip-mathew.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/philip-mathew.webp",
+      "linkedin": "https://www.linkedin.com/in/dr-philip-mathew-15148bb7/"
     },
     {
       "id": "sreeja-narayanan",
       "name": "Dr. Sreeja Narayanan",
       "role": "Faculty and Principal Investigator, Nano-Bioengineering",
       "organization": "CVJ Centre for Synthetic Biology and Biomanufacturing, CUSAT",
-      "linkedin": "",
-      "image": "assets/images/speakers/sreeja-narayanan.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/sreeja-narayanan.webp",
+      "linkedin": ""
     },
     {
       "id": "m-i-sahadulla",
       "name": "Dr. M. I. Sahadulla",
       "role": "Chairman & Managing Director",
       "organization": "KIMS Health Care Management Ltd.",
-      "linkedin": "",
-      "image": "assets/images/speakers/m-i-sahadulla.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/m-i-sahadulla.webp",
+      "linkedin": ""
     },
     {
       "id": "c-balagopal",
       "name": "C. Balagopal",
       "role": "Chairman",
       "organization": "Kerala State Industrial Development Corporation (KSIDC)",
-      "linkedin": "https://www.linkedin.com/in/balagopal-chandrasekhar-12848653/",
-      "image": "assets/images/speakers/c-balagopal.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/c-balagopal.webp",
+      "linkedin": "https://www.linkedin.com/in/balagopal-chandrasekhar-12848653/"
     },
     {
       "id": "milind-pappu",
       "name": "Milind Pappu",
       "role": "CEO & Board Member",
       "organization": "Nipro India Group",
-      "linkedin": "https://www.linkedin.com/in/milindpappu/",
-      "image": "assets/images/speakers/milind-pappu.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/milind-pappu.webp",
+      "linkedin": "https://www.linkedin.com/in/milindpappu/"
     },
     {
       "id": "r-mukund",
       "name": "R. Mukund",
       "role": "Vice President (Strategic Planning)",
       "organization": "HLL Lifecare Limited",
-      "linkedin": "https://www.linkedin.com/in/mukund-r-pillai-47972013/",
-      "image": "assets/images/speakers/r-mukund.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/r-mukund.webp",
+      "linkedin": "https://www.linkedin.com/in/mukund-r-pillai-47972013/"
     },
     {
       "id": "praveen-sagar",
       "name": "Praveen Sagar",
       "role": "Co-founder & Technical Director",
       "organization": "OxDevice Ltd, UK",
-      "linkedin": "",
-      "image": "assets/images/speakers/praveen-sagar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/praveen-sagar.webp",
+      "linkedin": ""
     },
     {
       "id": "sathish-kumar-g",
       "name": "Sathish Kumar G.",
       "role": "Managing Director",
       "organization": "Terumo Penpol",
-      "linkedin": "https://www.linkedin.com/in/sathishkrao-blr/",
-      "image": "assets/images/speakers/sathish-kumar-g.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/sathish-kumar-g.webp",
+      "linkedin": "https://www.linkedin.com/in/sathishkrao-blr/"
     },
     {
       "id": "jay-krishnan",
       "name": "Jay Krishnan",
       "role": "Partner & Head of Investments",
       "organization": "Beyond Next Ventures India",
-      "linkedin": "https://www.linkedin.com/in/thejaykrishnan/",
-      "image": "assets/images/speakers/jay-krishnan.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/jay-krishnan.webp",
+      "linkedin": "https://www.linkedin.com/in/thejaykrishnan/"
     },
     {
       "id": "balakrishnan-t-p",
       "name": "Balakrishnan T. P.",
       "role": "Founder & CEO",
       "organization": "I2R Labs",
-      "linkedin": "https://www.linkedin.com/in/balakrishnan-tp-34565b1b/",
-      "image": "assets/images/speakers/balakrishnan-t-p.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/balakrishnan-t-p.webp",
+      "linkedin": "https://www.linkedin.com/in/balakrishnan-tp-34565b1b/"
     },
     {
       "id": "binu-augustin",
       "name": "Binu Augustin",
       "role": "Managing Director & Co-founder",
       "organization": "Heka Medicals India Pvt. Ltd.",
-      "linkedin": "https://www.linkedin.com/in/binu-augustin-31034424/",
-      "image": "assets/images/speakers/binu-augustin.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/binu-augustin.webp",
+      "linkedin": "https://www.linkedin.com/in/binu-augustin-31034424/"
     },
     {
       "id": "c-padmakumar",
       "name": "C. Padmakumar",
       "role": "Special Officer",
       "organization": "Kerala Medical Technology Consortium (KMTC)",
-      "linkedin": "https://www.linkedin.com/in/padmakumar-advisory/",
-      "image": "assets/images/speakers/c-padmakumar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/c-padmakumar.webp",
+      "linkedin": "https://www.linkedin.com/in/padmakumar-advisory/"
     },
     {
       "id": "joseph-jose",
       "name": "Joseph Jose",
       "role": "Managing Director",
       "organization": "Mariya Healthcare Pvt. Ltd.",
-      "linkedin": "https://www.linkedin.com/in/joseph-jose-12063696/",
-      "image": "assets/images/speakers/joseph-jose.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/joseph-jose.webp",
+      "linkedin": "https://www.linkedin.com/in/joseph-jose-12063696/"
     },
     {
       "id": "t-c-jayasankar",
       "name": "T. C. Jayasankar",
       "role": "Managing Director",
       "organization": "Jayon Implants Pvt. Ltd.",
-      "linkedin": "",
-      "image": "assets/images/speakers/t-c-jayasankar.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/t-c-jayasankar.webp",
+      "linkedin": ""
     },
     {
       "id": "piyush-das",
       "name": "Dr. Piyush Das",
       "role": "Country Director & General Manager, India and South Asia",
       "organization": "Haier Biomedical",
-      "linkedin": "",
-      "image": "assets/images/speakers/piyush-das.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/piyush-das.webp",
+      "linkedin": ""
     },
     {
       "id": "sudhir-krishnan-nair",
       "name": "Sudhir Krishnan Nair",
       "role": "Vice President",
       "organization": "Agappe Diagnostics Ltd.",
-      "linkedin": "https://www.linkedin.com/in/sudhir-krishnan-nair-3a0525b/",
-      "image": "assets/images/speakers/sudhir-krishnan-nair.webp"
+      "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/sudhir-krishnan-nair.webp",
+      "linkedin": "https://www.linkedin.com/in/sudhir-krishnan-nair-3a0525b/"
     }
   ],
   "event_guide": {
     "activities": [],
     "faqs": [],
-    "revision": 1,
+    "revision": 2,
     "sessions": [],
     "venue": {
       "accessibility": "",
@@ -797,12 +798,6 @@
         "url": ""
       },
       {
-        "key": "product_launch",
-        "subtitle": "Kerala Startup Mission showcase",
-        "title": "Product launch",
-        "url": ""
-      },
-      {
         "key": "sponsors",
         "subtitle": "",
         "title": "Sponsors",
@@ -818,6 +813,12 @@
         "key": "privacy",
         "subtitle": "How we use and protect your information",
         "title": "Privacy policy",
+        "url": ""
+      },
+      {
+        "key": "moments",
+        "subtitle": "Find and save your event photos",
+        "title": "Moments album",
         "url": ""
       }
     ],
