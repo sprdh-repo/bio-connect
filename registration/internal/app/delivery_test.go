@@ -543,6 +543,75 @@ func TestAdminCanUploadExhibitorLogoOnRegistrantsBehalf(t *testing.T) {
 	}
 }
 
+func TestAdminCanReplaceApprovedExhibitorLogo(t *testing.T) {
+	a := mustApp(t)
+	fixed := time.Now().UTC().Truncate(time.Minute)
+	a.Now = func() time.Time { return fixed }
+	h := a.Handler()
+	ctx := context.Background()
+
+	sid, secret := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, err := a.Create(ctx, exhibitorInput("table", 2), key(1), tinyPNG(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegate, _, err := a.Create(ctx, delegateInput("industry"), key(2), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.DB.Exec(ctx, "UPDATE registrations SET status='approved' WHERE id=ANY($1)", []string{rid, delegate}); err != nil {
+		t.Fatal(err)
+	}
+
+	session, csrfTok := staffLogin(t, h, "reviewer@bioconnect.test", secret, fixed)
+	upload := func(target string) *httptest.ResponseRecorder {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/api/v1/admin/registrations/"+target+"/files?kind=logo", bytes.NewReader(tinyPNG(t)))
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.AddCookie(&http.Cookie{Name: "bc_session", Value: session})
+		req.Header.Set("X-CSRF-Token", csrfTok)
+		h.ServeHTTP(rr, req)
+		return rr
+	}
+
+	rr := upload(rid)
+	if rr.Code != 201 {
+		t.Fatalf("approved exhibitor logo replacement returned %d: %s", rr.Code, rr.Body.String())
+	}
+	var created struct{ ID string }
+	if err = json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND staff_id=$2 AND action='logo_replaced_by_staff'", rid, sid); n != 1 {
+		t.Fatalf("staff logo replacement audit rows = %d, want 1", n)
+	}
+
+	dir := httptest.NewRecorder()
+	h.ServeHTTP(dir, httptest.NewRequest("GET", "/api/v1/public/exhibitors", nil))
+	var out struct {
+		Exhibitors []struct {
+			LogoURL string `json:"logo_url"`
+		} `json:"exhibitors"`
+	}
+	if err = json.Unmarshal(dir.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Exhibitors) != 1 || out.Exhibitors[0].LogoURL != "/api/v1/public/exhibitors/logos/"+created.ID {
+		t.Fatalf("public directory did not switch to the replacement logo: %s", dir.Body.String())
+	}
+
+	if rr = upload(delegate); rr.Code != 400 {
+		t.Fatalf("delegate logo upload returned %d, want 400", rr.Code)
+	}
+	if _, err = a.DB.Exec(ctx, "UPDATE registrations SET status='cancelled' WHERE id=$1", rid); err != nil {
+		t.Fatal(err)
+	}
+	if rr = upload(rid); rr.Code != 409 {
+		t.Fatalf("cancelled exhibitor logo upload returned %d, want 409", rr.Code)
+	}
+}
+
 func TestPaymentReminderEmailCarriesReferenceFeeAndLink(t *testing.T) {
 	a := mustApp(t)
 	var sent map[string]any

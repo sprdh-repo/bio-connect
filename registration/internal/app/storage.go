@@ -174,9 +174,11 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request, rid string) {
 	respond(w, 201, map[string]string{"id": fid})
 }
 
-// adminUpload lets staff attach a logo on an exhibitor's behalf, e.g. when
+// adminUpload lets staff attach or replace an exhibitor's logo, e.g. when
 // recording a bank-confirmed payment for someone who never completed their
-// own upload. Receipts stay exhibitor-only evidence, so only "logo" is
+// own upload, or when an approved exhibitor sends a better logo for the public
+// directory. The directory shows the newest logo, so a replacement is simply a
+// new upload. Receipts stay exhibitor-only evidence, so only "logo" is
 // accepted here.
 func (a *App) adminUpload(w http.ResponseWriter, r *http.Request, rid string, p principal) {
 	if r.URL.Query().Get("kind") != "logo" {
@@ -199,13 +201,19 @@ func (a *App) adminUpload(w http.ResponseWriter, r *http.Request, rid string, p 
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var status string
-	if e = tx.QueryRow(r.Context(), "SELECT status FROM registrations WHERE id=$1 FOR UPDATE", rid).Scan(&status); e != nil {
+	var status, kind string
+	var replacing bool
+	if e = tx.QueryRow(r.Context(), `SELECT r.status,c.kind,EXISTS(SELECT 1 FROM files f WHERE f.registration_id=r.id AND f.kind='logo')
+ FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &replacing); e != nil {
 		fail(w, 404, "registration not found")
 		return
 	}
-	if status != "awaiting_payment" && status != "correction_requested" {
-		fail(w, 409, "uploads are closed while review is pending or complete")
+	if kind != "exhibitor" {
+		fail(w, 400, "only exhibitor registrations have a logo")
+		return
+	}
+	if status == "cancelled" {
+		fail(w, 409, "this registration is cancelled")
 		return
 	}
 	var count int
@@ -220,7 +228,11 @@ func (a *App) adminUpload(w http.ResponseWriter, r *http.Request, rid string, p 
 	}
 	_, e = tx.Exec(r.Context(), "INSERT INTO files(id,registration_id,kind,object_key,mime,size) VALUES($1,$2,$3,$1,$4,$5)", fid, rid, "logo", mime, len(b))
 	if e == nil {
-		e = audit(r.Context(), tx, p.ID, rid, "logo_uploaded_by_staff", "")
+		action := "logo_uploaded_by_staff"
+		if replacing {
+			action = "logo_replaced_by_staff"
+		}
+		e = audit(r.Context(), tx, p.ID, rid, action, "")
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())
