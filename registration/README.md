@@ -12,6 +12,7 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 
 - Public forms at `/delegates` and `/exhibitors` matching the site's visual language, with mobile-friendly steps, a review screen, and recoverable errors.
 - Database-backed mobile guide at `/api/v1/public/app-content`, including the published speaker directory and mutable event, Product Launch, leadership, sponsor and partner content. The app keeps a bundled offline fallback.
+- Authenticated Moments proxy for the mobile app, keeping provider credentials and attendee contact details out of the app and upstream service.
 - Server-side price calculation in INR using `Asia/Kolkata`, with early-bird eligibility tied to the verified payment date through 30 September 2026.
 - Registration saved before payment; SBI Collect paid out of band; payment reference, date, amount, and receipt collected for manual staff review.
 - Coupons `KSUM30` (30%) and `KMTC25` (25%) give their discount off the current fee for every category except students. The form shows the offer price once the code is applied; the discount is frozen on the registration, the registrant pays by direct bank transfer to the account shown on their registration page, and staff verify against the discounted amount.
@@ -58,6 +59,10 @@ Registration is disabled by default (`REGISTRATION_ENABLED=false`); the forms an
 With `LIVE_DELIVERY=false` the delivery worker uses a fake provider that marks every job delivered, so nothing leaves the machine.
 Set `OPS_KEY` to a strong shared multi-word passcode to use the on-site portal at `/ops`.
 Each device or desk also enters a station name, which is recorded against attendance and gate activity.
+
+To enable Moments, set `MOMENTS_API_TOKEN` and optionally override `MOMENTS_API_BASE`, then restart the backend.
+In the event-guide editor, set the provider's numeric Moments album ID under Event details, add or publish a menu entry with the `moments` destination, and publish the app content.
+The mobile routes require an existing verified saved-pass bearer session and accept its owned `pass_id`; the backend maps that pass to an opaque stable identifier before contacting Moments.
 
 Create the first staff account (prints the `otpauth://` URI to enrol in an authenticator):
 

@@ -11,6 +11,7 @@ const mobileSections = [
 const mobileDestinations = [
   ['sessions', 'Sessions'], ['speakers', 'Speakers'], ['venue', 'Venue & directions'], ['activities', 'Activities'],
   ['faqs', 'FAQs'], ['exhibitors', 'Exhibitors'], ['my_passes', 'My passes'], ['registration', 'Registration & passes'],
+  ['moments', 'Moments album'],
   ['brochure', 'Event brochure'], ['product_launch', 'Product launch'], ['sponsors', 'Sponsors'], ['leadership', 'Leadership'],
   ['explore', 'Explore Bio Connect'], ['privacy', 'Privacy policy'], ['link', 'Custom link (web, email or phone)']
 ];
@@ -101,6 +102,7 @@ async function mobileContentPage() {
       ${input('content.event.description', 'Description', 'textarea', { hide: 'content.event.hidden' })}
       ${input('content.event.brochure_url', 'Brochure link (HTTPS)', 'url', { hide: 'content.event.hidden' })}${input('content.event.privacy_url', 'Privacy policy link (HTTPS)', 'url', { hide: 'content.event.hidden' })}
       ${input('content.event.sponsorship_email', 'Sponsorship and organiser email', 'email', { hide: 'content.event.hidden', help: 'Used by the “Enquire” buttons. Hidden buttons disappear.' })}
+      ${input('content.event.moments_album_id', 'Moments album ID', 'number', { help: 'Leave blank until the Moments album is ready. Setting it makes published Moments menu entries available.' })}
     </div></section>`,
     menus: () => mobileMenus.map(([name, label, help]) => {
       if (!state.content.menus[name]) state.content.menus[name] = [];

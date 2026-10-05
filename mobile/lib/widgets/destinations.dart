@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart';
@@ -5,6 +6,7 @@ import '../models/event_content.dart';
 import '../screens/event_guide_screens.dart';
 import '../screens/exhibitors_screen.dart';
 import '../screens/my_passes_screen.dart';
+import '../screens/moments_screen.dart';
 import '../screens/partners_screens.dart';
 
 /// Lets menu entries switch to a bottom tab instead of pushing a page.
@@ -28,6 +30,7 @@ const _icons = <String, IconData>{
   'activities': Icons.local_activity_outlined,
   'faqs': Icons.help_outline,
   'exhibitors': Icons.storefront_outlined,
+  'moments': Icons.photo_library_outlined,
   'my_passes': Icons.confirmation_number_outlined,
   'registration': Icons.confirmation_number_outlined,
   'brochure': Icons.article_outlined,
@@ -46,6 +49,7 @@ const _titles = <String, String>{
   'activities': 'Activities',
   'faqs': 'FAQs',
   'exhibitors': 'Exhibitors',
+  'moments': 'Moments album',
   'my_passes': 'My passes',
   'registration': 'Registration & passes',
   'brochure': 'Event brochure',
@@ -88,6 +92,7 @@ bool hasContent(String key, EventContent c, {String url = ''}) => switch (key) {
         c.guide.venue.address.isNotEmpty,
   'activities' => c.guide.activities.isNotEmpty,
   'faqs' => c.guide.faqs.isNotEmpty || c.guide.venue.hasHelp,
+  'moments' => c.event.momentsAlbumId.isNotEmpty,
   'brochure' => c.event.brochureUrl.isNotEmpty,
   'product_launch' =>
     c.productLaunch.title.isNotEmpty || c.productLaunch.description.isNotEmpty,
@@ -99,12 +104,29 @@ bool hasContent(String key, EventContent c, {String url = ''}) => switch (key) {
   _ => true,
 };
 
-List<MenuEntry> visibleMenu(EventContent content, String name) => [
-  for (final entry in content.menu(name))
-    if (entryTitle(entry).isNotEmpty &&
-        hasContent(entry.key, content, url: entry.url))
-      entry,
-];
+List<MenuEntry> visibleMenu(EventContent content, String name) {
+  final configured = content.menu(name);
+  final entries =
+      kDebugMode &&
+          name == 'guide' &&
+          !configured.any((entry) => entry.key == 'moments')
+      ? [
+          ...configured,
+          const MenuEntry(
+            'moments',
+            'Moments album',
+            'Preview your private event photos',
+          ),
+        ]
+      : configured;
+  return [
+    for (final entry in entries)
+      if (entryTitle(entry).isNotEmpty &&
+          (hasContent(entry.key, content, url: entry.url) ||
+              kDebugMode && entry.key == 'moments'))
+        entry,
+  ];
+}
 
 /// Bottom tabs staff have published, in order, by destination key.
 List<MenuEntry> visibleTabs(EventContent content) => [
@@ -131,6 +153,7 @@ void openDestination(
     'activities' => const ActivitiesScreen(),
     'faqs' => const FaqScreen(),
     'exhibitors' => const ExhibitorsScreen(),
+    'moments' => const MomentsScreen(),
     'my_passes' => const MyPassesScreen(),
     'registration' => RegistrationScreen(content.event),
     'product_launch' => const ProductLaunchScreen(),

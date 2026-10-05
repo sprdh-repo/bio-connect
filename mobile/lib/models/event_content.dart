@@ -125,6 +125,7 @@ const destinationKeys = {
   'activities',
   'faqs',
   'exhibitors',
+  'moments',
   'my_passes',
   'registration',
   'brochure',
@@ -373,6 +374,7 @@ class EventDetails {
     this.brochureUrl = '',
     this.sponsorshipEmail = '',
     this.privacyUrl = '',
+    this.momentsAlbumId = '',
   });
   final String title,
       tagline,
@@ -382,13 +384,18 @@ class EventDetails {
       city,
       brochureUrl,
       sponsorshipEmail,
-      privacyUrl;
+      privacyUrl,
+      momentsAlbumId;
   final DateTime startDate, endDate;
 
   factory EventDetails.fromJson(Map<String, dynamic> json) {
     // Dates are required by the console; a malformed one cannot hide the guide.
     final start = DateTime.tryParse(str(json['start_date']));
     final end = DateTime.tryParse(str(json['end_date'])) ?? start;
+    final rawMomentsAlbumId = str(json['moments_album_id']);
+    final momentsAlbumId = (int.tryParse(rawMomentsAlbumId) ?? 0) > 0
+        ? rawMomentsAlbumId
+        : '';
     return EventDetails(
       title: switch (str(json['title'])) {
         '' => 'Bio Connect 4.0',
@@ -404,6 +411,7 @@ class EventDetails {
       brochureUrl: str(json['brochure_url']),
       sponsorshipEmail: str(json['sponsorship_email']),
       privacyUrl: str(json['privacy_url']),
+      momentsAlbumId: momentsAlbumId,
     );
   }
 }

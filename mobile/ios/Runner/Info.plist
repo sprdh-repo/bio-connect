@@ -3,7 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan the QR on your Bio Connect admission pass to add it to this phone.</string>
+	<string>Scan your Bio Connect pass or take a selfie to find your event photos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your Bio Connect Moments photos to your photo library.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

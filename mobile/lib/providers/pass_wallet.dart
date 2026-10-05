@@ -37,6 +37,13 @@ class PassWallet extends ChangeNotifier {
     return byId.values.toList();
   }
 
+  List<MomentsCredential> get momentsCredentials => [
+    for (final access in _access)
+      if (access.expiresAt.isAfter(_now()))
+        for (final pass in access.passes)
+          MomentsCredential(token: access.token, pass: pass),
+  ];
+
   DateTime? checkedAt(String passId) {
     final times =
         _access

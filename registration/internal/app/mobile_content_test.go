@@ -39,14 +39,15 @@ func TestMobileContentValidation(t *testing.T) {
 		return mobileContent{Event: contentEvent{Title: "Bio Connect", StartDate: "2026-10-08", EndDate: "2026-10-09"}}
 	}
 	cases := map[string]func(*mobileContent){
-		"missing title":        func(c *mobileContent) { c.Event.Title = " " },
-		"reversed dates":       func(c *mobileContent) { c.Event.EndDate = "2026-10-07" },
-		"hide required date":   func(c *mobileContent) { c.Event.Hidden = []string{"start_date"} },
-		"unsafe brochure":      func(c *mobileContent) { c.Event.BrochureURL = "javascript:alert(1)" },
-		"unknown menu":         func(c *mobileContent) { c.Menus = map[string][]menuItem{"drawer": {}} },
-		"unknown destination":  func(c *mobileContent) { c.Menus = map[string][]menuItem{"guide": {{Key: "admin"}}} },
-		"tab outside allowed":  func(c *mobileContent) { c.Menus = map[string][]menuItem{"tabs": {{Key: "faqs"}}} },
-		"link without address": func(c *mobileContent) { c.Menus = map[string][]menuItem{"guide": {{Key: "link", Title: "Help"}}} },
+		"missing title":         func(c *mobileContent) { c.Event.Title = " " },
+		"reversed dates":        func(c *mobileContent) { c.Event.EndDate = "2026-10-07" },
+		"invalid moments album": func(c *mobileContent) { c.Event.MomentsAlbumID = "album-one" },
+		"hide required date":    func(c *mobileContent) { c.Event.Hidden = []string{"start_date"} },
+		"unsafe brochure":       func(c *mobileContent) { c.Event.BrochureURL = "javascript:alert(1)" },
+		"unknown menu":          func(c *mobileContent) { c.Menus = map[string][]menuItem{"drawer": {}} },
+		"unknown destination":   func(c *mobileContent) { c.Menus = map[string][]menuItem{"guide": {{Key: "admin"}}} },
+		"tab outside allowed":   func(c *mobileContent) { c.Menus = map[string][]menuItem{"tabs": {{Key: "faqs"}}} },
+		"link without address":  func(c *mobileContent) { c.Menus = map[string][]menuItem{"guide": {{Key: "link", Title: "Help"}}} },
 		"link to script": func(c *mobileContent) {
 			c.Menus = map[string][]menuItem{"guide": {{Key: "link", Title: "x", URL: "javascript:x"}}}
 		},
@@ -69,10 +70,15 @@ func TestMobileContentValidation(t *testing.T) {
 		{Key: "faqs", Published: true},
 	}}
 	c.Copy = map[string]string{"sessions.title": "Today on stage"}
+	c.Event.MomentsAlbumID = "42"
 	c.Event.Hidden = []string{"brochure_url"}
 	c.Themes = []contentTheme{{Title: "AI", Image: "https://example.com/ai.webp"}, {Title: "Bio", Image: "assets/images/theme-biopharma.webp"}}
 	if err := c.validate(); err != nil {
 		t.Fatal(err)
+	}
+	c.Event.MomentsAlbumID = "0"
+	if c.validate() == nil {
+		t.Fatal("zero moments album accepted")
 	}
 	if validateSpeakers([]adminSpeaker{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}}) == nil {
 		t.Fatal("duplicate speaker IDs accepted")
@@ -118,8 +124,8 @@ func TestMobileContentAPI(t *testing.T) {
 	}
 	// Migration 031 keeps every existing entry visible and seeds the released menus.
 	if len(m.Speakers) != 56 || m.Speakers[0].ImageURL == "" || len(m.Content.Sponsors) != 9 || !m.Content.Sponsors[0].Published ||
-		len(m.Content.Leadership.Committee.Members) != 14 || !m.Content.Leadership.Committee.Members[0].Published ||
-		len(m.Content.Menus["guide"]) != 11 || !m.Content.Menus["guide"][0].Published || m.Content.Event.PrivacyURL == "" {
+		len(m.Content.Leadership.Committee.Members) != 14 || !m.Content.Leadership.Committee.Members[0].Published || m.Content.Event.MomentsAlbumID != "" ||
+		len(m.Content.Menus["guide"]) != 12 || !m.Content.Menus["guide"][0].Published || m.Content.Event.PrivacyURL == "" {
 		t.Fatalf("migrated content incomplete: %+v", m.Content.Menus)
 	}
 
@@ -128,6 +134,7 @@ func TestMobileContentAPI(t *testing.T) {
 	m.Content.Sponsors[1].Published = false
 	hiddenSponsor := m.Content.Sponsors[1].Name
 	m.Content.Event.Hidden = []string{"brochure_url"}
+	m.Content.Event.MomentsAlbumID = "42"
 	m.Content.Copy["sessions.title"] = "Today on stage"
 	m.Content.Menus["tabs"][1].Published = false
 	m.Speakers = append([]adminSpeaker{{ID: "new-speaker", Name: "New Speaker", Role: "Chair", Organization: "Lab", Published: true}}, m.Speakers[1:]...)
@@ -180,7 +187,7 @@ func TestMobileContentAPI(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Event["brochure_url"] != "" || out.Event["start_date"] != "2026-10-08" || out.Copy["sessions.title"] != "Today on stage" ||
+	if out.Event["brochure_url"] != "" || out.Event["start_date"] != "2026-10-08" || out.Event["moments_album_id"] != "42" || out.Copy["sessions.title"] != "Today on stage" ||
 		len(out.Menus["tabs"]) != 1 || len(out.Sponsors) != 8 || out.Sponsor["name"] != out.Sponsors[0]["name"] ||
 		out.Speakers[0].ID != "new-speaker" || len(out.EventGuide.Sessions) != 1 ||
 		out.EventGuide.Venue.HelpWhatsApp != "+91 88888 00000" || out.EventGuide.Venue.HelpPhone != "" {

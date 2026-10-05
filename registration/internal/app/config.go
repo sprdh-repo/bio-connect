@@ -25,6 +25,7 @@ type Config struct {
 	MetaToken, MetaPhoneID, MetaAppSecret, MetaVerifyToken, MetaTemplate, MetaLanguage, MetaVersion, MetaAPIBase string
 	WebhookUser, WebhookPassword                                                                                 string
 	MetaOTPTemplate, MetaOTPLanguage                                                                             string
+	MomentsAPIBase, MomentsAPIToken                                                                              string
 }
 
 func env(k, d string) string {
@@ -44,6 +45,7 @@ func FromEnv() Config {
 		MetaToken: os.Getenv("META_ACCESS_TOKEN"), MetaPhoneID: os.Getenv("META_PHONE_NUMBER_ID"), MetaAppSecret: os.Getenv("META_APP_SECRET"), MetaVerifyToken: os.Getenv("META_VERIFY_TOKEN"), MetaTemplate: os.Getenv("META_TEMPLATE"), MetaLanguage: env("META_TEMPLATE_LANGUAGE", "en"), MetaVersion: os.Getenv("META_API_VERSION"), MetaAPIBase: env("META_API_BASE", "https://graph.facebook.com"),
 		WebhookUser: os.Getenv("POSTMARK_WEBHOOK_USER"), WebhookPassword: os.Getenv("POSTMARK_WEBHOOK_PASSWORD"),
 		MetaOTPTemplate: os.Getenv("META_OTP_TEMPLATE"), MetaOTPLanguage: env("META_OTP_TEMPLATE_LANGUAGE", "en_US"),
+		MomentsAPIBase: env("MOMENTS_API_BASE", "https://moments.mshiyaf.com/api/v1"), MomentsAPIToken: os.Getenv("MOMENTS_API_TOKEN"),
 	}
 }
 func (c Config) Validate() error {
@@ -65,6 +67,12 @@ func (c Config) Validate() error {
 		s, e := url.Parse(c.SBIURL)
 		if e != nil || s.Scheme != "https" || s.Hostname() == "" || s.User != nil {
 			return errors.New("SBI_COLLECT_URL must be HTTPS")
+		}
+	}
+	if c.MomentsAPIBase != "" {
+		m, err := url.Parse(c.MomentsAPIBase)
+		if err != nil || m.Hostname() == "" || m.User != nil || m.RawQuery != "" || m.Fragment != "" || (c.Production && m.Scheme != "https") || (!c.Production && m.Scheme != "https" && m.Scheme != "http") {
+			return errors.New("MOMENTS_API_BASE must be an HTTP(S) URL without credentials, query or fragment")
 		}
 	}
 	if c.Production && c.RegistrationEnabled && (!c.LiveDelivery || c.SBIURL == "") {

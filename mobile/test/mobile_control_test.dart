@@ -6,6 +6,7 @@ import 'package:bio_connect_app/models/event_content.dart';
 import 'package:bio_connect_app/providers/content_provider.dart';
 import 'package:bio_connect_app/screens/event_guide_screens.dart';
 import 'package:bio_connect_app/services/content_service.dart';
+import 'package:bio_connect_app/widgets/destinations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:bio_connect_app/widgets/nav_bar.dart';
@@ -67,6 +68,7 @@ void main() {
       },
     });
     expect(content.event.title, 'Bio Connect 4.0');
+    expect(content.event.momentsAlbumId, isEmpty);
     expect(content.themes, isEmpty);
     expect(content.speakers.single.name, 'Named');
     expect(content.leadership.convenedBy, isNull);
@@ -84,6 +86,24 @@ void main() {
   test('an empty published sponsors list stays empty', () async {
     final json = bundled()..['sponsors'] = [];
     expect(EventContent.fromJson(json).sponsors, isEmpty);
+  });
+
+  test('Moments is offered only for a configured positive album', () {
+    final json = bundled();
+    json['menus'] = {
+      'guide': [
+        {'key': 'moments', 'title': 'Moments album'},
+      ],
+    };
+    json['event'] = {...json['event'] as Map, 'moments_album_id': '42'};
+    final configured = EventContent.fromJson(json);
+    expect(configured.event.momentsAlbumId, '42');
+    expect(visibleMenu(configured, 'guide').single.key, 'moments');
+
+    json['event'] = {...json['event'] as Map, 'moments_album_id': '0'};
+    final invalid = EventContent.fromJson(json);
+    expect(invalid.event.momentsAlbumId, isEmpty);
+    expect(hasContent('moments', invalid), isFalse);
   });
 
   testWidgets('staff control tabs, menus and headings', (tester) async {

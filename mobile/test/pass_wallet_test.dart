@@ -145,6 +145,35 @@ void main() {
     expect(store.data, isEmpty);
     expect(wallet.passes, isEmpty);
   });
+  test(
+    'Moments credentials pair each active pass with its session token',
+    () async {
+      final expired = access(
+        expiresAt: now.subtract(const Duration(seconds: 1)),
+        passes: const [
+          AdmissionPass(
+            id: 'old',
+            name: 'Old Pass',
+            institution: '',
+            designation: '',
+            category: '',
+            number: '',
+            qrId: '',
+            downloadUrl: '',
+          ),
+        ],
+      );
+      final wallet = PassWallet(
+        service: FakePassService()..failure = const PassException('offline'),
+        store: MemoryPassStore([expired, access()]),
+        now: () => now,
+      );
+      await wallet.load();
+      expect(wallet.momentsCredentials, hasLength(1));
+      expect(wallet.momentsCredentials.single.token, 'session');
+      expect(wallet.momentsCredentials.single.pass.id, 'p1');
+    },
+  );
   test('scanner accepts admission identifiers and badge profile URLs, never arbitrary URLs', () {
     expect(admissionQr(pass.qrId), pass.qrId);
     expect(admissionQr('https://example.com/passes/token'), isNull);

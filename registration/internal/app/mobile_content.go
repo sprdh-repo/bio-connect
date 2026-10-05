@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ type contentEvent struct {
 	BrochureURL      string   `json:"brochure_url"`
 	SponsorshipEmail string   `json:"sponsorship_email"`
 	PrivacyURL       string   `json:"privacy_url"`
+	MomentsAlbumID   string   `json:"moments_album_id"`
 	Hidden           []string `json:"hidden"`
 }
 type contentTheme struct {
@@ -146,7 +148,7 @@ type adminSpeaker struct {
 
 var (
 	menuNames        = []string{"tabs", "home_shortcuts", "home_links", "guide"}
-	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
+	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "moments", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
 	// Old app builds parse these, so they can never be withheld.
 	eventHideable      = []string{"tagline", "hero_title", "description", "venue", "city", "brochure_url", "sponsorship_email", "privacy_url"}
 	launchHideable     = []string{"eyebrow", "title", "description", "deadline", "eligibility", "focus_areas", "apply_url"}
@@ -203,6 +205,12 @@ func (c mobileContent) validate() error {
 	}
 	if e.SponsorshipEmail != "" && !validEmail(e.SponsorshipEmail) {
 		return fmt.Errorf("enter a valid sponsorship email")
+	}
+	if e.MomentsAlbumID != "" {
+		album, err := strconv.Atoi(e.MomentsAlbumID)
+		if err != nil || album <= 0 {
+			return fmt.Errorf("Moments album ID must be a positive number")
+		}
 	}
 	if err := checkHidden("event", e.Hidden, eventHideable); err != nil {
 		return err

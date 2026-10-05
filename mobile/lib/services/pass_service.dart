@@ -80,6 +80,15 @@ class PassAccess {
   };
 }
 
+/// A verified saved pass and the short-lived bearer session that owns it.
+/// Moments sends the opaque pass ID to Bio Connect; attendee contact details
+/// never leave the pass service.
+class MomentsCredential {
+  const MomentsCredential({required this.token, required this.pass});
+  final String token;
+  final AdmissionPass pass;
+}
+
 class PassException implements Exception {
   const PassException(this.message, {this.unauthorized = false});
   final String message;

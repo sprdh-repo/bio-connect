@@ -30,10 +30,13 @@ App IDs and release signing are still placeholders and must be set before store 
 - Backend event-guide editor with draft/published controls, public APIs and staff audit history.
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
 - My passes: email or WhatsApp OTP, optional admission QR scanning, secure saved passes and on-phone admission QR display.
+- Moments: consent-based selfie matching against the organizer's event album, processing updates, a private photo gallery, zoom, save and share.
 - Loading, retry, empty and no-match states are included for live content and directories.
 
 Unpublished event-day sections show “To be announced”.
 Staff can add and publish content from the registration backend at `/admin?view=event-guide`.
+For Moments, staff set the provider's numeric album ID under Event details and publish a Guide menu entry with the `moments` destination.
+Debug builds also show Moments in Guide and provide a sample state when no pass has been saved, so the screen can be reviewed during local development.
 See [Event-day guide](docs/event-guide.md) for the API contract, publishing workflow and offline behavior.
 See [My passes](docs/my-passes.md) for attendee verification, WhatsApp template setup and saved pass behavior.
 Bank payment and exhibitor registration remain on the secure official portal; maps, LinkedIn, the brochure and third-party applications open in their owning apps.
