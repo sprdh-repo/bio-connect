@@ -6,6 +6,8 @@
 	<string>Scan your Bio Connect pass or another attendee's badge, or take a selfie to find your event photos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Save your Bio Connect Moments photos to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Bio Connect needs photo library access to save the event photos you choose from Moments to your library.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Add the Bio Connect sessions you choose to your calendar.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
