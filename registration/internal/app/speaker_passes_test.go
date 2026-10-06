@@ -73,11 +73,15 @@ func TestSpeakerContactThenPass(t *testing.T) {
 		t.Fatalf("contact not corrected: %+v %+v", s.Attendee, s.Contact)
 	}
 
-	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "send", Channel: "email"}); err != nil {
+	// With a phone and WhatsApp consent, one send goes by email and WhatsApp.
+	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "send"}); err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if s = speakerRow(t, a, speaker); s.Delivery == nil || s.Delivery.Status != "queued" {
-		t.Fatalf("delivery after send = %+v", s.Delivery)
+	if s = speakerRow(t, a, speaker); s.Delivery == nil || s.Delivery.Status != "queued" || s.WhatsApp == nil || s.WhatsApp.Status != "queued" {
+		t.Fatalf("deliveries after send = %+v %+v", s.Delivery, s.WhatsApp)
+	}
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1 AND purpose='pass' AND channel='whatsapp' AND recipient='+919876543210'", rid); n != 1 {
+		t.Fatalf("whatsapp jobs = %d, want 1", n)
 	}
 }
 

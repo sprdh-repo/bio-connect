@@ -47,11 +47,15 @@ type speakerPassRow struct {
 		ID     string `json:"id"`
 		Number string `json:"number"`
 	} `json:"pass"`
-	// Delivery is the latest email delivery of the active pass, if any.
-	Delivery *struct {
-		Status string    `json:"status"`
-		At     time.Time `json:"at"`
-	} `json:"delivery"`
+	// Delivery and WhatsApp are the latest email and WhatsApp deliveries of
+	// the active pass, if any.
+	Delivery *speakerDelivery `json:"delivery"`
+	WhatsApp *speakerDelivery `json:"whatsapp"`
+}
+
+type speakerDelivery struct {
+	Status string    `json:"status"`
+	At     time.Time `json:"at"`
 }
 
 func (a *App) speakersAPI(w http.ResponseWriter, r *http.Request, staff, path string) {
@@ -93,7 +97,7 @@ func (a *App) speakersAPI(w http.ResponseWriter, r *http.Request, staff, path st
 func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 	rows, e := a.DB.Query(ctx, `SELECT s.id,s.name,s.role,s.organization,s.image_url,s.published,
 		c.email,c.phone,c.whatsapp_consent,
-		r.id,r.reference,r.status,at.id,at.email,at.phone,at.whatsapp_consent,p.id,p.number,j.status,j.updated_at
+		r.id,r.reference,r.status,at.id,at.email,at.phone,at.whatsapp_consent,p.id,p.number,j.status,j.updated_at,wa.status,wa.updated_at
 		FROM speakers s
 		LEFT JOIN speaker_contacts c ON c.speaker_id=s.id
 		LEFT JOIN speaker_registrations sr ON sr.speaker_id=s.id
@@ -103,6 +107,8 @@ func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 		LEFT JOIN passes p ON p.attendee_id=at.id AND p.revoked_at IS NULL
 		LEFT JOIN LATERAL (SELECT status,updated_at FROM delivery_jobs
 			WHERE pass_id=p.id AND purpose='pass' AND channel='email' ORDER BY created_at DESC LIMIT 1) j ON true
+		LEFT JOIN LATERAL (SELECT status,updated_at FROM delivery_jobs
+			WHERE pass_id=p.id AND purpose='pass' AND channel='whatsapp' ORDER BY created_at DESC LIMIT 1) wa ON true
 		ORDER BY s.position,s.id`)
 	if e != nil {
 		return nil, e
@@ -111,11 +117,11 @@ func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 	out := []speakerPassRow{}
 	for rows.Next() {
 		var s speakerPassRow
-		var cEmail, cPhone, rid, ref, status, aid, email, phone, pid, number, job *string
+		var cEmail, cPhone, rid, ref, status, aid, email, phone, pid, number, job, waJob *string
 		var cConsent, consent *bool
-		var at *time.Time
+		var at, waAt *time.Time
 		if e = rows.Scan(&s.ID, &s.Name, &s.Role, &s.Organization, &s.ImageURL, &s.Published, &cEmail, &cPhone, &cConsent,
-			&rid, &ref, &status, &aid, &email, &phone, &consent, &pid, &number, &job, &at); e != nil {
+			&rid, &ref, &status, &aid, &email, &phone, &consent, &pid, &number, &job, &at, &waJob, &waAt); e != nil {
 			return nil, e
 		}
 		if cEmail != nil {
@@ -147,10 +153,10 @@ func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 			}{*pid, *number}
 		}
 		if job != nil {
-			s.Delivery = &struct {
-				Status string    `json:"status"`
-				At     time.Time `json:"at"`
-			}{*job, *at}
+			s.Delivery = &speakerDelivery{*job, *at}
+		}
+		if waJob != nil {
+			s.WhatsApp = &speakerDelivery{*waJob, *waAt}
 		}
 		out = append(out, s)
 	}
