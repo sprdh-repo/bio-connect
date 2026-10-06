@@ -167,11 +167,22 @@ class BioConnectApp extends StatelessWidget {
         primary: forest,
         surface: paper,
       ),
+      // Inner pages share the main header's cream bar, Manrope title and
+      // forest icons, so the top of every page reads as one app.
       appBarTheme: const AppBarTheme(
-        backgroundColor: paper,
+        backgroundColor: cream,
         foregroundColor: ink,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: forest),
+        actionsIconTheme: IconThemeData(color: forest),
         centerTitle: false,
         scrolledUnderElevation: 0,
+        titleTextStyle: TextStyle(
+          fontFamily: 'Manrope',
+          fontWeight: FontWeight.w700,
+          fontSize: 19,
+          color: ink,
+        ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

@@ -35,6 +35,12 @@ class DetailHeader extends StatelessWidget {
     // transparent and flat while content scrolls under it.
     backgroundColor: Colors.transparent,
     foregroundColor: Colors.white,
+    // The app bar theme colours titles and icons for cream bars; over the
+    // forest header they stay white.
+    iconTheme: const IconThemeData(color: Colors.white),
+    actionsIconTheme: const IconThemeData(color: Colors.white),
+    titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+        ?.copyWith(color: Colors.white),
     surfaceTintColor: Colors.transparent,
     elevation: 0,
     scrolledUnderElevation: 0,
