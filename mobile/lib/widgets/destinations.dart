@@ -40,7 +40,7 @@ const _icons = <String, IconData>{
   'exhibitors': Icons.storefront_outlined,
   'moments': Icons.photo_library_outlined,
   'my_passes': Icons.confirmation_number_outlined,
-  'registration': Icons.confirmation_number_outlined,
+  'registration': Icons.how_to_reg_outlined,
   'brochure': Icons.article_outlined,
   'product_launch': Icons.rocket_launch_outlined,
   'sponsors': Icons.handshake_outlined,

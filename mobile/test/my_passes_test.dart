@@ -71,6 +71,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      // Nothing saved yet: the pitch leads and there is nothing to remove.
+      expect(find.text('Your pass.\nOn your phone.'), findsOneWidget);
+      expect(find.byTooltip('Remove saved passes'), findsNothing);
       await tester.tap(find.text('Add a pass'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextFormField), 'asha@example.com');
@@ -93,6 +96,21 @@ void main() {
       expect(find.text('Asha Nair'), findsOneWidget);
       expect(find.byType(QrImageView), findsOneWidget);
       expect(store.data.single.passes.single.number, 'BC-1');
+      // A saved pass leads the screen; adding another moves below it.
+      expect(find.text('Your pass.\nOn your phone.'), findsNothing);
+      expect(find.text('Add a pass'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Add another pass'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(find.text('Add another pass'), findsOneWidget);
+      expect(find.byTooltip('Remove saved passes'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
       wallet.dispose();
     },

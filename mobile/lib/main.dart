@@ -38,6 +38,10 @@ const gold = Color(0xFFE4AD54);
 const ink = Color(0xFF10201B);
 const muted = Color(0xFF616F69);
 
+/// Input outlines. At least 3:1 against white, paper and cream, so a field's
+/// edge stays visible on every surface it sits on.
+const fieldEdge = Color(0xFF7F8B85);
+
 const _months = [
   'January',
   'February',
@@ -52,6 +56,12 @@ const _months = [
   'November',
   'December',
 ];
+
+OutlineInputBorder _fieldBorder(Color color, {double width = 1}) =>
+    OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color, width: width),
+    );
 
 String eventDateRange(EventDetails event, {bool uppercase = false}) {
   final sameMonth = event.startDate.month == event.endDate.month;
@@ -205,6 +215,34 @@ class BioConnectApp extends StatelessWidget {
           ),
         ),
       ),
+      // Matches the chips: a selected segment is forest with a lime check.
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+          side: const WidgetStatePropertyAll(BorderSide(color: fieldEdge)),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) =>
+                states.contains(WidgetState.selected) ? forest : Colors.white,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.disabled)
+                ? muted
+                : states.contains(WidgetState.selected)
+                ? Colors.white
+                : ink,
+          ),
+          iconColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected) ? lime : forest,
+          ),
+          textStyle: const WidgetStatePropertyAll(
+            TextStyle(
+              fontFamily: 'DM Sans',
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: cream,
         selectedColor: forest,
@@ -241,10 +279,11 @@ class BioConnectApp extends StatelessWidget {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
+        hintStyle: const TextStyle(color: muted),
+        border: _fieldBorder(fieldEdge),
+        enabledBorder: _fieldBorder(fieldEdge),
+        focusedBorder: _fieldBorder(forest, width: 2),
+        disabledBorder: _fieldBorder(fieldEdge.withValues(alpha: .4)),
       ),
       textTheme: Theme.of(context).textTheme
           .apply(fontFamily: 'DM Sans', bodyColor: ink, displayColor: ink),
@@ -721,12 +760,6 @@ class _SpeakersScreenState extends State<SpeakersScreen> {
                             },
                             icon: const Icon(Icons.close),
                           ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
                   ),
                 ),
                 const SizedBox(height: 14),

@@ -7,6 +7,7 @@ import '../widgets/motion.dart';
 
 const _forest = Color(0xFF0B3329);
 const _cream = Color(0xFFF3F1E9);
+const _lime = Color(0xFFB9DC72);
 const _ink = Color(0xFF10201B);
 const _muted = Color(0xFF616F69);
 
@@ -491,35 +492,48 @@ class _PassOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: Material(
-      color: selected ? _cream : Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Row(
-            children: [
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: _forest,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  category.label,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-              Text(
-                _formatRupees(category.payablePaise),
-                style: const TextStyle(
+    child: Semantics(
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      child: Material(
+        color: selected ? _lime.withValues(alpha: .22) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: selected
+              ? const BorderSide(color: _forest, width: 2)
+              : const BorderSide(color: Colors.transparent, width: 2),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
                   color: _forest,
-                  fontWeight: FontWeight.w700,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    category.label,
+                    style: TextStyle(
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  _formatRupees(category.payablePaise),
+                  style: const TextStyle(
+                    color: _forest,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -570,16 +584,7 @@ class _Field extends StatelessWidget {
         'Institution / organisation' => const [AutofillHints.organizationName],
         _ => null,
       },
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-      ),
+      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
     ),
   );
 }

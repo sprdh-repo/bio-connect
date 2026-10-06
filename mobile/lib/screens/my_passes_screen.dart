@@ -92,135 +92,162 @@ class _MyPassesScreenState extends State<MyPassesScreen>
     if (confirmed == true) await _wallet.forget();
   }
 
+  void _add() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => AddPassScreen(wallet: _wallet)),
+  );
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('My passes'),
-      actions: [
-        IconButton(
-          tooltip: 'Remove saved passes',
-          onPressed: _wallet.busy ? null : _forget,
-          icon: const Icon(Icons.delete_outline),
+  Widget build(BuildContext context) {
+    final hasPasses = _wallet.passes.isNotEmpty;
+    final canAdd = !_wallet.busy && _wallet.loaded;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My passes'),
+        actions: [
+          if (hasPasses)
+            IconButton(
+              tooltip: 'Remove saved passes',
+              onPressed: _wallet.busy ? null : _forget,
+              icon: const Icon(Icons.delete_outline),
+            ),
+        ],
+        // A saved pass stays put while its status is checked, so the QR is
+        // never pushed around on open or resume.
+        bottom: hasPasses && _wallet.busy
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            : null,
+      ),
+      body: BioRefresh(
+        onRefresh: () => AppFeedback.refresh(
+          _wallet.loaded ? _wallet.refresh : _wallet.load,
         ),
-      ],
-    ),
-    body: BioRefresh(
-      onRefresh: () =>
-          AppFeedback.refresh(_wallet.loaded ? _wallet.refresh : _wallet.load),
-      child: ListView(
-        padding: const EdgeInsets.all(20),
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const Eyebrow('READY FOR BIO CONNECT'),
-          const SizedBox(height: 8),
-          const TitleText('Your pass.\nOn your phone.'),
-          const SizedBox(height: 12),
-          const Text(
-            'Add an issued pass using your registered email or mobile number. Show its QR at the event entrance.',
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: _wallet.busy || !_wallet.loaded
-                ? null
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddPassScreen(wallet: _wallet),
-                    ),
-                  ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add a pass'),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic,
-            child: _wallet.busy
-                ? const Padding(
-                    padding: EdgeInsets.only(top: 22),
-                    child: Center(
-                      child: BioLoader(
-                        width: 60,
-                        label: 'Checking your passes',
-                      ),
-                    ),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-          if (_wallet.error != null) ...[
-            const SizedBox(height: 16),
-            Text(_wallet.error!, style: const TextStyle(color: muted)),
-            TextButton.icon(
-              onPressed: _wallet.busy
-                  ? null
-                  : (_wallet.loaded ? _wallet.refresh : _wallet.load),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
-            ),
-          ],
-          const SizedBox(height: 20),
-          if (_showSamplePass &&
-              _wallet.passes.isEmpty &&
-              !_wallet.busy &&
-              _wallet.loaded) ...[
-            const _SampleBadge(),
-            const SizedBox(height: 10),
-            Reveal(
-              child: _PassCard(
-                pass: _samplePass,
-                checkedAt: null,
-                offline: false,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            // The pitch and the add button lead only until a pass is saved.
+            // After that the pass itself is the first thing on screen.
+            if (!hasPasses) ...[
+              const Eyebrow('READY FOR BIO CONNECT'),
+              const SizedBox(height: 8),
+              const TitleText('Your pass.\nOn your phone.'),
+              const SizedBox(height: 12),
+              const Text(
+                'Add an issued pass using your registered email or mobile number. Show its QR at the event entrance.',
               ),
-            ),
-            const SizedBox(height: 18),
-          ] else if (_wallet.passes.isEmpty && !_wallet.busy && _wallet.loaded)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.confirmation_number_outlined,
-                      size: 40,
-                      color: forest,
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'No issued passes saved',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Passes appear after registration approval. If a saved pass was revoked or replaced, add your current pass again.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: canAdd ? _add : null,
+                icon: const Icon(Icons.add),
+                label: const Text('Add a pass'),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                child: _wallet.busy
+                    ? const Padding(
+                        padding: EdgeInsets.only(top: 22),
+                        child: Center(
+                          child: BioLoader(
+                            width: 60,
+                            label: 'Checking your passes',
+                          ),
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+            ],
+            if (_wallet.error != null) ...[
+              if (!hasPasses) const SizedBox(height: 16),
+              Text(_wallet.error!, style: const TextStyle(color: muted)),
+              TextButton.icon(
+                onPressed: _wallet.busy
+                    ? null
+                    : (_wallet.loaded ? _wallet.refresh : _wallet.load),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+              ),
+              if (hasPasses) const SizedBox(height: 8),
+            ],
+            if (!hasPasses) const SizedBox(height: 20),
+            if (_showSamplePass &&
+                !hasPasses &&
+                !_wallet.busy &&
+                _wallet.loaded) ...[
+              const _SampleBadge(),
+              const SizedBox(height: 10),
+              Reveal(
+                child: _PassCard(
+                  pass: _samplePass,
+                  checkedAt: null,
+                  offline: false,
                 ),
               ),
-            ),
-          for (final (i, pass) in _wallet.passes.indexed) ...[
-            Reveal(
-              order: i,
-              child: _PassCard(
-                pass: pass,
-                checkedAt: _wallet.checkedAt(pass.id),
-                offline: _wallet.offline,
+              const SizedBox(height: 18),
+            ] else if (!hasPasses && !_wallet.busy && _wallet.loaded)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 40,
+                        color: forest,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'No issued passes saved',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Passes appear after registration approval. If a saved pass was revoked or replaced, add your current pass again.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
+            for (final (i, pass) in _wallet.passes.indexed) ...[
+              Reveal(
+                order: i,
+                child: _PassCard(
+                  pass: pass,
+                  checkedAt: _wallet.checkedAt(pass.id),
+                  offline: _wallet.offline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SharingPanel(wallet: _wallet, pass: pass),
+              const SizedBox(height: 18),
+            ],
+            // Still reachable for a colleague's or a second registration's
+            // pass, but below the passes rather than above them.
+            if (hasPasses) ...[
+              OutlinedButton.icon(
+                onPressed: canAdd ? _add : null,
+                icon: const Icon(Icons.add),
+                label: const Text('Add another pass'),
+              ),
+              const SizedBox(height: 20),
+            ],
+            const Text(
+              'Passes are saved securely on this phone. Pull down to check the latest status. Admission is confirmed by event staff.',
+              style: TextStyle(color: muted, height: 1.5),
             ),
-            const SizedBox(height: 12),
-            _SharingPanel(wallet: _wallet, pass: pass),
-            const SizedBox(height: 18),
           ],
-          const Text(
-            'Passes are saved securely on this phone. Pull down to check the latest status. Admission is confirmed by event staff.',
-            style: TextStyle(color: muted, height: 1.5),
-          ),
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// The holder's consent to give their email or phone to people who scan

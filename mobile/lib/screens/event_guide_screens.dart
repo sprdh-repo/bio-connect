@@ -838,7 +838,7 @@ class _FaqScreenState extends State<FaqScreen> {
             OutlinedButton.icon(
               onPressed: () =>
                   showGuidePage(context, const DelegateRegistrationScreen()),
-              icon: const Icon(Icons.confirmation_number_outlined),
+              icon: const Icon(Icons.how_to_reg_outlined),
               label: const Text('Register as a delegate'),
             ),
           ],
