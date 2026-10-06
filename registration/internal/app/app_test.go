@@ -866,6 +866,8 @@ func TestSummaryCountsRegisteredAndConfirmedPerCategory(t *testing.T) {
 	if _, _, err := a.Create(ctx, exhibitorInput("premium", 5), key(4), tinyPNG(t)); err != nil {
 		t.Fatal(err)
 	}
+	approvedExhibitor(t, a, 5, "premium", sid)
+	premiumPasses := rosterOf(t, a, "premium")
 
 	rr := httptest.NewRecorder()
 	a.summary(rr, httptest.NewRequest("GET", "/api/v1/admin/summary", nil))
@@ -880,13 +882,15 @@ func TestSummaryCountsRegisteredAndConfirmedPerCategory(t *testing.T) {
 	if len(out.Categories) != len(cats) {
 		t.Fatalf("summary has %d categories, want every one of %d", len(out.Categories), len(cats))
 	}
-	want := map[string][2]int{"industry": {2, 1}, "premium": {1, 0}}
+	// The cancelled delegate's pass is revoked, so only the confirmed
+	// registrations' active passes count.
+	want := map[string][3]int{"industry": {2, 1, 1}, "premium": {2, 1, premiumPasses}}
 	for i, c := range out.Categories {
 		if c.ID != cats[i].ID {
 			t.Fatalf("summary order %d is %q, want category order %q", i, c.ID, cats[i].ID)
 		}
-		if got := [2]int{c.Registered, c.Confirmed}; got != want[c.ID] {
-			t.Fatalf("%s registered/confirmed = %v, want %v", c.ID, got, want[c.ID])
+		if got := [3]int{c.Registered, c.Confirmed, c.Passes}; got != want[c.ID] {
+			t.Fatalf("%s registered/confirmed/passes = %v, want %v", c.ID, got, want[c.ID])
 		}
 	}
 }
