@@ -259,7 +259,6 @@ main:has(.admin-page) > .eyebrow { display: none; }
 .speaker-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.25fr) 116px 210px; align-items: center; gap: 16px; padding: 12px 18px; transition: background 1.2s; }
 .speaker-row + .speaker-row { border-top: 1px solid rgba(16, 32, 27, 0.07); }
 .speaker-row.is-updated { background: #f4f9ea; }
-img.speaker-avatar { object-fit: cover; object-position: center 30%; }
 .speaker-avatar { display: grid; place-items: center; width: 40px; height: 40px; color: var(--forest); background: #eef4e0; border-radius: 50%; font-family: var(--display); font-size: 13px; font-weight: 700; }
 .speaker-who { min-width: 0; line-height: 1.35; }
 .speaker-who strong, .speaker-who > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
