@@ -24,8 +24,9 @@ var errRosterFull = errors.New("every pass on this registration is already assig
 // console is not sent: they send it when ready.
 func (a *App) AddAttendee(ctx context.Context, rid, staff string, p Attendee) error {
 	// Staff may leave the phone out; an exhibitor adding their own team may not.
-	if !attendeeOK(&p, staff != "") {
-		return attendeeError(staff != "")
+	// Only exhibitors have open places, and every exhibitor attendee has an email.
+	if !attendeeOK(&p, staff != "", false) {
+		return attendeeError(staff != "", false)
 	}
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {

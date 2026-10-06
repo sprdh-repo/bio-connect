@@ -138,19 +138,34 @@ func validPhone(s string, optional bool) bool {
 	return phoneRE.MatchString(s) || (optional && s == "")
 }
 
+// emailOptional reports whether a category accepts a person reached by phone
+// alone. Government officials often have no email they can share, so they
+// give an email, a phone, or both.
+func emailOptional(categoryID string) bool { return categoryID == "official" }
+
 // attendeeOK normalises one attendee and reports whether their details are
 // complete. Staff entry may leave the phone out, but WhatsApp delivery still
-// needs one.
-func attendeeOK(p *Attendee, phoneOptional bool) bool {
+// needs one. When the email is optional, one of email or phone is still
+// required, and a person with no email must permit WhatsApp, the only way
+// their pass can reach them.
+func attendeeOK(p *Attendee, phoneOptional, noEmail bool) bool {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Phone = strings.TrimSpace(p.Phone)
-	return validText(p.Name, 120) && validText(p.Designation, 180) && validEmail(p.Email) &&
-		validPhone(p.Phone, phoneOptional) && (p.Phone != "" || !p.WhatsAppConsent)
+	if !validText(p.Name, 120) || !validText(p.Designation, 180) || (p.Phone == "" && p.WhatsAppConsent) {
+		return false
+	}
+	if noEmail && p.Email == "" {
+		return validPhone(p.Phone, false) && p.WhatsAppConsent
+	}
+	return validEmail(p.Email) && validPhone(p.Phone, phoneOptional || noEmail)
 }
 
 // attendeeError describes what attendeeOK requires.
-func attendeeError(phoneOptional bool) error {
+func attendeeError(phoneOptional, noEmail bool) error {
+	if noEmail {
+		return errors.New("each attendee needs name, designation and a valid email or international phone (+country code); without an email, permit WhatsApp so the pass can be sent there")
+	}
 	if phoneOptional {
 		return errors.New("each attendee needs name, designation and valid email; a phone is optional but must be international (+country code), and WhatsApp delivery needs one")
 	}
@@ -168,7 +183,10 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 	if _, e := lookupCoupon(in.CouponCode, c.ID); e != nil {
 		return e
 	}
-	if !validText(in.Institution, 180) || !validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff) {
+	noEmail := emailOptional(c.ID)
+	// A delegate's contact is their one attendee, copied below once the
+	// attendee is checked, so only an exhibitor's contact is checked here.
+	if !validText(in.Institution, 180) || c.Kind == "exhibitor" && (!validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff)) {
 		if staff {
 			return errors.New("provide institution, contact name and valid email; a contact phone is optional but must be international (+country code)")
 		}
@@ -187,8 +205,11 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 	seen := map[string]bool{}
 	for i := range in.Attendees {
 		p := &in.Attendees[i]
-		if !attendeeOK(p, staff) {
-			return attendeeError(staff)
+		if !attendeeOK(p, staff, noEmail) {
+			return attendeeError(staff, noEmail)
+		}
+		if p.Email == "" {
+			continue
 		}
 		if seen[p.Email] {
 			return errors.New("attendee emails must be unique within a registration")

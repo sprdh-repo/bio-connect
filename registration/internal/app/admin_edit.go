@@ -23,18 +23,18 @@ import (
 // changed email or phone are cancelled so they cannot reach the old address.
 func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Attendee) error {
 	p.Designation = strings.TrimSpace(p.Designation)
-	// Only staff correct attendees, so the phone is optional here.
-	if !attendeeOK(&p, true) {
-		return attendeeError(true)
-	}
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
 		return e
 	}
 	defer tx.Rollback(ctx)
-	var status, kind string
-	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind); e != nil {
+	var status, kind, categoryID string
+	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind,c.id FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &categoryID); e != nil {
 		return e
+	}
+	// Only staff correct attendees, so the phone is optional here.
+	if !attendeeOK(&p, true, emailOptional(categoryID)) {
+		return attendeeError(true, emailOptional(categoryID))
 	}
 	if status == "cancelled" {
 		return ErrConflict
@@ -44,7 +44,7 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 		return errors.New("attendee not found on this registration")
 	}
 	var dup bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM attendees WHERE registration_id=$1 AND id<>$2 AND removed_at IS NULL AND lower(email)=$3)", rid, aid, p.Email).Scan(&dup); e != nil {
+	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM attendees WHERE registration_id=$1 AND id<>$2 AND removed_at IS NULL AND $3<>'' AND lower(email)=$3)", rid, aid, p.Email).Scan(&dup); e != nil {
 		return e
 	}
 	if dup {

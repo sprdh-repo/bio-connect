@@ -132,8 +132,12 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 			return "", "", e
 		}
 	}
-	if e = a.queue(ctx, tx, rid, "", "registration", "email", in.Email, a.Config.BaseURL+"/manage/"+rid+"#"+token, "registration:"+rid); e != nil {
-		return "", "", e
+	// A government official may register with a phone alone; they keep the
+	// private link the form opens and receive their pass by WhatsApp.
+	if in.Email != "" {
+		if e = a.queue(ctx, tx, rid, "", "registration", "email", in.Email, a.Config.BaseURL+"/manage/"+rid+"#"+token, "registration:"+rid); e != nil {
+			return "", "", e
+		}
 	}
 	if freeLinkID != "" && autoApprove {
 		if e = a.issuePasses(ctx, tx, rid, c.RosterCount); e != nil {
@@ -418,6 +422,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			if in.Channel == "whatsapp" && !consent {
 				return errors.New("this attendee has not permitted WhatsApp delivery")
 			}
+			if in.Channel == "email" && email == "" {
+				return errors.New("this attendee has no email; send their pass by WhatsApp")
+			}
 			if e = a.queuePass(ctx, tx, rid, in.PassID, email, phone, consent, in.Channel, key); e != nil {
 				return e
 			}
@@ -521,7 +528,9 @@ func (a *App) queue(ctx context.Context, tx pgx.Tx, rid, pid, purpose, channel, 
 // queuePasses, so a pass queued here under "initial" is not sent twice by a
 // later "send".
 func (a *App) queuePass(ctx context.Context, tx pgx.Tx, rid, pid, email, phone string, consent bool, channel, key string) error {
-	if channel == "" || channel == "email" {
+	// An attendee without an email (a government official reached by phone)
+	// is sent their pass by WhatsApp alone.
+	if email != "" && (channel == "" || channel == "email") {
 		if e := a.queue(ctx, tx, rid, pid, "pass", "email", email, "", key+":"+pid+":email"); e != nil {
 			return e
 		}
