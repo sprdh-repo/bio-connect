@@ -21,7 +21,11 @@ const opsSessionLifetime = 12 * time.Hour
 var opsDays = []struct{ ID, Label string }{{"2026-10-08", "Day 1 · 08 October"}, {"2026-10-09", "Day 2 · 09 October"}}
 var opsCodeCleaner = regexp.MustCompile(`[^A-Z0-9]`)
 
-type opsPrincipal struct{ Station, CSRF string }
+type opsPrincipal struct {
+	Station, CSRF string
+	// Kiosk sessions run unattended self-service and reach only the kiosk endpoints.
+	Kiosk bool
+}
 
 type opsPerson struct {
 	AttendeeID, RegistrationID, Reference, QRID, Name, Email, Phone, Designation, Institution, CategoryID, Category string
@@ -82,7 +86,7 @@ func (a *App) opsPrincipal(r *http.Request) (opsPrincipal, error) {
 		return p, errors.New("start a shift")
 	}
 	var csrfHash string
-	err = a.DB.QueryRow(r.Context(), `SELECT station,csrf_hash FROM ops_sessions WHERE token_hash=$1 AND expires_at>now()`, hash(c.Value)).Scan(&p.Station, &csrfHash)
+	err = a.DB.QueryRow(r.Context(), `SELECT station,csrf_hash,kiosk FROM ops_sessions WHERE token_hash=$1 AND expires_at>now()`, hash(c.Value)).Scan(&p.Station, &csrfHash, &p.Kiosk)
 	if err != nil {
 		return p, errors.New("start a shift")
 	}
@@ -103,27 +107,46 @@ func (a *App) opsStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "name this station")
 		return
 	}
-	if a.Config.OpsKey == "" {
-		fail(w, 503, "ops passcode is not configured")
+	if !a.opsPasscodeValid(w, r, in.Passcode) {
 		return
 	}
-	if a.limited(r.Context(), "ops-login:"+a.clientPeer(r), 30, 10*time.Minute) {
-		fail(w, 429, "too many attempts; wait ten minutes")
-		return
-	}
-	if subtle.ConstantTimeCompare([]byte(hash(in.Passcode)), []byte(hash(a.Config.OpsKey))) != 1 {
-		fail(w, 401, "passcode is incorrect")
-		return
-	}
-	token, csrf := randomToken(), randomToken()
-	_, err := a.DB.Exec(r.Context(), `INSERT INTO ops_sessions(token_hash,csrf_hash,station,expires_at) VALUES($1,$2,$3,$4)`, hash(token), hash(csrf), in.Station, a.Now().Add(opsSessionLifetime))
+	csrf, err := a.opsOpenSession(r.Context(), w, a.DB, in.Station, false)
 	if err != nil {
 		fail(w, 503, "shift could not start")
 		return
 	}
+	respond(w, 200, map[string]any{"station": in.Station, "csrf": csrf, "today": opsToday(a.Now()), "days": opsDays})
+}
+
+// opsOpenSession stores a new station session and sets its cookies. The session
+// token is HttpOnly; the CSRF value is readable so the page can recover it.
+func (a *App) opsOpenSession(ctx context.Context, w http.ResponseWriter, db execer, station string, kiosk bool) (string, error) {
+	token, csrf := randomToken(), randomToken()
+	_, err := db.Exec(ctx, `INSERT INTO ops_sessions(token_hash,csrf_hash,station,expires_at,kiosk) VALUES($1,$2,$3,$4,$5)`, hash(token), hash(csrf), station, a.Now().Add(opsSessionLifetime), kiosk)
+	if err != nil {
+		return "", err
+	}
 	http.SetCookie(w, &http.Cookie{Name: "bc_ops", Value: token, Path: "/", HttpOnly: true, Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: int(opsSessionLifetime.Seconds())})
 	http.SetCookie(w, &http.Cookie{Name: "bc_ops_csrf", Value: csrf, Path: "/", Secure: a.Config.Production, SameSite: http.SameSiteStrictMode, MaxAge: int(opsSessionLifetime.Seconds())})
-	respond(w, 200, map[string]any{"station": in.Station, "csrf": csrf, "today": opsToday(a.Now()), "days": opsDays})
+	return csrf, nil
+}
+
+// opsPasscodeValid checks the shared ops passcode under the same per-client
+// throttle as starting a shift.
+func (a *App) opsPasscodeValid(w http.ResponseWriter, r *http.Request, passcode string) bool {
+	if a.Config.OpsKey == "" {
+		fail(w, 503, "ops passcode is not configured")
+		return false
+	}
+	if a.limited(r.Context(), "ops-login:"+a.clientPeer(r), 30, 10*time.Minute) {
+		fail(w, 429, "too many attempts; wait ten minutes")
+		return false
+	}
+	if subtle.ConstantTimeCompare([]byte(hash(passcode)), []byte(hash(a.Config.OpsKey))) != 1 {
+		fail(w, 401, "passcode is incorrect")
+		return false
+	}
+	return true
 }
 
 func (a *App) opsAPI(w http.ResponseWriter, r *http.Request) {
@@ -137,14 +160,22 @@ func (a *App) opsAPI(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, err.Error())
 		return
 	}
-	switch {
-	case path == "me" && r.Method == http.MethodGet:
+	if path == "me" && r.Method == http.MethodGet {
 		csrf, _ := r.Cookie("bc_ops_csrf")
 		value := ""
 		if csrf != nil {
 			value = csrf.Value
 		}
-		respond(w, 200, map[string]any{"station": p.Station, "csrf": value, "today": opsToday(a.Now()), "days": opsDays})
+		respond(w, 200, map[string]any{"station": p.Station, "csrf": value, "today": opsToday(a.Now()), "days": opsDays, "kiosk": p.Kiosk})
+		return
+	}
+	if p.Kiosk {
+		a.kioskAPI(w, r, p, path)
+		return
+	}
+	switch {
+	case path == "kiosk/start" && r.Method == http.MethodPost:
+		a.kioskStart(w, r, p)
 	case path == "auth/logout" && r.Method == http.MethodPost:
 		c, _ := r.Cookie("bc_ops")
 		if c != nil {

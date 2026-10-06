@@ -49,9 +49,9 @@ func (a *App) Handler() http.Handler {
 	fileSrv := http.StripPrefix("/static/", http.FileServer(http.FS(static)))
 	m.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// CloudFront does not cache (dynamic app), so let the browser hold static assets.
-		if strings.HasSuffix(r.URL.Path, "/ops.js") || strings.HasSuffix(r.URL.Path, "/ops.css") {
+		if strings.HasSuffix(r.URL.Path, "/ops.js") || strings.HasSuffix(r.URL.Path, "/ops.css") || strings.HasSuffix(r.URL.Path, "/kiosk.js") || strings.HasSuffix(r.URL.Path, "/kiosk.css") {
 			w.Header().Set("Cache-Control", "no-cache")
-		} else if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") || strings.HasSuffix(r.URL.Path, ".svg") {
+		} else if strings.HasSuffix(r.URL.Path, ".woff2") || strings.HasSuffix(r.URL.Path, ".png") || strings.HasSuffix(r.URL.Path, ".webp") || strings.HasSuffix(r.URL.Path, ".svg") {
 			w.Header().Set("Cache-Control", "public, max-age=2592000")
 		} else {
 			w.Header().Set("Cache-Control", "public, max-age=300")
@@ -64,6 +64,7 @@ func (a *App) Handler() http.Handler {
 		m.HandleFunc("GET "+path, a.page)
 	}
 	m.HandleFunc("GET /ops", a.opsPage)
+	m.HandleFunc("GET /kiosk", a.kioskPage)
 	m.HandleFunc("GET /p/{qr}", a.publicProfile)
 	m.HandleFunc("GET /privacy-policy", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -151,7 +152,7 @@ func (a *App) Handler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Frame-Options", "DENY")
 		permissionsPolicy := "camera=(), microphone=(), geolocation=()"
-		if r.URL.Path == "/ops" {
+		if r.URL.Path == "/ops" || r.URL.Path == "/kiosk" {
 			permissionsPolicy = "camera=(self), microphone=(), geolocation=()"
 		}
 		w.Header().Set("Permissions-Policy", permissionsPolicy)

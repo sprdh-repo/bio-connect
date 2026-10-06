@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f5f3eb">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Self check-in · Bio Connect 4.0</title>
+<link rel="icon" href="/static/favicon.png" type="image/png">
+<link rel="manifest" href="/static/kiosk-manifest.json">
+<link rel="preload" href="/static/fonts/manrope-600-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/kiosk.css">
+<script src="/static/vendor/html5-qrcode-2.3.8.min.js" defer></script>
+<script src="/static/kiosk.js" defer></script>
+</head>
+<body class="booting">
+<div class="kiosk" id="kiosk">
+  <header class="k-top">
+    <button class="k-brand" id="staff-trigger" type="button" aria-label="Bio Connect 4.0. Staff: press and hold for the kiosk menu"><img src="/static/bio-connect-logo.png" alt="Bio Connect 4.0"></button>
+    <div class="k-top-label"><span>Self check-in</span></div>
+    <div class="k-top-meta"><span class="k-day" id="day-label"></span><time class="k-clock" id="clock"></time></div>
+  </header>
+
+  <main class="k-stage">
+    <!-- Attract: the camera is always live here. -->
+    <section class="screen screen-scan active" data-screen="scan" aria-labelledby="scan-title">
+      <div class="scan-copy">
+        <p class="eyebrow">Welcome to Bio Connect 4.0</p>
+        <h1 id="scan-title">Your badge,<br><em>in seconds.</em></h1>
+        <p class="lede">Hold the QR code from your pass email, WhatsApp or the Bio Connect app up to the camera.</p>
+        <ol class="steps">
+          <li><img src="/static/kiosk/scan.webp" alt="" width="240" height="160"><span><b>1</b>Scan your pass</span></li>
+          <li><img src="/static/kiosk/print.webp" alt="" width="240" height="160"><span><b>2</b>Print your badge</span></li>
+          <li><img src="/static/kiosk/lanyard.webp" alt="" width="240" height="160"><span><b>3</b>Wear it</span></li>
+        </ol>
+        <p class="no-qr"><span class="no-qr-icon" aria-hidden="true">?</span>No QR code with you? The registration desk will help.</p>
+      </div>
+      <div class="scan-panel">
+        <div class="camera" id="camera">
+          <div id="camera-reader"></div>
+          <div class="camera-fallback" id="camera-fallback" hidden>
+            <img src="/static/kiosk/scan.webp" alt="" width="480" height="320">
+            <p id="camera-fallback-text">Starting the camera…</p>
+          </div>
+          <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><span class="sweep"></span></div>
+          <div class="camera-checking" id="camera-checking" aria-hidden="true"><span class="spinner"></span><span>Finding your pass…</span></div>
+        </div>
+        <p class="camera-hint" id="camera-hint" role="status"><span class="pulse" aria-hidden="true"></span>Hold your QR code inside the frame</p>
+        <p class="camera-tip">Tip: turn up your phone's brightness</p>
+      </div>
+    </section>
+
+    <!-- First badge: confirm, then print. -->
+    <section class="screen screen-confirm" data-screen="confirm" aria-labelledby="confirm-title">
+      <div class="confirm-copy">
+        <p class="eyebrow">Is this you?</p>
+        <h1 id="confirm-title">Hello, <em data-field="first"></em></h1>
+        <dl class="who">
+          <div><dt>Name</dt><dd data-field="name"></dd></div>
+          <div data-optional="designation"><dt>Role</dt><dd data-field="designation"></dd></div>
+          <div data-optional="institution"><dt>Organisation</dt><dd data-field="institution"></dd></div>
+          <div class="who-row"><div><dt>Category</dt><dd><span class="chip" data-field="category"></span></dd></div><div><dt>Pass</dt><dd class="mono" data-field="reference"></dd></div></div>
+        </dl>
+        <div class="actions">
+          <button class="btn btn-primary" id="print-button" type="button"><span>Print my badge</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <button class="btn btn-ghost" data-action="reset" type="button">This isn't me</button>
+        </div>
+        <p class="fine">Printing your badge checks you in for <b data-field="day"></b>.</p>
+      </div>
+      <figure class="badge-stage">
+        <div class="badge-card"><canvas id="badge-preview" aria-label="Preview of your printed badge"></canvas></div>
+        <figcaption>Your badge preview</figcaption>
+      </figure>
+      <div class="timeout" aria-hidden="true"><span></span></div>
+    </section>
+
+    <!-- Printing. -->
+    <section class="screen screen-printing" data-screen="printing" aria-labelledby="printing-title">
+      <div class="art-printing" aria-hidden="true">
+        <img src="/static/kiosk/print.webp" alt="" width="720" height="480">
+      </div>
+      <div class="center-copy">
+        <p class="eyebrow">One moment</p>
+        <h1 id="printing-title">Printing your badge…</h1>
+        <div class="progress" aria-hidden="true"><span></span></div>
+        <p class="lede">It will come out of the printer beside this screen.</p>
+      </div>
+    </section>
+
+    <!-- Collect: badge printed and checked in. -->
+    <section class="screen screen-collect" data-screen="collect" aria-labelledby="collect-title">
+      <div class="collect-copy">
+        <p class="eyebrow eyebrow-ok"><span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span>You're checked in for <span data-field="day"></span></span></p>
+        <h1 id="collect-title">Your badge is ready, <em data-field="first"></em>.</h1>
+        <ol class="howto">
+          <li><b>1</b><span>Take your badge from the printer.</span></li>
+          <li><b>2</b><span>Peel the badge off its backing.</span></li>
+          <li><b>3</b><span>Stick it on the badge card and clip it to your lanyard.</span></li>
+        </ol>
+        <div class="actions">
+          <button class="btn btn-primary" data-action="reset" type="button"><span>Done</span><span class="countdown" data-countdown></span></button>
+          <button class="btn btn-ghost" id="reprint-button" type="button" hidden>Badge didn't print? Try again</button>
+        </div>
+      </div>
+      <div class="art"><img src="/static/kiosk/lanyard.webp" alt="" width="720" height="480"></div>
+    </section>
+
+    <!-- Returning attendee: already has a badge. -->
+    <section class="screen screen-welcome" data-screen="welcome" aria-labelledby="welcome-title">
+      <div class="art"><img src="/static/kiosk/welcome.webp" alt="" width="720" height="480"></div>
+      <div class="welcome-copy">
+        <p class="eyebrow" data-field="welcome-eyebrow"></p>
+        <h1 id="welcome-title" data-field="welcome-title"></h1>
+        <p class="lede" data-field="welcome-copy"></p>
+        <div class="actions">
+          <button class="btn btn-primary" id="checkin-button" type="button"><span>Check me in</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <button class="btn btn-primary" data-action="reset" id="welcome-done" type="button"><span>Done</span><span class="countdown" data-countdown></span></button>
+          <button class="btn btn-ghost" data-action="reset" id="welcome-cancel" type="button">This isn't me</button>
+        </div>
+        <p class="fine" data-field="welcome-fine"></p>
+      </div>
+      <div class="timeout" aria-hidden="true"><span></span></div>
+    </section>
+
+    <!-- Problems the attendee can act on, and problems that need staff. -->
+    <section class="screen screen-problem" data-screen="problem" aria-labelledby="problem-title" aria-live="assertive">
+      <div class="art"><img id="problem-art" src="/static/kiosk/notfound.webp" alt="" width="720" height="480"></div>
+      <div class="problem-copy">
+        <p class="eyebrow eyebrow-warn" data-field="problem-eyebrow"></p>
+        <h1 id="problem-title" data-field="problem-title"></h1>
+        <p class="lede" data-field="problem-copy"></p>
+        <div class="actions">
+          <button class="btn btn-primary" data-action="reset" type="button"><span>Try again</span><span class="countdown" data-countdown></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Kiosk not running: paused, offline or not started. -->
+    <section class="screen screen-paused" data-screen="paused" aria-labelledby="paused-title">
+      <div class="art"><img src="/static/kiosk/helpdesk.webp" alt="" width="720" height="480"></div>
+      <div class="paused-copy">
+        <p class="eyebrow" data-field="paused-eyebrow">Kiosk paused</p>
+        <h1 id="paused-title" data-field="paused-title">This kiosk is taking a break.</h1>
+        <p class="lede" data-field="paused-copy">Please visit the registration desk. A staff member will be with you shortly.</p>
+        <div class="actions" id="setup-actions" hidden>
+          <button class="btn btn-primary" id="start-button" type="button" hidden><span>Start kiosk on this device</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+          <a class="btn btn-ghost" href="/ops" id="ops-link">Open the operations portal</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="k-foot">
+    <span>Hyatt Regency Trivandrum · 08–09 October 2026</span>
+    <span class="k-net" id="net-status" hidden><i></i>Reconnecting…</span>
+  </footer>
+</div>
+
+<!-- Staff menu: opened by holding the logo, unlocked with the ops passcode. -->
+<dialog id="staff-dialog" aria-labelledby="staff-title">
+  <form id="unlock-form" class="staff-unlock">
+    <p class="eyebrow">Staff only</p>
+    <h2 id="staff-title">Kiosk menu</h2>
+    <label>Operations passcode<input id="unlock-passcode" type="password" autocomplete="current-password" required></label>
+    <p class="form-error" id="unlock-error" role="alert"></p>
+    <div class="staff-row"><button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button><button class="btn btn-primary btn-sm">Unlock</button></div>
+  </form>
+  <div id="staff-panel" class="staff-panel" hidden>
+    <div class="staff-head"><div><p class="eyebrow">Staff only · <span id="staff-station"></span></p><h2>Kiosk settings</h2></div><p class="staff-count"><b id="staff-printed">0</b> badges printed on this device</p></div>
+    <form id="settings-form" class="settings">
+      <fieldset><legend>Printing</legend>
+        <label class="opt"><input type="radio" name="printer" value="rawbt"><span><b>RawBT (silent)</b><small>Android print service app. No dialog.</small></span></label>
+        <label class="opt"><input type="radio" name="printer" value="browser"><span><b>Browser print dialog</b><small>For testing on a laptop or desk printer.</small></span></label>
+      </fieldset>
+      <fieldset><legend>Printer resolution</legend>
+        <label class="opt"><input type="radio" name="dpi" value="203"><span><b>203 dpi</b><small>Most thermal label printers.</small></span></label>
+        <label class="opt"><input type="radio" name="dpi" value="300"><span><b>300 dpi</b></span></label>
+      </fieldset>
+      <fieldset><legend>Badge orientation</legend>
+        <label class="opt"><input type="radio" name="rotate" value="0"><span><b>Landscape</b><small>76.2 × 50.8 mm as fed.</small></span></label>
+        <label class="opt"><input type="radio" name="rotate" value="90"><span><b>Rotated 90°</b><small>For printers that feed the label portrait.</small></span></label>
+      </fieldset>
+      <fieldset><legend>Camera</legend>
+        <label class="opt"><input type="radio" name="camera" value="user"><span><b>Front camera</b><small>Faces the attendee. Preview is mirrored.</small></span></label>
+        <label class="opt"><input type="radio" name="camera" value="environment"><span><b>Back camera</b></span></label>
+      </fieldset>
+    </form>
+    <div class="staff-row">
+      <button class="btn btn-ghost btn-sm" type="button" id="test-print">Print a test badge</button>
+      <button class="btn btn-ghost btn-sm btn-danger" type="button" id="exit-kiosk">Exit kiosk mode</button>
+      <button class="btn btn-primary btn-sm" type="button" data-close>Resume kiosk</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="print-sheet" id="print-sheet" aria-hidden="true"></div>
+</body>
+</html>

@@ -62,6 +62,39 @@ The session lasts 12 hours and all writes carry CSRF protection.
 Before doors open, run one real pass through check-in, print, gate entry, gate exit and checkout on each device and printer.
 Keep a USB scanner available because browser camera scanning depends on `BarcodeDetector` support and camera permission.
 
+### Self-service kiosk
+
+`/kiosk` turns an Android tablet into an unattended self check-in point.
+An attendee scans the QR on their pass, confirms their name against a preview of the badge, and prints it; printing is what checks them in for the day.
+
+- Sign the tablet in at `/ops` with a station name such as `Kiosk 1`, open **Kiosk**, and choose **Start kiosk on this device**.
+  The staff session on that device is replaced by a kiosk session that can only scan, print and check in.
+  It cannot read the roster, reports or gates, and returns no contact details.
+- Only the pass QR is accepted (the PDF pass, the app, or a printed badge).
+  Typed or scanned pass numbers are refused because they are short and guessable; those attendees go to a staffed desk.
+- A pass prints once at a kiosk.
+  "Badge didn't print? Try again" reprints from the same kiosk for five minutes, at most three prints in all; later reprints are done at a desk.
+  A badge printed earlier at a desk counts too.
+- On day two, an attendee who already has a badge is checked in without printing.
+- The event day comes from the server clock, not the tablet.
+- Prints and check-ins appear in the activity audit under the kiosk's station name with the detail "Self-service kiosk", and opening or closing a kiosk is audited as well.
+- Hold the Bio Connect logo for two seconds and enter the ops passcode for the staff menu: printer, resolution, label orientation, camera, a test print, and **Exit kiosk mode**.
+  The menu closes itself after 90 seconds. Settings are stored on the tablet.
+
+Printing goes through [RawBT](https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter) so no Android print dialog appears.
+The kiosk draws the 76.2 × 50.8 mm badge as a PNG at the printer's resolution, with whole printer dots per QR module, and hands it to RawBT through an Android intent after the server has recorded the print.
+Set up each tablet before doors open:
+
+1. Install RawBT, pair the badge printer, choose its driver, set the paper to the 76.2 mm label width, and print RawBT's own test page.
+2. In Chrome, open `/kiosk` once and allow the camera. Optionally use **Add to Home screen**: the kiosk opens full screen from there.
+3. Keep the tablet on a kiosk launcher that allows RawBT to open, or simply in the full-screen kiosk app.
+   Do not use Android screen pinning: it blocks Chrome from opening RawBT, so nothing prints.
+4. From the staff menu, run **Print a test badge** and check the margins, orientation (switch to "Rotated 90°" if the printer feeds labels portrait) and that a phone can scan the QR.
+5. Run one real pass through scan, print, gate entry and checkout.
+
+The front camera is the default, since it faces the attendee; the preview is mirrored so it behaves like a mirror.
+A USB or Bluetooth scanner in keyboard mode also works with no field focused.
+
 ### Rollback
 
 Application only, schema unchanged:
