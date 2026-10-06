@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,6 +22,9 @@ type StaffRegistrationInput struct {
 	// nothing is sent and staff send them from the console when ready.
 	Send bool   `json:"send"`
 	Note string `json:"note"`
+	// AcceptAmount accepts a verified amount different from the fee due, with
+	// the reason in Note, as in a review (checkPaidAmount).
+	AcceptAmount bool `json:"accept_amount"`
 }
 
 // StaffCreate saves and approves a registration entered by staff. Unlike the
@@ -105,8 +107,8 @@ func (a *App) staffCreate(ctx context.Context, tx pgx.Tx, in StaffRegistrationIn
 			return "", e
 		}
 		quoted = payable(c, coupon.PercentOff, date)
-		if in.VerifiedAmountPaise != quoted {
-			return "", fmt.Errorf("verified payment must equal %s for the verified date", money(quoted))
+		if e = checkPaidAmount(in.VerifiedAmountPaise, quoted, in.AcceptAmount, in.Note); e != nil {
+			return "", e
 		}
 		if !validText(ref, 100) {
 			return "", errors.New("verified bank reference is required")
@@ -132,9 +134,14 @@ func (a *App) staffCreate(ctx context.Context, tx pgx.Tx, in StaffRegistrationIn
 		_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
 			id,registration_id,bank_reference,payment_date,amount_paise,
 			verified_at,verified_by,verified_reference,verified_date,verified_amount_paise,beneficiary_confirmed
-		) VALUES($1,$2,$3,$4,$5,now(),$6,$3,$4,$5,true)`, id(), rid, ref, date, quoted, staff)
+		) VALUES($1,$2,$3,$4,$5,now(),$6,$3,$4,$5,true)`, id(), rid, ref, date, in.VerifiedAmountPaise, staff)
 		if e != nil {
 			return "", paymentVerifyError(e)
+		}
+		if in.VerifiedAmountPaise != quoted {
+			if e = audit(ctx, tx, staff, rid, "amount_accepted", amountOverride(in.VerifiedAmountPaise, quoted, in.Note)); e != nil {
+				return "", e
+			}
 		}
 	}
 	if logoMime != "" {

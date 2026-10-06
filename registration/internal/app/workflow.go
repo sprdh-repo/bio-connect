@@ -274,6 +274,9 @@ type ReviewInput struct {
 	Channel              string `json:"channel"`
 	PassID               string `json:"pass_id"`
 	RequestID            string `json:"request_id"`
+	// AcceptAmount lets a reviewer approve a verified amount that differs from
+	// the fee due; Note must then give the reason (checkPaidAmount).
+	AcceptAmount bool `json:"accept_amount"`
 }
 
 func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) error {
@@ -324,8 +327,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			if e != nil {
 				return e
 			}
-			if due := payable(c, discount, date); in.VerifiedAmountPaise != due {
-				return fmt.Errorf("verified payment must equal %s for the verified date", money(due))
+			due := payable(c, discount, date)
+			if e = checkPaidAmount(in.VerifiedAmountPaise, due, in.AcceptAmount, in.Note); e != nil {
+				return e
 			}
 			ref := normalizeReference(in.VerifiedReference)
 			if !validText(ref, 100) {
@@ -363,6 +367,11 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 			}
 			if e != nil {
 				return paymentVerifyError(e)
+			}
+			if in.VerifiedAmountPaise != due {
+				if e = audit(ctx, tx, staff, rid, "amount_accepted", amountOverride(in.VerifiedAmountPaise, due, in.Note)); e != nil {
+					return e
+				}
 			}
 		}
 		if _, e = tx.Exec(ctx, "UPDATE registrations SET status='approved',approved_at=now(),approved_by=$2,review_note=$3,updated_at=now() WHERE id=$1", rid, staff, in.Note); e != nil {
@@ -486,6 +495,30 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		return e
 	}
 	return tx.Commit(ctx)
+}
+
+// checkPaidAmount requires the verified amount to equal the fee due, unless a
+// reviewer explicitly accepts a different amount the bank shows (a short
+// payment, a bank charge, an old fee) and says why. The reason is the review
+// note, so it is kept on the registration and in the audit trail.
+func checkPaidAmount(paid, due int64, accept bool, note string) error {
+	if paid == due {
+		return nil
+	}
+	if paid <= 0 {
+		return errors.New("enter the amount the bank shows")
+	}
+	if !accept {
+		return fmt.Errorf("verified payment must equal %s for the verified date; if the bank shows a different amount, tick “The bank shows a different amount” and give the reason", money(due))
+	}
+	if len([]rune(strings.TrimSpace(note))) < 10 {
+		return fmt.Errorf("give the reason for accepting %s instead of %s in the review note", money(paid), money(due))
+	}
+	return nil
+}
+
+func amountOverride(paid, due int64, note string) string {
+	return fmt.Sprintf("accepted %s, fee due %s: %s", money(paid), money(due), strings.TrimSpace(note))
 }
 
 // referenceFree refuses a bank reference that already approved a registration

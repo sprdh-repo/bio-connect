@@ -572,6 +572,75 @@ func TestApprovalRejectsMismatchedAmount(t *testing.T) {
 	}
 }
 
+// A reviewer may approve an amount the bank shows that differs from the fee,
+// but only by ticking accept_amount and giving a reason; the amount paid is
+// recorded and the audit trail keeps both amounts and the reason.
+func TestApprovalAcceptsDifferentAmountWithReason(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
+	rid, _, _ := a.Create(ctx, delegateInput("industry"), key(1), nil)
+	due := dueNow(t, a, rid)
+	payDelegate(t, a, rid, due-50000)
+	review := func(accept bool, note string) error {
+		return a.Review(ctx, rid, sid, ReviewInput{
+			Action: "approve_only", PaymentID: latestPayment(a, rid), VerifiedReference: "SBISHORT",
+			VerifiedDate: today(a), VerifiedAmountPaise: due - 50000, Successful: true, BeneficiaryConfirmed: true,
+			AcceptAmount: accept, Note: note,
+		})
+	}
+	if err := review(false, "paid less"); err == nil || !strings.Contains(err.Error(), "bank shows a different amount") {
+		t.Fatalf("different amount without the tick: %v", err)
+	}
+	if err := review(true, "  short "); err == nil || !strings.Contains(err.Error(), "reason") {
+		t.Fatalf("different amount without a reason: %v", err)
+	}
+	if status(t, a, rid) != "awaiting_review" {
+		t.Fatalf("status changed after refused approvals: %s", status(t, a, rid))
+	}
+	if err := review(true, "Bank deducted transfer charges; confirmed with the delegate"); err != nil {
+		t.Fatalf("accepted amount with reason: %v", err)
+	}
+	if status(t, a, rid) != "approved" {
+		t.Fatalf("status = %s, want approved", status(t, a, rid))
+	}
+	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE registration_id=$1 AND verified_amount_paise=$2", rid, due-50000); n != 1 {
+		t.Fatal("verified payment does not record the amount paid")
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND action='amount_accepted' AND staff_id=$2 AND detail LIKE '%transfer charges%' AND detail LIKE 'accepted INR%fee due INR%'", rid, sid); n != 1 {
+		t.Fatal("amount override not audited with both amounts and the reason")
+	}
+}
+
+// Staff entry accepts a different paid amount on the same terms.
+func TestStaffCreateAcceptsDifferentAmountWithReason(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
+	in := staffInput(delegateInput("industry"), "paid")
+	in.VerifiedReference, in.VerifiedDate = "sbi staff short", today(a)
+	cats, _ := a.categories(ctx)
+	for _, c := range cats {
+		if c.ID == "industry" {
+			in.VerifiedAmountPaise = payable(c, 0, a.Now()) + 10000
+		}
+	}
+	if _, err := a.StaffCreate(ctx, in, key(1), nil, sid); err == nil || !strings.Contains(err.Error(), "must equal") {
+		t.Fatalf("different amount without the tick: %v", err)
+	}
+	in.AcceptAmount, in.Note = true, "Paid the regular fee before the early-bird refund"
+	rid, err := a.StaffCreate(ctx, in, key(2), nil, sid)
+	if err != nil {
+		t.Fatalf("accepted amount with reason: %v", err)
+	}
+	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE registration_id=$1 AND verified_amount_paise=$2 AND amount_paise=$2", rid, in.VerifiedAmountPaise); n != 1 {
+		t.Fatal("staff payment does not record the amount paid")
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE registration_id=$1 AND action='amount_accepted'", rid); n != 1 {
+		t.Fatal("staff amount override not audited")
+	}
+}
+
 func TestApprovalRequiresBankConfirmationFlags(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
