@@ -205,6 +205,15 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 	seen := map[string]bool{}
 	for i := range in.Attendees {
 		p := &in.Attendees[i]
+		// Staff may issue a speaker a pass with no contact at all, to download
+		// and hand over in person; nothing can be sent to such a holder.
+		if staff && c.ID == "speaker" && strings.TrimSpace(p.Email) == "" && strings.TrimSpace(p.Phone) == "" && !p.WhatsAppConsent {
+			p.Name, p.Designation, p.Email, p.Phone = strings.TrimSpace(p.Name), strings.TrimSpace(p.Designation), "", ""
+			if !validText(p.Name, 120) || !validText(p.Designation, 180) {
+				return errors.New("a speaker pass needs the speaker's name and role")
+			}
+			continue
+		}
 		if !attendeeOK(p, staff, noEmail) {
 			return attendeeError(staff, noEmail)
 		}

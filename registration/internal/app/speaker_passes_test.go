@@ -30,7 +30,7 @@ func TestSpeakerContactThenPass(t *testing.T) {
 	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
 	const speaker = "beena-pillai"
 
-	if _, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid); err == nil || !strings.Contains(err.Error(), "save this speaker's email") {
+	if _, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid, false); err == nil || !strings.Contains(err.Error(), "save this speaker's email") {
 		t.Fatalf("issue without contact: %v", err)
 	}
 	if err := a.SaveSpeakerContact(ctx, speaker, " Beena@Example.org ", "", false, sid); err != nil {
@@ -44,7 +44,7 @@ func TestSpeakerContactThenPass(t *testing.T) {
 		t.Fatalf("saving a contact issued %d registrations", n)
 	}
 
-	rid, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid)
+	rid, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid, false)
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestSpeakerContactThenPass(t *testing.T) {
 	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1", rid); n != 0 {
 		t.Fatalf("issuing queued %d deliveries", n)
 	}
-	if again, err := a.IssueSpeakerPass(ctx, speaker, key(3), sid); err != nil || again != rid {
+	if again, err := a.IssueSpeakerPass(ctx, speaker, key(3), sid, false); err != nil || again != rid {
 		t.Fatalf("second issue = %s, %v; want the same registration", again, err)
 	}
 
@@ -94,7 +94,7 @@ func TestSpeakerPassReissuedAfterCancellation(t *testing.T) {
 	if err := a.SaveSpeakerContact(ctx, speaker, "tp@example.org", "", false, sid); err != nil {
 		t.Fatal(err)
 	}
-	first, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid)
+	first, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestSpeakerPassReissuedAfterCancellation(t *testing.T) {
 	if s := speakerRow(t, a, speaker); s.Registration == nil || s.Registration.Status != "cancelled" || s.Pass != nil {
 		t.Fatalf("cancelled row = %+v", s)
 	}
-	second, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid)
+	second, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid, false)
 	if err != nil {
 		t.Fatal(err)
 	}

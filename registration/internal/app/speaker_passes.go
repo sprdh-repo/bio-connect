@@ -83,7 +83,15 @@ func (a *App) speakersAPI(w http.ResponseWriter, r *http.Request, staff, path st
 		}
 		respond(w, 200, map[string]bool{"ok": true})
 	case len(parts) == 3 && parts[2] == "pass" && r.Method == "POST":
-		rid, e := a.IssueSpeakerPass(r.Context(), parts[1], r.Header.Get("Idempotency-Key"), staff)
+		// The body is optional: {"without_contact": true} asks for a
+		// download-only pass for a speaker with no saved contact.
+		var in struct {
+			WithoutContact bool `json:"without_contact"`
+		}
+		if r.ContentLength != 0 && !decode(w, r, &in) {
+			return
+		}
+		rid, e := a.IssueSpeakerPass(r.Context(), parts[1], r.Header.Get("Idempotency-Key"), staff, in.WithoutContact)
 		if e != nil {
 			fail(w, 400, publicError(e))
 			return
@@ -209,8 +217,9 @@ func (a *App) SaveSpeakerContact(ctx context.Context, speakerID, email, phone st
 
 // IssueSpeakerPass issues the speaker's complimentary pass from their saved
 // contact, approved and not sent. A speaker who already holds a pass keeps it;
-// one whose pass registration was cancelled gets a new one.
-func (a *App) IssueSpeakerPass(ctx context.Context, speakerID, key, staff string) (string, error) {
+// one whose pass registration was cancelled gets a new one. withoutContact
+// issues a download-only pass to a speaker with no saved contact.
+func (a *App) IssueSpeakerPass(ctx context.Context, speakerID, key, staff string, withoutContact bool) (string, error) {
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
 		return "", e
@@ -227,15 +236,24 @@ func (a *App) IssueSpeakerPass(ctx context.Context, speakerID, key, staff string
 	if e != nil || rid != "" {
 		return rid, e
 	}
-	var name, role, org, email, phone string
-	var consent bool
-	e = tx.QueryRow(ctx, `SELECT s.name,s.role,s.organization,c.email,c.phone,c.whatsapp_consent FROM speakers s
-		JOIN speaker_contacts c ON c.speaker_id=s.id WHERE s.id=$1`, speakerID).Scan(&name, &role, &org, &email, &phone, &consent)
-	if errors.Is(e, pgx.ErrNoRows) {
-		return "", errors.New("save this speaker's email before issuing their pass")
-	}
-	if e != nil {
+	var name, role, org string
+	var email, phone *string
+	var consent *bool
+	if e = tx.QueryRow(ctx, `SELECT s.name,s.role,s.organization,c.email,c.phone,c.whatsapp_consent FROM speakers s
+		LEFT JOIN speaker_contacts c ON c.speaker_id=s.id WHERE s.id=$1`, speakerID).Scan(&name, &role, &org, &email, &phone, &consent); e != nil {
 		return "", e
+	}
+	// A saved contact is always used. Without one, the pass is issued only on
+	// request, to download and hand over: nothing can be sent to its holder.
+	if email == nil {
+		if !withoutContact {
+			return "", errors.New("save this speaker's email before issuing their pass, or issue it for download only")
+		}
+		email, phone, consent = new(string), new(string), new(bool)
+	}
+	note := "Speaker pass"
+	if *email == "" && *phone == "" {
+		note = "Speaker pass, download only: no contact on file"
 	}
 	if org = strings.TrimSpace(org); org == "" {
 		org = "Speaker"
@@ -248,12 +266,12 @@ func (a *App) IssueSpeakerPass(ctx context.Context, speakerID, key, staff string
 			CategoryID:  "speaker",
 			Institution: clip(org, 180),
 			ContactName: clip(name, 120),
-			Email:       email,
-			Phone:       phone,
-			Attendees:   []Attendee{{Name: clip(name, 120), Email: email, Phone: phone, Designation: clip(role, 180), WhatsAppConsent: consent}},
+			Email:       *email,
+			Phone:       *phone,
+			Attendees:   []Attendee{{Name: clip(name, 120), Email: *email, Phone: *phone, Designation: clip(role, 180), WhatsAppConsent: *consent}},
 		},
 		Payment: "complimentary",
-		Note:    "Speaker pass",
+		Note:    note,
 	}
 	if rid, e = a.staffCreate(ctx, tx, in, key, nil, staff); e != nil {
 		return "", e

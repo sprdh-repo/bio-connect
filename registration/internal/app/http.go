@@ -592,6 +592,14 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.bulkReview(w, r, p, in.IDs, ReviewInput{Action: "send", Channel: in.Channel})
+	case path == "bulk-approve" && r.Method == "POST":
+		var in struct {
+			IDs []string `json:"ids"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		a.bulkApproveFree(w, r, p, in.IDs)
 	case path == "bulk-remind" && r.Method == "POST":
 		var in struct {
 			IDs []string `json:"ids"`
@@ -761,6 +769,40 @@ func (a *App) summary(w http.ResponseWriter, r *http.Request) {
 		out = append(out, CategorySummary{ID: c.ID, Kind: c.Kind, Label: c.Label, Registered: n[0], Confirmed: n[1]})
 	}
 	respond(w, 200, map[string]any{"categories": out})
+}
+
+// bulkApproveFree approves free registrations (free link or complimentary)
+// awaiting review and sends their passes, each independently, reporting
+// per-id "queued" or the reason it was skipped. A paid registration is never
+// approved here: it needs its payment verified against the bank, one by one.
+func (a *App) bulkApproveFree(w http.ResponseWriter, r *http.Request, p principal, ids []string) {
+	if len(ids) < 1 || len(ids) > 100 {
+		fail(w, 400, "select 1-100 registrations")
+		return
+	}
+	result := map[string]string{}
+	for _, rid := range ids {
+		var status string
+		var free bool
+		e := a.DB.QueryRow(r.Context(), "SELECT status,free_link_id IS NOT NULL OR complimentary FROM registrations WHERE id=$1", rid).Scan(&status, &free)
+		switch {
+		case errors.Is(e, pgx.ErrNoRows):
+			result[rid] = "not found"
+		case e != nil:
+			result[rid] = publicError(e)
+		case !free:
+			result[rid] = "paid registration: verify the payment and approve it on its own"
+		case status != "awaiting_review":
+			result[rid] = "not awaiting review"
+		default:
+			if e = a.Review(r.Context(), rid, p.ID, ReviewInput{Action: "approve_send", Note: "Approved in bulk"}); e != nil {
+				result[rid] = publicError(e)
+			} else {
+				result[rid] = "queued"
+			}
+		}
+	}
+	respond(w, 200, result)
 }
 
 // bulkReview applies one review action to each registration independently and
