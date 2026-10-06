@@ -4,7 +4,7 @@
 // held in memory and saved in one request, guarded by its revision.
 
 const mobileSections = [
-  ['event', 'Event'], ['menus', 'Menus'], ['text', 'Headings & text'], ['sessions', 'Sessions'],
+  ['event', 'Event'], ['menus', 'Menus'], ['text', 'Headings & text'], ['sessions', 'Programme'],
   ['activities', 'Activities'], ['faqs', 'FAQs'], ['venue', 'Venue & help'], ['speakers', 'Speakers'],
   ['sponsors', 'Sponsors & partners'], ['leadership', 'Leadership'], ['launch', 'Product launch'], ['themes', 'Themes & highlights'],
   ['feedback', 'Feedback']
@@ -55,6 +55,31 @@ function mobileSet(root, path, value) {
 function mobileIST(value) {
   return value ? new Date(new Date(value).getTime() + 330 * 60000).toISOString().slice(0, 16) : '';
 }
+// Session types; a break is a divider in the timetable that cannot be saved or rated.
+const sessionKinds = [['', 'Session'], ['talk', 'Keynote, address or talk'], ['panel', 'Panel or fireside chat'], ['ceremony', 'Ceremony with a running order'],
+  ['social', 'Social or networking event'], ['break', 'Break or registration (not saveable)']];
+const personRoles = [['', 'Speaker'], ['moderator', 'Moderator'], ['panelist', 'Panellist'], ['host', 'Host']];
+function mobileTimeRange(item) {
+  if (!item.starts_at) return '';
+  const fmt = (v, o) => new Date(v).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: false, ...o });
+  return `${fmt(item.starts_at, { weekday: 'short', day: 'numeric', month: 'short' })} · ${fmt(item.starts_at, { hour: '2-digit', minute: '2-digit' })}-${fmt(item.ends_at, { hour: '2-digit', minute: '2-digit' })}`;
+}
+function mobileByTime(a, b) {
+  return (!a.starts_at - !b.starts_at) || (a.starts_at && Date.parse(a.starts_at) - Date.parse(b.starts_at)) || 0;
+}
+// Sessions saved before people and running orders carried only a speakers
+// line and directory links; both become people the editor can work with.
+function mobileUpgradeSessions(state) {
+  const byId = new Map(state.speakers.map(s => [s.id, s]));
+  for (const s of state.guide.sessions) {
+    s.kind ??= ''; s.label ??= ''; s.track ??= ''; s.segments ??= [];
+    if (s.people?.length || s.segments.length) continue;
+    const linked = (s.speaker_ids || []).map(id => byId.get(id)).filter(Boolean);
+    s.people = linked.length
+      ? linked.map(sp => ({ name: sp.name, designation: [sp.role, sp.organization].filter(Boolean).join(', '), role: '', speaker_id: sp.id }))
+      : (s.speakers || '').split('\n').map(n => n.trim()).filter(Boolean).map(name => ({ name, designation: '', role: '', speaker_id: '' }));
+  }
+}
 function mobileSlug(name, taken) {
   const base = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'speaker';
   let id = base, n = 2;
@@ -66,6 +91,9 @@ let mobileCleanup = null;
 async function mobileContentPage() {
   mobileCleanup?.();
   let state = await api('/admin/mobile-content'), dirty = false;
+  mobileUpgradeSessions(state);
+  // Sessions expanded in the editor, kept across re-renders.
+  const openItems = new Set();
   let section = sessionStorage.getItem('bc_mobile_section') || 'event';
   if (!mobileSections.some(([k]) => k === section)) section = 'event';
 
@@ -87,15 +115,17 @@ async function mobileContentPage() {
   function shown(path, label = 'Show in app') {
     return `<label class="check"><input type="checkbox" data-path="${esc(path)}" data-type="checkbox" ${mobilePath(state, path) ? 'checked' : ''}> ${esc(label)}</label>`;
   }
-  // Links a session to speakers in the directory, so the session appears on
-  // their profiles and in attendees' day plans. New speakers get their ID on save.
-  function speakerLinks(path, item) {
-    const linked = item.speaker_ids || [], byId = new Map(state.speakers.filter(s => s.id).map(s => [s.id, s]));
-    const chips = linked.map(id => `<span class="mc-chip">${esc(byId.get(id)?.name || id)}<button type="button" class="quiet" data-unlink="${esc(path)}" data-speaker="${esc(id)}" aria-label="Unlink ${esc(byId.get(id)?.name || id)}">×</button></span>`).join('');
-    const options = [...byId.values()].filter(s => !linked.includes(s.id)).map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    const id = `mc-f${++fieldId}`;
-    return `<div class="mc-field full"><div class="mc-label"><label for="${id}">Linked speakers</label></div><div class="mc-chips">${chips || '<span class="muted">None linked</span>'}</div>
-      <select id="${id}" data-link="${esc(path)}"><option value="">Link a speaker…</option>${options}</select><p class="help">Linked speakers show this session on their profile, and attendees who save a speaker see it in their day plan. Save new speakers before linking them.</p></div>`;
+  // The people on a session or running-order item, each optionally linked
+  // to the speaker directory for a portrait and profile.
+  function peopleList(path) {
+    const options = [['', 'Not in the speaker directory'], ...state.speakers.filter(sp => sp.id).map(sp => [sp.id, sp.name])];
+    return listOf(path, {
+      noun: 'person', publish: false, compact: true, blank: () => ({ name: '', designation: '', role: '', speaker_id: '' }),
+      title: i => i.name && `${i.role ? `${personRoles.find(([k]) => k === i.role)[1]}: ` : ''}${i.name}`,
+      fields: pp => `${input(`${pp}.name`, 'Name as printed', 'text', { required: true })}${input(`${pp}.role`, 'Role', 'select', { options: personRoles })}
+        ${input(`${pp}.designation`, 'Designation for this session', 'text', { full: true })}
+        ${input(`${pp}.speaker_id`, 'Speaker directory', 'select', { options, full: true, help: pp.endsWith('.0') ? 'Linking shows their portrait and profile, and lists this session on it. Picking a speaker fills a blank name and designation.' : '' })}`
+    });
   }
   // A speaker's portrait: a preview and an upload that frames any photo into
   // the website's 4:5 duotone format (portrait.js) before storing it.
@@ -131,14 +161,20 @@ async function mobileContentPage() {
     } catch (err) { box.innerHTML = `<p class="muted">${esc(err.message)}</p>`; }
   }
   // A reorderable list of records; fields(path) renders one record's inputs.
-  function list(path, { title, fields, blank, noun, publish = true }) {
+  // summary(item) folds each record behind a one-line summary; compact suits lists nested in a record.
+  function list(path, { title, fields, blank, noun, publish = true, summary, compact }) {
     const items = mobilePath(state, path) || [];
-    return `<div class="mc-list">${items.map((item, i) => `<fieldset class="mc-item ${publish && !item.published ? 'mc-off' : ''}"><legend>${esc(title(item) || `New ${noun}`)}</legend>
-      <div class="fields">${fields(`${path}.${i}`, item)}</div>
+    return `<div class="mc-list ${compact ? 'mc-list-compact' : ''}">${items.map((item, i) => {
+      const off = publish && !item.published ? 'mc-off' : '';
+      const body = `<div class="fields">${fields(`${path}.${i}`, item)}</div>
       <div class="mc-row">${publish ? shown(`${path}.${i}.published`) : '<span></span>'}<span class="mc-tools">
         <button type="button" class="quiet" data-move="${esc(path)}" data-index="${i}" data-step="-1" ${i ? '' : 'disabled'} aria-label="Move up">↑</button>
         <button type="button" class="quiet" data-move="${esc(path)}" data-index="${i}" data-step="1" ${i < items.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button>
-        <button type="button" class="quiet" data-remove="${esc(path)}" data-index="${i}">Remove</button></span></div></fieldset>`).join('') || `<p class="muted">No ${noun} entries yet.</p>`}
+        <button type="button" class="quiet" data-remove="${esc(path)}" data-index="${i}">Remove</button></span></div>`;
+      if (!summary) return `<fieldset class="mc-item ${off}"><legend>${esc(title(item) || `New ${noun}`)}</legend>${body}</fieldset>`;
+      const key = `${path}:${item.id}`;
+      return `<details class="mc-item mc-fold ${off}" data-fold="${esc(key)}" ${openItems.has(key) ? 'open' : ''}><summary>${summary(item)}</summary>${body}</details>`;
+    }).join('') || `<p class="muted">No ${noun} entries yet.</p>`}
       <button type="button" class="secondary" data-add="${esc(path)}" data-noun="${esc(noun)}">Add ${esc(noun)}</button></div>`;
   }
   const blanks = {};
@@ -168,9 +204,22 @@ async function mobileContentPage() {
     text: () => `<section class="card"><h2>Headings & text</h2><p class="help">Override the app’s built-in headings. Leave a field blank to keep the default shown in grey. Use a new line to break a title.</p></section>` +
       mobileCopy.map(([group, keys]) => `<section class="card"><h3>${esc(group)}</h3><div class="fields">${keys.map(([key, fallback]) =>
         `<label class="full"><span class="mc-label">${esc(key)}</span><textarea data-copy="${esc(key)}" rows="${fallback.length > 60 ? 2 : 1}" maxlength="600" placeholder="${esc(fallback)}">${esc(state.content.copy[key] || '')}</textarea></label>`).join('')}</div></section>`).join(''),
-    sessions: () => `<section class="card"><h2>Sessions</h2><p class="help">Times are India time (IST). Leave both blank if unconfirmed; blank details are left out in the app.</p>${listOf('guide.sessions', {
-      noun: 'session', blank: () => ({ id: uuid(), title: '', description: '', starts_at: '', ends_at: '', location: '', speakers: '', speaker_ids: [], published: false }), title: i => i.title,
-      fields: (p, item) => `${input(`${p}.title`, 'Session title', 'text', { required: true, full: true })}${input(`${p}.starts_at`, 'Start (IST)', 'datetime-local')}${input(`${p}.ends_at`, 'End (IST)', 'datetime-local')}${input(`${p}.location`, 'Hall / location')}${input(`${p}.speakers`, 'Speakers (as shown)', 'text', { help: 'Shown on the session exactly as written.' })}${speakerLinks(p, item)}${input(`${p}.description`, 'Description', 'textarea')}`
+    sessions: () => `<section class="card"><div class="mc-row mc-head"><h2>Programme</h2><button type="button" class="secondary" id="mc-sort-sessions">Sort by start time</button></div>
+      <p class="help">The timetable in the app and on the website's Programme page. Times are India time (IST); leave both blank if unconfirmed. The app and website order sessions by start time, then by their order here. Blank details are left out.</p>${listOf('guide.sessions', {
+      noun: 'session', blank: () => ({ id: uuid(), kind: '', label: '', title: '', track: '', description: '', starts_at: '', ends_at: '', location: '', people: [], segments: [], speakers: '', speaker_ids: [], published: false }),
+      summary: i => `<span class="mc-fold-time">${esc(mobileTimeRange(i) || 'Time to be confirmed')}</span><strong>${esc([i.label, i.title || 'New session'].filter(Boolean).join(' · '))}</strong>
+        <span class="mc-fold-meta">${esc([sessionKinds.find(([k]) => k === (i.kind || ''))[1], i.people?.length && `${i.people.length} ${i.people.length === 1 ? 'person' : 'people'}`, i.segments?.length && `${i.segments.length} running-order items`, !i.published && 'hidden'].filter(Boolean).join(' · '))}</span>`,
+      fields: (p, item) => `${input(`${p}.kind`, 'Type', 'select', { options: sessionKinds })}${input(`${p}.label`, 'Label above the title', 'text', { placeholder: 'Panel Discussion 1' })}
+        ${input(`${p}.title`, 'Title', 'text', { required: true, full: true })}${input(`${p}.starts_at`, 'Start (IST)', 'datetime-local')}${input(`${p}.ends_at`, 'End (IST)', 'datetime-local')}
+        ${input(`${p}.location`, 'Hall / location')}${input(`${p}.track`, 'Track', 'text', { placeholder: 'AI, Biopharma…', help: 'A short theme tag.' })}
+        ${input(`${p}.description`, 'Description', 'textarea', { rows: 2 })}
+        ${item.kind === 'break' ? '' : `<div class="mc-field full"><h3 class="mc-subhead">People</h3>${peopleList(`${p}.people`)}</div>`}
+        ${item.kind === 'ceremony' || item.segments?.length ? `<div class="mc-field full"><h3 class="mc-subhead">Running order</h3><p class="help">The timed items of a ceremony, each with its own speakers.</p>${listOf(`${p}.segments`, {
+          noun: 'running-order item', publish: false, compact: true, blank: () => ({ starts_at: '', ends_at: '', title: '', description: '', people: [] }),
+          title: i => [mobileTimeRange(i).split(' · ')[1], i.title].filter(Boolean).join(' '),
+          fields: sp => `${input(`${sp}.starts_at`, 'Start (IST)', 'datetime-local')}${input(`${sp}.ends_at`, 'End (IST)', 'datetime-local')}${input(`${sp}.title`, 'Item', 'text', { required: true, full: true })}
+            ${input(`${sp}.description`, 'Note', 'textarea', { rows: 2 })}<div class="mc-field full">${peopleList(`${sp}.people`)}</div>`
+        })}</div>` : ''}`
     })}</section>`,
     activities: () => `<section class="card"><h2>Activities</h2>${listOf('guide.activities', {
       noun: 'activity', blank: () => ({ id: uuid(), title: '', description: '', schedule: '', location: '', published: false }), title: i => i.title,
@@ -271,18 +320,19 @@ async function mobileContentPage() {
       if (t === 'datetime-local') v = v ? `${v}:00+05:30` : '';
       if (t === 'lines') v = v.split('\n').map(s => s.trim()).filter(Boolean);
       mobileSet(state, el.dataset.path, v);
-      // Picking a custom link reveals its address field; ticks restyle the card.
-      if (e.type === 'change' && (el.dataset.path.endsWith('.key') || t === 'checkbox')) render();
+      // A linked speaker fills a blank name and designation from the directory.
+      if (el.dataset.path.endsWith('.speaker_id') && v) {
+        const person = mobilePath(state, el.dataset.path.replace(/\.speaker_id$/, '')), sp = state.speakers.find(s => s.id === v);
+        if (!person.name.trim()) person.name = sp.name;
+        if (!person.designation.trim()) person.designation = [sp.role, sp.organization].filter(Boolean).join(', ');
+      }
+      // Picking a custom link reveals its address field, a session type its sections; ticks restyle the card.
+      if (e.type === 'change' && (/\.(key|kind|speaker_id)$/.test(el.dataset.path) || t === 'checkbox')) render();
       changed();
     } else if (el.dataset.hide) {
       const list = mobilePath(state, el.dataset.hide) || [], name = el.dataset.field;
       mobileSet(state, el.dataset.hide, el.checked ? [...new Set([...list, name])] : list.filter(n => n !== name));
       changed();
-    } else if (el.dataset.link) {
-      if (!el.value) return;
-      const session = mobilePath(state, el.dataset.link);
-      session.speaker_ids = [...(session.speaker_ids || []), el.value];
-      changed(); render();
     } else if (el.dataset.copy) {
       if (el.value.trim()) state.content.copy[el.dataset.copy] = el.value; else delete state.content.copy[el.dataset.copy];
       changed();
@@ -291,6 +341,9 @@ async function mobileContentPage() {
   // The form is re-rendered on every structural change, so all controls are
   // handled by delegation from #app.
   app.onclick = async e => {
+    const fold = e.target.closest('summary')?.parentElement;
+    // The browser toggles the fold after this handler; note its new state then.
+    if (fold?.dataset.fold && active()) setTimeout(() => fold.open ? openItems.add(fold.dataset.fold) : openItems.delete(fold.dataset.fold));
     const b = e.target.closest('button');
     if (!b || !active()) return;
     try {
@@ -304,7 +357,7 @@ async function mobileContentPage() {
       } else if (b.id === 'mc-reload') {
         if (dirty && !confirm('Discard unsaved changes and reload the saved content?')) return;
         message('');
-        state = await api('/admin/mobile-content'); dirty = false; render();
+        state = await api('/admin/mobile-content'); mobileUpgradeSessions(state); dirty = false; render();
       } else if (b.dataset.section) {
         section = b.dataset.section;
         sessionStorage.setItem('bc_mobile_section', section);
@@ -317,9 +370,8 @@ async function mobileContentPage() {
         const items = mobilePath(state, b.dataset.move), i = +b.dataset.index, j = i + +b.dataset.step;
         [items[i], items[j]] = [items[j], items[i]];
         changed(); render();
-      } else if (b.dataset.unlink) {
-        const session = mobilePath(state, b.dataset.unlink);
-        session.speaker_ids = (session.speaker_ids || []).filter(id => id !== b.dataset.speaker);
+      } else if (b.id === 'mc-sort-sessions') {
+        state.guide.sessions.sort(mobileByTime);
         changed(); render();
       } else if (b.dataset.remove) {
         if (!confirm('Remove this entry? It is deleted when you save.')) return;
@@ -334,11 +386,15 @@ async function mobileContentPage() {
     message('');
     const taken = new Set(state.speakers.map(s => s.id).filter(Boolean));
     for (const s of state.speakers) if (!s.id) { s.id = mobileSlug(s.name, taken); taken.add(s.id); }
-    // A removed speaker drops out of the sessions that linked them.
-    for (const session of state.guide.sessions) session.speaker_ids = (session.speaker_ids || []).filter(id => taken.has(id));
+    // A removed speaker stays on the programme by name, unlinked.
+    for (const session of state.guide.sessions) {
+      for (const person of [...session.people, ...session.segments.flatMap(seg => seg.people)]) if (!taken.has(person.speaker_id)) person.speaker_id = '';
+      session.speaker_ids = (session.speaker_ids || []).filter(id => taken.has(id));
+    }
     try {
       await busy(e.submitter || app.querySelector('[type=submit]'), async () => {
         state = await api('/admin/mobile-content', { method: 'PUT', body: JSON.stringify(state) });
+        mobileUpgradeSessions(state);
       });
       dirty = false; render();
       message(`Saved. The app shows these changes on its next refresh (revision ${state.revision}).`);
