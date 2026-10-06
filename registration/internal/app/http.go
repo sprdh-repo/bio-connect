@@ -120,6 +120,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("POST /api/v1/recovery", a.recover)
 	m.HandleFunc("POST /api/v1/mobile/pass-access/challenges", a.mobileChallenge)
 	m.HandleFunc("POST /api/v1/mobile/pass-access/verify", a.mobileVerify)
+	m.HandleFunc("GET /api/v1/mobile/review-pass.pdf", a.storeReviewPDF)
 	m.HandleFunc("GET /api/v1/mobile/passes", a.mobilePasses)
 	m.HandleFunc("DELETE /api/v1/mobile/passes", a.mobilePasses)
 	m.HandleFunc("GET /api/v1/mobile/moments/status", a.mobileMoments)

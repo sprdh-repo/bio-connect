@@ -41,6 +41,15 @@ func (a *App) momentsAttendee(r *http.Request) (string, error) {
 	if passID == "" {
 		return "", errMobilePass
 	}
+	if qr == storeReviewQR {
+		if !a.isStoreReviewer(channel, identifier) {
+			return "", errMobileSession
+		}
+		if passID != storeReviewPassID {
+			return "", errMobilePass
+		}
+		return "bio_connect_store_review", nil
+	}
 	var attendeeID string
 	err = a.DB.QueryRow(r.Context(), "SELECT a.id"+mobilePassScope+" AND p.id=$4 ORDER BY p.created_at LIMIT 1", channel, identifier, qr, passID).Scan(&attendeeID)
 	if errors.Is(err, pgx.ErrNoRows) {

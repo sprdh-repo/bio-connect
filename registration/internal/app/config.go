@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 )
 
 type Config struct {
+	StoreReviewCode string
+
 	DatabaseURL, BaseURL, Listen, StorageDir, S3Bucket, AWSRegion, TrustedProxyCIDR, OpsKey                      string
 	RegistrationEnabled, LiveDelivery, Production                                                                bool
 	EncryptionKey, SBIURL, PostmarkToken, SenderAddress, SenderName, PostmarkStream, PostmarkAPIBase             string
@@ -36,6 +39,7 @@ func env(k, d string) string {
 }
 func FromEnv() Config {
 	return Config{
+		StoreReviewCode:  os.Getenv("STORE_REVIEW_CODE"),
 		TrustedProxyCIDR: os.Getenv("TRUSTED_PROXY_CIDR"), DatabaseURL: os.Getenv("DATABASE_URL"), BaseURL: env("BASE_URL", "http://localhost:8080"), Listen: env("LISTEN_ADDR", ":8080"),
 		OpsKey:     os.Getenv("OPS_KEY"),
 		StorageDir: env("STORAGE_DIR", "./var/files"), S3Bucket: os.Getenv("S3_BUCKET"), AWSRegion: env("AWS_REGION", "ap-south-1"),
@@ -49,6 +53,10 @@ func FromEnv() Config {
 	}
 }
 func (c Config) Validate() error {
+	if c.StoreReviewCode != "" && !regexp.MustCompile(`^[0-9]{6}$`).MatchString(c.StoreReviewCode) {
+		return errors.New("STORE_REVIEW_CODE must be exactly six digits")
+	}
+
 	key, e := base64.StdEncoding.DecodeString(c.EncryptionKey)
 	if e != nil || len(key) != 32 {
 		return errors.New("ENCRYPTION_KEY must be a base64-encoded 32-byte key")

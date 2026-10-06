@@ -85,6 +85,15 @@ func (a *App) mobileChallenge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := fmt.Sprintf("%06d", n.Int64())
+	review := a.isStoreReviewer(in.Channel, identifier)
+	if review {
+		if in.QRID != "" {
+			fail(w, 400, "review access uses email without scanning a pass")
+			return
+		}
+		code = a.Config.StoreReviewCode
+		in.QRID = storeReviewQR
+	}
 	tx, err := a.DB.Begin(r.Context())
 	if err != nil {
 		fail(w, 503, "verification unavailable")
@@ -104,7 +113,10 @@ func (a *App) mobileChallenge(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(r.Context(), "SELECT r.id"+mobilePassScope+" ORDER BY p.created_at LIMIT 1", in.Channel, identifier, in.QRID).Scan(&rid)
 	var delivery any
 	codeHash := ""
-	if err == nil {
+	if review {
+		err = nil
+		codeHash = hash(challenge + ":" + code)
+	} else if err == nil {
 		codeHash = hash(challenge + ":" + code)
 		if err = a.queue(r.Context(), tx, rid, "", "pass_otp", in.Channel, identifier, code, "pass-otp:"+hash(challenge)); err == nil {
 			var jid string
@@ -157,6 +169,10 @@ func (a *App) mobileVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		fail(w, 503, "verification unavailable")
+		return
+	}
+	if qr == storeReviewQR && !a.isStoreReviewer(channel, identifier) {
+		fail(w, 401, "review access is disabled")
 		return
 	}
 	actual := hash(in.Challenge + ":" + in.Code)
@@ -215,6 +231,10 @@ func (a *App) mobileSession(w http.ResponseWriter, r *http.Request) (token, chan
 		fail(w, 503, "passes unavailable; retry shortly")
 		return
 	}
+	if qr == storeReviewQR && !a.isStoreReviewer(channel, identifier) {
+		fail(w, 401, "review access is disabled")
+		return
+	}
 	return token, channel, identifier, qr, true
 }
 
@@ -230,6 +250,10 @@ func (a *App) mobilePasses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respond(w, 200, map[string]bool{"ok": true})
+		return
+	}
+	if qr == storeReviewQR {
+		a.storeReviewPasses(w, r, token)
 		return
 	}
 	rows, err := a.DB.Query(r.Context(), "SELECT p.id,a.name,r.institution,a.designation,c.label,p.number,p.qr_id,p.download_cipher,a.share_email,a.share_phone"+mobilePassScope+" ORDER BY p.created_at,p.id", channel, identifier, qr)
@@ -279,7 +303,7 @@ func (a *App) sendPassOTP(ctx context.Context, j job, code string) sendResult {
 // mobilePassSharing records whether a pass holder's email and phone go to
 // people who scan their badge. Only a verified holder of that pass can change it.
 func (a *App) mobilePassSharing(w http.ResponseWriter, r *http.Request) {
-	_, channel, identifier, qr, ok := a.mobileSession(w, r)
+	token, channel, identifier, qr, ok := a.mobileSession(w, r)
 	if !ok {
 		return
 	}
@@ -288,6 +312,19 @@ func (a *App) mobilePassSharing(w http.ResponseWriter, r *http.Request) {
 		SharePhone bool `json:"share_phone"`
 	}
 	if !decode(w, r, &in) {
+		return
+	}
+	if qr == storeReviewQR {
+		if r.PathValue("id") != storeReviewPassID {
+			fail(w, 404, "pass not found")
+			return
+		}
+		_, err := a.DB.Exec(r.Context(), "UPDATE mobile_pass_sessions SET review_share_email=$2,review_share_phone=$3 WHERE token_hash=$1", hash(token), in.ShareEmail, in.SharePhone)
+		if err != nil {
+			fail(w, 503, "could not save your choice")
+			return
+		}
+		respond(w, 200, map[string]bool{"share_email": in.ShareEmail, "share_phone": in.SharePhone})
 		return
 	}
 	result, err := a.DB.Exec(r.Context(), "UPDATE attendees SET share_email=$4,share_phone=$5,sharing_updated_at=$6 WHERE id=(SELECT a.id"+mobilePassScope+" AND p.id=$7)",
