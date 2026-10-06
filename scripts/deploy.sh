@@ -17,7 +17,7 @@ for command in aws curl python3; do
   fi
 done
 
-for file in index.html speakers.html committee.html exhibitors.html sponsors.html product-launch.html privacy-policy.html privacy-policy.css 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
+for file in index.html programme.html speakers.html committee.html exhibitors.html sponsors.html product-launch.html privacy-policy.html privacy-policy.css 404.html styles.css script.js robots.txt sitemap.xml favicon.ico; do
   if [[ ! -f "$file" ]]; then
     echo "Error: required site file '$file' is missing." >&2
     exit 1
@@ -37,6 +37,13 @@ if ! git diff --quiet -- speakers.html index.html assets/speakers || [[ -n "$(gi
   echo "Note: the speaker sync changed files. Commit them after this deploy so the repository matches the site."
 fi
 
+# The programme comes from the same backend and reuses the portraits above.
+echo "Syncing the programme from the registration backend..."
+python3 scripts/sync-programme.py
+if ! git diff --quiet -- programme.html; then
+  echo "Note: the programme sync changed programme.html. Commit it after this deploy so the repository matches the site."
+fi
+
 echo "Checking AWS credentials..."
 aws sts get-caller-identity --query 'Account' --output text >/dev/null
 
@@ -47,6 +54,11 @@ aws s3 cp index.html "s3://$BUCKET/index.html" \
   --only-show-errors
 
 aws s3 cp speakers.html "s3://$BUCKET/speakers.html" \
+  --content-type "text/html; charset=utf-8" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --only-show-errors
+
+aws s3 cp programme.html "s3://$BUCKET/programme.html" \
   --content-type "text/html; charset=utf-8" \
   --cache-control "no-cache, no-store, must-revalidate" \
   --only-show-errors
@@ -115,7 +127,7 @@ echo "Invalidating CloudFront cache..."
 INVALIDATION_ID="$(
   aws cloudfront create-invalidation \
     --distribution-id "$DISTRIBUTION_ID" \
-    --paths "/" "/index.html" "/speakers.html" "/committee.html" "/exhibitors.html" "/sponsors.html" "/product-launch.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
+    --paths "/" "/index.html" "/programme.html" "/speakers.html" "/committee.html" "/exhibitors.html" "/sponsors.html" "/product-launch.html" "/404.html" "/robots.txt" "/sitemap.xml" "/favicon.ico" \
             "/styles.css" "/script.js" "/assets/*" "/privacy-policy" "/privacy-policy.html" "/privacy-policy.css" \
     --query 'Invalidation.Id' \
     --output text
@@ -160,7 +172,7 @@ if ! cmp -s committee.html "$REMOTE_COMMITTEE"; then
   exit 1
 fi
 
-for page in exhibitors sponsors product-launch; do
+for page in programme exhibitors sponsors product-launch; do
   if ! curl --fail --silent --show-error --location --retry 3 --retry-delay 2 "$SITE_URL/$page.html" | cmp -s "$page.html" -; then
     echo "Error: production HTML does not match the deployed $page.html." >&2
     exit 1

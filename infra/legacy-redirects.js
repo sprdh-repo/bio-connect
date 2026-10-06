@@ -15,7 +15,7 @@
    missing keeps returning the 404 that lets search engines drop it from the index. */
 var MOVED = {
   "/about": "/#about",
-  "/agenda": "/#themes",
+  "/agenda": "/programme.html",
   "/highlights": "/#highlights",
   "/delegate-registration": "/#registration",
   "/expo-registration": "/#registration",

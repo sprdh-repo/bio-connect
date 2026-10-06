@@ -432,6 +432,18 @@ if (speakerGrid) {
   };
   speakers.forEach(({ card }) => addProfileButton(card));
 
+  /* speakers.html#<speaker id>, linked from the programme, opens that profile. */
+  const openLinkedProfile = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const card = id && speakers.find(({ card: item }) => item.dataset.speakerId === id)?.card;
+    if (!card || dialog.open) return;
+    showSpeaker(card);
+    dialog.showModal();
+    document.body.classList.add("dialog-open");
+  };
+  openLinkedProfile();
+  window.addEventListener("hashchange", openLinkedProfile);
+
   stepButtons.forEach((button) =>
     button.addEventListener("click", () => stepSpeaker(Number(button.dataset.speakerDialogStep))),
   );
@@ -662,4 +674,278 @@ if (exhibitorDirectory) {
   clear.addEventListener('click', () => { query.value = ''; filter(); query.focus(); });
   retry.addEventListener('click', load);
   load();
+}
+
+/* Programme page. The timetable is static HTML written at deploy time by
+   scripts/sync-timetable.py; this adds filtering, search, the day the reader
+   is on, what is happening now, and a refresh from the live programme when it
+   has changed since the deploy. renderProgramme mirrors the script's markup:
+   change both together. */
+const timetable = document.querySelector("[data-programme]");
+if (timetable) {
+  const IST_OFFSET = 330 * 60000;
+  const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const KIND_LABELS = { talk: "Talk", panel: "Panel discussion", ceremony: "Ceremony", social: "Evening programme", break: "Break" };
+  const ROLE_GROUPS = [["moderator", "Moderator", "Moderators"], ["panelist", "Panellist", "Panellists"], ["host", "Host", "Hosts"]];
+  const BREAK_ICONS = {
+    meal: '<path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8M7 7h4M17 21V3c-2 1-3 4-3 8h3" />',
+    badge: '<rect x="4" y="6" width="16" height="14" rx="2" /><path d="M9 6V4h6v2M8 12h8M8 16h5" />',
+    cup: '<path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9ZM17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 3v3M12 3v3" />',
+  };
+  const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;" })[c]);
+  /* A Date whose UTC fields read as India time. */
+  const ist = (value) => (value ? new Date(Date.parse(value) + IST_OFFSET) : null);
+  const isoIST = (d) => `${d.toISOString().slice(0, 19)}+05:30`;
+  const clock = (d) => `${d.getUTCHours() % 12 || 12}:${String(d.getUTCMinutes()).padStart(2, "0")} ${d.getUTCHours() < 12 ? "am" : "pm"}`;
+  const initials = (name) => {
+    const words = name.replace(/\b(dr|prof|mr|mrs|ms|shri|smt|padma bhushan|padma shri|ias)\b\.?/gi, " ").split(/[\s.]+/).filter((w) => /^[a-z]/i.test(w));
+    return words.length ? (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase() : "";
+  };
+
+  const avatar = (p, portraits) => {
+    const src = portraits.get(p.speaker_id || "");
+    return src
+      ? `<span class="prog-avatar"><img src="${esc(src)}" width="480" height="600" alt="" loading="lazy" decoding="async" /></span>`
+      : `<span class="prog-avatar" aria-hidden="true">${esc(initials(p.name))}</span>`;
+  };
+  const person = (p, portraits) => {
+    const text = `<span class="prog-person-text"><span class="prog-person-name">${esc(p.name)}</span>${p.designation ? `<span class="prog-person-role">${esc(p.designation)}</span>` : ""}</span>`;
+    const body = p.speaker_id
+      ? `<a class="prog-person-link" href="speakers.html#${esc(p.speaker_id)}" data-speaker-id="${esc(p.speaker_id)}">${avatar(p, portraits)}${text}</a>`
+      : `<span class="prog-person-link">${avatar(p, portraits)}${text}</span>`;
+    return `<li class="prog-person">${body}</li>`;
+  };
+  const timeBlock = (start, end) => {
+    if (!start) return '<p class="prog-time"><span class="prog-tbc">Time to be confirmed</span></p>';
+    return `<p class="prog-time"><time datetime="${isoIST(start)}">${clock(start)}</time>${end ? `<span class="prog-end">to <time datetime="${isoIST(end)}">${clock(end)}</time></span>` : ""}</p>`;
+  };
+  const peopleGroups = (s, portraits) => {
+    const speaking = s.people.filter((p) => !["moderator", "panelist", "host"].includes(p.role || ""));
+    const [one, many] = s.kind === "panel" ? ["In conversation", "In conversation"] : ["Speaker", "Speakers"];
+    const groups = [[speaking.length === 1 ? one : many, speaking]];
+    for (const [role, single, plural] of ROLE_GROUPS) {
+      const members = s.people.filter((p) => (p.role || "") === role);
+      groups.push([members.length === 1 ? single : plural, members]);
+    }
+    return `<div class="prog-people">${groups
+      .filter(([, members]) => members.length)
+      .map(([title, members]) => `<div class="prog-group"><p class="prog-role">${esc(title)}</p><ul class="prog-persons">${members.map((p) => person(p, portraits)).join("")}</ul></div>`)
+      .join("")}</div>`;
+  };
+  const runningOrder = (segments, portraits) => {
+    const timed = segments.filter((g) => g.starts_at).length;
+    const items = segments.map((g) => {
+      const start = ist(g.starts_at);
+      const when = start ? `<time datetime="${isoIST(start)}">${clock(start)}</time>` : '<span class="prog-order-untimed" aria-hidden="true"></span>';
+      const people = g.people?.length ? `<ul class="prog-persons prog-persons-compact">${g.people.map((p) => person(p, portraits)).join("")}</ul>` : "";
+      return `<li class="prog-order-item${start ? "" : " prog-order-note-only"}">${when}<div class="prog-order-body"><p class="prog-order-title">${esc(g.title)}</p>${g.description ? `<p class="prog-order-note">${esc(g.description)}</p>` : ""}${people}</div></li>`;
+    });
+    return `<details class="prog-order"><summary>Running order <span>${timed} ${timed === 1 ? "item" : "items"}</span></summary><ol class="prog-order-list">${items.join("")}</ol></details>`;
+  };
+  const breakIcon = (title) => {
+    const t = title.toLowerCase();
+    const key = t.includes("lunch") || t.includes("dinner") ? "meal" : t.includes("registration") ? "badge" : "cup";
+    return `<svg class="prog-break-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${BREAK_ICONS[key]}</svg>`;
+  };
+  const item = (s, portraits) => {
+    const start = ist(s.starts_at), end = ist(s.ends_at);
+    let attrs = `data-kind="${esc(s.kind || "session")}"`;
+    if (start && end) attrs += ` data-start="${isoIST(start)}" data-end="${isoIST(end)}"`;
+    if (s.kind === "break") {
+      const when = start ? ` data-when="${clock(start)}${end ? ` - ${clock(end)}` : ""}"` : "";
+      return `<li class="prog-item prog-break" ${attrs}>${timeBlock(start, end)}<p class="prog-break-body"${when}>${breakIcon(s.title)}<span>${esc(s.title)}</span></p></li>`;
+    }
+    const label = s.label || KIND_LABELS[s.kind] || "Session";
+    const solo = s.kind === "talk" && s.people.length === 1 && !s.segments.length && s.people[0].name === s.title;
+    const track = s.track ? ` <span class="prog-track">${esc(s.track)}</span>` : "";
+    let body = `<p class="prog-label"><span class="prog-live" hidden>Now</span>${esc(label)}${track}</p>`;
+    if (solo) {
+      const p = s.people[0];
+      const text = `<div class="prog-solo-text"><h3 class="prog-title" id="t-${esc(s.id)}">${esc(p.name)}</h3>${p.designation ? `<p class="prog-person-role">${esc(p.designation)}</p>` : ""}</div>`;
+      body += p.speaker_id
+        ? `<a class="prog-solo" href="speakers.html#${esc(p.speaker_id)}" data-speaker-id="${esc(p.speaker_id)}">${avatar(p, portraits)}${text}</a>`
+        : `<div class="prog-solo">${avatar(p, portraits)}${text}</div>`;
+    } else {
+      body += `<h3 class="prog-title" id="t-${esc(s.id)}">${esc(s.title)}</h3>`;
+    }
+    if (s.description) body += `<p class="prog-desc">${esc(s.description)}</p>`;
+    if (s.location) body += `<p class="prog-where">${esc(s.location)}</p>`;
+    if (s.people.length && !solo) body += peopleGroups(s, portraits);
+    if (s.segments.length) body += runningOrder(s.segments, portraits);
+    return `<li class="prog-item" id="s-${esc(s.id)}" ${attrs}>${timeBlock(start, end)}<article class="prog-card" aria-labelledby="t-${esc(s.id)}">${body}</article></li>`;
+  };
+  /* Sessions by India day in programme order, untimed ones last. */
+  const byDay = (sessions) => {
+    const sorted = sessions
+      .map((s, i) => ({ s, i, start: Date.parse(s.starts_at) || null, end: Date.parse(s.ends_at) || null }))
+      .sort((a, b) => (!a.start - !b.start) || (a.start ?? 0) - (b.start ?? 0) || (a.end ?? Infinity) - (b.end ?? Infinity) || (a.start ? 0 : a.s.title.localeCompare(b.s.title)) || a.i - b.i);
+    const days = new Map();
+    for (const { s } of sorted) {
+      const key = s.starts_at ? ist(s.starts_at).toISOString().slice(0, 10) : "";
+      if (!days.has(key)) days.set(key, []);
+      days.get(key).push(s);
+    }
+    return [...days];
+  };
+  const dayMeta = (n, key) => {
+    if (!key) return ["day-tbc", "Later", "Time to be confirmed", "To be confirmed"];
+    const d = new Date(`${key}T00:00:00Z`);
+    return [`day-${n}`, `Day ${n}`, `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`, `${WEEKDAYS[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`];
+  };
+  const renderProgramme = (sessions, portraits) => {
+    const days = byDay(sessions);
+    const list = days.map(([key, items], i) => {
+      const [anchor, number, title] = dayMeta(i + 1, key);
+      return `<section class="prog-day" id="${anchor}" aria-labelledby="${anchor}-title"><header class="prog-day-head"><p class="prog-day-num">${number}</p><h2 class="prog-day-title" id="${anchor}-title">${title}</h2></header><ol class="prog-list">${items.map((s) => item(s, portraits)).join("")}</ol></section>`;
+    });
+    const nav = days.map(([key], i) => {
+      const [anchor, number, , short] = dayMeta(i + 1, key);
+      return `<a class="prog-daylink" href="#${anchor}"><strong>${number}</strong><span>${short}</span></a>`;
+    });
+    return { list: list.join(""), nav: nav.join("") };
+  };
+
+  const navBox = document.querySelector(".prog-days-nav");
+  const tools = document.querySelector("[data-programme-tools]");
+  const input = document.querySelector("[data-programme-query]");
+  const filters = [...document.querySelectorAll("[data-programme-filter]")];
+  const empty = document.querySelector("[data-programme-empty]");
+  const status = document.querySelector("[data-programme-status]");
+  const nowButton = document.querySelector("[data-programme-now]");
+  const nowLabel = document.querySelector("[data-programme-now-label]");
+  const compact = (value) => value.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ");
+  let kind = "all";
+
+  const applyFilters = () => {
+    const terms = compact(input.value).split(" ").filter(Boolean);
+    let shown = 0;
+    timetable.querySelectorAll(".prog-day").forEach((day) => {
+      let dayShown = 0;
+      day.querySelectorAll(".prog-item").forEach((entry) => {
+        const isBreak = entry.dataset.kind === "break";
+        /* Breaks frame the full day; a filter or search shows only what matched. */
+        const match = isBreak
+          ? kind === "all" && !terms.length
+          : (kind === "all" || entry.dataset.kind === kind) && terms.every((t) => compact(entry.textContent).includes(t));
+        entry.hidden = !match;
+        if (match && !isBreak) dayShown += 1;
+      });
+      day.hidden = dayShown === 0;
+      shown += dayShown;
+    });
+    const filtered = kind !== "all" || terms.length;
+    empty.hidden = shown > 0;
+    empty.querySelector("[data-programme-empty-query]").textContent = terms.length ? `“${input.value.trim()}”` : "this filter";
+    status.textContent = filtered ? `${shown} ${shown === 1 ? "session" : "sessions"} shown` : "";
+  };
+  const setKind = (value) => {
+    kind = value;
+    filters.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.programmeFilter === value)));
+    applyFilters();
+  };
+  filters.forEach((b) => b.addEventListener("click", () => setKind(b.dataset.programmeFilter)));
+  input.addEventListener("input", applyFilters);
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !input.value) return;
+    event.preventDefault();
+    input.value = "";
+    applyFilters();
+  });
+  empty.querySelector("[data-programme-clear]").addEventListener("click", () => {
+    input.value = "";
+    setKind("all");
+    input.focus();
+  });
+  tools.hidden = false;
+
+  /* The day being read is marked in the bar. */
+  let dayObserver;
+  const watchDays = () => {
+    dayObserver?.disconnect();
+    const links = new Map([...navBox.querySelectorAll(".prog-daylink")].map((a) => [a.getAttribute("href").slice(1), a]));
+    dayObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          links.forEach((a, id) => (id === entry.target.id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));
+        }
+      },
+      { rootMargin: "-45% 0px -50% 0px" },
+    );
+    timetable.querySelectorAll(".prog-day").forEach((day) => dayObserver.observe(day));
+  };
+
+  /* During the conclave: mark the sessions under way, dim those that ended,
+     and offer a jump to the one on now (or next). */
+  let target = null;
+  const markNow = () => {
+    const now = Date.now();
+    let live = null, next = null;
+    timetable.querySelectorAll(".prog-item[data-start]").forEach((entry) => {
+      const start = Date.parse(entry.dataset.start), end = Date.parse(entry.dataset.end);
+      const isLive = start <= now && now < end;
+      entry.classList.toggle("is-live", isLive);
+      entry.classList.toggle("is-past", end <= now);
+      entry.querySelector(".prog-live")?.toggleAttribute("hidden", !isLive);
+      if (entry.dataset.kind === "break") return;
+      if (isLive && !live) live = entry;
+      if (start > now && (!next || start < Date.parse(next.dataset.start))) next = entry;
+    });
+    const days = [...timetable.querySelectorAll(".prog-item[data-start]")].map((e) => e.dataset.start.slice(0, 10));
+    const today = isoIST(new Date(now + IST_OFFSET)).slice(0, 10);
+    target = live || (days.includes(today) ? next : null);
+    nowButton.hidden = !target;
+    if (target) nowLabel.textContent = `${live ? "On now" : "Up next"}: ${target.querySelector(".prog-title").textContent}`;
+  };
+  nowButton.addEventListener("click", () => {
+    if (!target) return;
+    if (target.hidden) {
+      input.value = "";
+      setKind("all");
+    }
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    target.querySelector("a, summary")?.focus({ preventScroll: true });
+  });
+
+  const setup = () => {
+    watchDays();
+    markNow();
+    applyFilters();
+  };
+  setup();
+  setInterval(markNow, 30000);
+  /* Printing shows every running order. */
+  window.addEventListener("beforeprint", () => timetable.querySelectorAll(".prog-order").forEach((d) => (d.open = true)));
+
+  /* A newer programme than the deploy's is rendered in place, keeping the
+     reader's filter, search and open running orders. */
+  const api = "https://reg.bioconnect.kerala.gov.in/api/v1/public";
+  const refreshProgramme = async () => {
+    let guide, speakers;
+    try {
+      const response = await fetch(`${api}/event-guide?include=breaks`, { credentials: "omit" });
+      if (!response.ok) return;
+      guide = await response.json();
+      if (!Array.isArray(guide?.sessions) || !guide.sessions.length || String(guide.revision) === timetable.dataset.programmeRevision) return;
+      const people = await fetch(`${api}/speakers`, { credentials: "omit" });
+      speakers = people.ok ? (await people.json()).speakers || [] : [];
+    } catch {
+      return;
+    }
+    /* Portraits already on the page are the site's own files; others come from the API. */
+    const portraits = new Map(speakers.filter((s) => s.image_url).map((s) => [s.id, s.image_url]));
+    timetable.querySelectorAll("[data-speaker-id] img").forEach((img) => portraits.set(img.closest("[data-speaker-id]").dataset.speakerId, img.getAttribute("src")));
+    const open = new Set([...timetable.querySelectorAll(".prog-order[open]")].map((d) => d.closest(".prog-item").id));
+    const sessions = guide.sessions.map((s) => ({ kind: "", label: "", track: "", description: "", location: "", starts_at: "", ends_at: "", ...s, people: s.people || [], segments: s.segments || [] }));
+    const { list, nav } = renderProgramme(sessions, portraits);
+    timetable.innerHTML = list;
+    navBox.innerHTML = nav;
+    open.forEach((id) => document.getElementById(id)?.querySelector(".prog-order")?.setAttribute("open", ""));
+    timetable.dataset.programmeRevision = String(guide.revision);
+    setup();
+  };
+  const whenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 1));
+  if (document.readyState === "complete") whenIdle(refreshProgramme);
+  else window.addEventListener("load", () => whenIdle(refreshProgramme), { once: true });
 }
