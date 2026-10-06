@@ -26,8 +26,8 @@ const mobileMenus = [
 // Keys and the app's built-in wording. Leave a field blank to keep the default.
 const mobileCopy = [
   ['Home', [['home.eyebrow', 'YOUR CONCLAVE COMPANION'], ['home.title', 'Make the most\nof Bio Connect.'], ['home.button', 'View sessions'], ['home.glance', 'Your event, at a glance.'],
-    ['home.notice_title', 'Announcement title (blank shows the session count)'], ['home.notice_message', 'Announcement message']]],
-  ['Sessions', [['sessions.eyebrow', 'THE PROGRAMME'], ['sessions.title', 'Find your next\nconversation.'], ['sessions.intro', 'Sessions, speakers and places to be. All times are in IST.']]],
+    ['home.notice_title', 'Announcement title (the card shows only while set)'], ['home.notice_message', 'Announcement message']]],
+  ['Sessions', [['sessions.eyebrow', 'THE PROGRAMME'], ['sessions.title', 'Find your next\nconversation.'], ['sessions.intro', 'Sessions, speakers and places to be.']]],
   ['Speakers', [['speakers.eyebrow', 'CONCLAVE SPEAKERS'], ['speakers.title', 'The voices\ntaking the stage.']]],
   ['Guide tab', [['guide.eyebrow', 'YOUR EVENT GUIDE'], ['guide.title', 'Everything in\none place.']]],
   ['Venue & help', [['venue.eyebrow', 'GETTING HERE'], ['venue.directions', 'Open directions'], ['help.title', 'Need a hand?']]],

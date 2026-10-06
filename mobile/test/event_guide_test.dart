@@ -73,7 +73,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Opening discussion'));
     await tester.pumpAndSettle();
-    expect(find.text('Thu 8 Oct\n09:00 - 10:00 IST'), findsOneWidget);
+    expect(find.text('Thu 8 Oct\n09:00 - 10:00'), findsOneWidget);
     expect(find.text('Dr Test'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();

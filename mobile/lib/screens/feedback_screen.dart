@@ -108,7 +108,7 @@ class _SessionRating extends StatelessWidget {
                   if (session.startsAt case final start?) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${sessionDay(start)} · ${sessionTime(start)} IST',
+                      '${sessionDay(start)} · ${sessionTime(start)}',
                       style: const TextStyle(color: muted, fontSize: 11),
                     ),
                   ],
@@ -152,7 +152,7 @@ Future<void> rateSession(
         title: session.title,
         subtitle: session.startsAt == null
             ? session.location
-            : '${sessionDay(session.startsAt!)} · ${sessionTime(session.startsAt!)} IST',
+            : '${sessionDay(session.startsAt!)} · ${sessionTime(session.startsAt!)}',
         answer: context.read<FeedbackBook>().answer(session.id),
         closeOnSend: true,
       ),

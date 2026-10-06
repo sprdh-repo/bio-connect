@@ -1274,7 +1274,7 @@ class SpeakerDetailScreen extends StatelessWidget {
                       s.title,
                       [
                         if (s.startsAt case final start?)
-                          '${sessionDay(start)} · ${sessionTime(start)} IST',
+                          '${sessionDay(start)} · ${sessionTime(start)}',
                         if (s.location.isNotEmpty) s.location,
                       ].join('\n'),
                       () => showGuidePage(context, SessionDetailScreen(s.id)),

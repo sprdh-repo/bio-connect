@@ -135,10 +135,10 @@ class SaveButton extends StatelessWidget {
         );
 }
 
-/// "09:30 - 10:15 IST", or the start alone when the end is unknown.
+/// "09:30 - 10:15", or the start alone when the end is unknown.
 String sessionSpan(GuideSession s) => s.startsAt == null
     ? ''
-    : '${sessionTime(s.startsAt!)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST';
+    : '${sessionTime(s.startsAt!)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'}';
 
 /// "in 25 min", "in 2 h 5 min" or "tomorrow" until [at].
 String startsIn(DateTime at, DateTime now) {

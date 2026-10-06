@@ -40,7 +40,6 @@ class AttendeeHomeScreen extends StatelessWidget {
     ];
     final noticeTitle = content.override('home.notice_title');
     final noticeMessage = content.override('home.notice_message');
-    final count = content.guide.sessions.length;
     return LiveRefresh(
       onRefresh: context.read<ContentProvider>().load,
       child: ListView(
@@ -85,7 +84,7 @@ class AttendeeHomeScreen extends StatelessWidget {
                     IconText(Icons.place_outlined, content.event.venue),
                   ],
                   if (visibleTabs(content).any((t) => t.key == 'sessions') ||
-                      count > 0) ...[
+                      content.guide.sessions.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     FilledButton.icon(
                       onPressed: () =>
@@ -162,19 +161,12 @@ class AttendeeHomeScreen extends StatelessWidget {
               child: SelfieFramePromo(content, frame),
             ),
           ],
-          // Staff announcements take the place of the programme summary.
+          // Shown only while staff have an announcement up.
           if (noticeTitle != null || noticeMessage != null) ...[
             const SizedBox(height: 24),
             GuideNotice(
               title: noticeTitle ?? '',
               message: noticeMessage ?? '',
-              icon: Icons.campaign_outlined,
-            ),
-          ] else if (count > 0) ...[
-            const SizedBox(height: 24),
-            GuideNotice(
-              title: '$count ${count == 1 ? 'session' : 'sessions'} to explore',
-              message: 'Browse the published programme, with timings shown in India time (IST).',
               icon: Icons.campaign_outlined,
             ),
           ],
@@ -545,7 +537,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           Text(
             content.text(
               'sessions.intro',
-              'Sessions, speakers and places to be. All times are in IST.',
+              'Sessions, speakers and places to be.',
             ),
             style: const TextStyle(color: muted),
           ),
@@ -1096,7 +1088,7 @@ class SessionDetailScreen extends StatelessWidget {
                       if (s.startsAt case final start?)
                         _DetailBlock(
                           'When',
-                          '${sessionDayLabel(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
+                          '${sessionDayLabel(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'}',
                           icon: Icons.schedule_rounded,
                         ),
                       if (s.location.isNotEmpty)

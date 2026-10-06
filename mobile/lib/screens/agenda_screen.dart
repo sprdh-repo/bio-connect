@@ -358,8 +358,7 @@ class AgendaGlance extends StatelessWidget {
                 live: true,
                 session: now,
                 detail: [
-                  if (now.endsAt case final end?)
-                    'until ${sessionTime(end)} IST',
+                  if (now.endsAt case final end?) 'until ${sessionTime(end)}',
                   if (now.location.isNotEmpty) now.location,
                 ].join(' · '),
               ),
@@ -370,7 +369,7 @@ class AgendaGlance extends StatelessWidget {
                 label: 'UP NEXT',
                 session: next,
                 detail: [
-                  '${sessionTime(next.startsAt!)} IST, ${startsIn(next.startsAt!, at)}',
+                  '${sessionTime(next.startsAt!)}, ${startsIn(next.startsAt!, at)}',
                   if (next.location.isNotEmpty) next.location,
                 ].join(' · '),
               ),

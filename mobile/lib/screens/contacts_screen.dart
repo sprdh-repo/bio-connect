@@ -555,7 +555,7 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                 DetailFact(
                   Icons.schedule_rounded,
                   'Saved',
-                  '${sessionDay(c.savedAt)} · ${sessionTime(c.savedAt)} IST',
+                  '${sessionDay(c.savedAt)} · ${sessionTime(c.savedAt)}',
                 ),
               ],
             ),

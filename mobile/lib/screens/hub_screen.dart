@@ -138,7 +138,7 @@ class AfterEventScreen extends StatelessWidget {
                   s.title,
                   [
                     if (s.startsAt case final start?)
-                      '${sessionDay(start)} · ${sessionTime(start)} IST',
+                      '${sessionDay(start)} · ${sessionTime(start)}',
                     if (feedback.answer(s.id) case final a?)
                       'You rated it ${a.rating} of 5',
                   ].join('\n'),

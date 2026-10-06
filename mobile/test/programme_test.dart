@@ -197,6 +197,11 @@ void main() {
       );
 
       // A panellist's designation finds their panel; breaks drop out of a search.
+      await tester.scrollUntilVisible(
+        find.byType(TextField),
+        -200,
+        scrollable: find.byType(Scrollable).hitTestable().first,
+      );
       await tester.enterText(find.byType(TextField), 'tcs');
       await tester.pumpAndSettle();
       expect(find.text('Digital Innovation'), findsOneWidget);
