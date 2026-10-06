@@ -485,10 +485,66 @@ func normalizeGuide(g *eventGuide) {
 		g.Venue.Hidden = []string{}
 	}
 	for i := range g.Sessions {
-		if g.Sessions[i].SpeakerIDs == nil {
-			g.Sessions[i].SpeakerIDs = []string{}
+		s := &g.Sessions[i]
+		if s.People == nil {
+			s.People = []guidePerson{}
+		}
+		if s.Segments == nil {
+			s.Segments = []guideSegment{}
+		}
+		for j := range s.Segments {
+			if s.Segments[j].People == nil {
+				s.Segments[j].People = []guidePerson{}
+			}
+		}
+		if len(s.People) > 0 || len(s.Segments) > 0 {
+			s.Speakers, s.SpeakerIDs = s.legacySpeakers()
+		}
+		if s.SpeakerIDs == nil {
+			s.SpeakerIDs = []string{}
 		}
 	}
+}
+
+// legacySpeakers renders People and Segments for app versions that predate
+// them: the text they show under "Speakers", and every linked speaker.
+func (s guideSession) legacySpeakers() (string, []string) {
+	var lines []string
+	ids := []string{}
+	person := func(p guidePerson) string {
+		if p.SpeakerID != "" && !slices.Contains(ids, p.SpeakerID) {
+			ids = append(ids, p.SpeakerID)
+		}
+		line := p.Name
+		if p.Designation != "" {
+			line += ", " + p.Designation
+		}
+		switch p.Role {
+		case "moderator":
+			return "Moderator: " + line
+		case "host":
+			return "Host: " + line
+		}
+		return line
+	}
+	for _, p := range s.People {
+		lines = append(lines, person(p))
+	}
+	for _, seg := range s.Segments {
+		head := seg.Title
+		if t, err := time.Parse(time.RFC3339, seg.StartsAt); err == nil {
+			head = t.In(indiaTime).Format("15:04") + " " + head
+		}
+		var names []string
+		for _, p := range seg.People {
+			names = append(names, person(p))
+		}
+		if len(names) > 0 {
+			head += ": " + strings.Join(names, "; ")
+		}
+		lines = append(lines, head)
+	}
+	return strings.Join(lines, "\n"), ids
 }
 
 type queryer interface {
@@ -696,7 +752,7 @@ func (a *App) publicAppContent(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "app content unavailable; please retry")
 		return
 	}
-	if doc["event_guide"], err = toJSONMap(guide.public()); err != nil {
+	if doc["event_guide"], err = toJSONMap(guide.public(r.URL.Query().Get("include") == "breaks")); err != nil {
 		fail(w, http.StatusServiceUnavailable, "event guide unavailable; please retry")
 		return
 	}

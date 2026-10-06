@@ -241,3 +241,92 @@ func TestFeedback(t *testing.T) {
 		t.Fatalf("csv: %d %s", rr.Code, body)
 	}
 }
+
+// Breaks reach only clients that ask for them, so released app versions
+// never offer to save or rate a tea break; those versions read the derived
+// speakers line instead of the structured people.
+func TestProgrammeBreaksAndPeopleInPublicContent(t *testing.T) {
+	a := mustApp(t)
+	request := staffRequester(t, a, "programme@example.com", "reviewer")
+	const path = "/api/v1/admin/mobile-content"
+	rr := request("GET", path, nil)
+	var m mobileEditor
+	if err := json.Unmarshal(rr.Body.Bytes(), &m); err != nil {
+		t.Fatal(err)
+	}
+	speaker := m.Speakers[0].ID
+	m.Guide.Sessions = []guideSession{
+		{ID: "tea", Kind: "break", Title: "Tea Break", StartsAt: "2026-10-08T11:40:00+05:30", EndsAt: "2026-10-08T11:50:00+05:30", Published: true},
+		{ID: "panel-1", Kind: "panel", Label: "Panel Discussion 1", Title: "Digital Innovation", Published: true, People: []guidePerson{
+			{Name: "Dr. Moderator", Designation: "Head, Data", Role: "moderator"},
+			{Name: "Linked Panelist", Role: "panelist", SpeakerID: speaker},
+		}},
+	}
+	unknown := m
+	unknown.Guide.Sessions = []guideSession{{ID: "k", Title: "K", Published: true, People: []guidePerson{{Name: "N", SpeakerID: "nobody-here"}}}}
+	if rr := request("PUT", path, unknown); rr.Code != 400 || !strings.Contains(rr.Body.String(), "not in the speaker list") {
+		t.Fatalf("unknown person link accepted: %d %s", rr.Code, rr.Body.String())
+	}
+	if rr := request("PUT", path, m); rr.Code != 200 {
+		t.Fatalf("save: %d %s", rr.Code, rr.Body.String())
+	}
+
+	sessions := func(url string) []map[string]any {
+		rr := httptest.NewRecorder()
+		a.Handler().ServeHTTP(rr, httptest.NewRequest("GET", url, nil))
+		var doc struct {
+			Sessions   []map[string]any `json:"sessions"`
+			EventGuide struct {
+				Sessions []map[string]any `json:"sessions"`
+			} `json:"event_guide"`
+		}
+		if rr.Code != 200 || json.Unmarshal(rr.Body.Bytes(), &doc) != nil {
+			t.Fatalf("%s: %d %s", url, rr.Code, rr.Body.String())
+		}
+		return append(doc.Sessions, doc.EventGuide.Sessions...)
+	}
+	for _, url := range []string{"/api/v1/public/app-content", "/api/v1/public/event-guide"} {
+		old := sessions(url)
+		if len(old) != 1 || old[0]["id"] != "panel-1" {
+			t.Fatalf("%s: break shown to released apps: %v", url, old)
+		}
+		if old[0]["speakers"] != "Moderator: Dr. Moderator, Head, Data\nLinked Panelist" {
+			t.Fatalf("%s: derived speakers line: %q", url, old[0]["speakers"])
+		}
+		if ids, _ := old[0]["speaker_ids"].([]any); len(ids) != 1 || ids[0] != speaker {
+			t.Fatalf("%s: derived speaker IDs: %v", url, old[0]["speaker_ids"])
+		}
+		if all := sessions(url + "?include=breaks"); len(all) != 2 || all[0]["kind"] != "break" {
+			t.Fatalf("%s: breaks missing for new clients: %v", url, all)
+		}
+	}
+}
+
+// The seeded programme must survive a save from the editor unchanged.
+func TestSeededProgrammeIsValid(t *testing.T) {
+	a := mustApp(t)
+	request := staffRequester(t, a, "seed@example.com", "reviewer")
+	rr := request("GET", "/api/v1/admin/mobile-content", nil)
+	var m mobileEditor
+	if err := json.Unmarshal(rr.Body.Bytes(), &m); err != nil {
+		t.Fatal(err)
+	}
+	breaks := 0
+	for _, s := range m.Guide.Sessions {
+		if s.Kind == "break" {
+			breaks++
+		}
+	}
+	if len(m.Guide.Sessions) != 35 || breaks != 7 {
+		t.Fatalf("seeded %d sessions with %d breaks", len(m.Guide.Sessions), breaks)
+	}
+	if err := m.Guide.validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := linkedSpeakers(m.Guide, m.Speakers); err != nil {
+		t.Fatal(err)
+	}
+	if rr := request("PUT", "/api/v1/admin/mobile-content", m); rr.Code != 200 {
+		t.Fatalf("save: %d %s", rr.Code, rr.Body.String())
+	}
+}

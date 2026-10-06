@@ -66,7 +66,7 @@ func (a *App) publicFeedback(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		found := false
-		for _, s := range guide.public().Sessions {
+		for _, s := range guide.public(false).Sessions {
 			found = found || s.ID == in.SessionID
 		}
 		if !found {

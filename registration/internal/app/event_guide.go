@@ -5,23 +5,57 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 )
 
+// A programme entry. Kind sets how it is shown: a break is a divider in the
+// timetable that attendees cannot save, rate or be reminded of.
 type guideSession struct {
 	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	Label       string `json:"label"`
 	Title       string `json:"title"`
+	Track       string `json:"track"`
 	Description string `json:"description"`
 	StartsAt    string `json:"starts_at"`
 	EndsAt      string `json:"ends_at"`
 	Location    string `json:"location"`
-	Speakers    string `json:"speakers"`
-	// SpeakerIDs links the session to the speaker directory, so the app can
-	// list a speaker's sessions and plan a day around saved speakers.
+	// People are listed as printed in the programme, each with the
+	// designation for this session and, optionally, a directory link.
+	People []guidePerson `json:"people"`
+	// Segments are a ceremony's running order.
+	Segments []guideSegment `json:"segments"`
+	// Speakers and SpeakerIDs are derived from People and Segments. Released
+	// app versions show Speakers as text and use SpeakerIDs to list a
+	// speaker's sessions.
+	Speakers   string   `json:"speakers"`
 	SpeakerIDs []string `json:"speaker_ids"`
 	Published  bool     `json:"published"`
 }
+type guidePerson struct {
+	Name        string `json:"name"`
+	Designation string `json:"designation"`
+	Role        string `json:"role"`
+	SpeakerID   string `json:"speaker_id"`
+}
+type guideSegment struct {
+	StartsAt    string        `json:"starts_at"`
+	EndsAt      string        `json:"ends_at"`
+	Title       string        `json:"title"`
+	Description string        `json:"description"`
+	People      []guidePerson `json:"people"`
+}
+
+// indiaTime formats programme times; the event is in India, with no DST.
+var indiaTime = time.FixedZone("IST", 330*60)
+
+var (
+	sessionKinds = []string{"", "talk", "panel", "ceremony", "social", "break"}
+	personRoles  = []string{"", "moderator", "panelist", "host"}
+)
+
 type guideActivity struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
@@ -56,10 +90,13 @@ type eventGuide struct {
 	Venue      guideVenue      `json:"venue"`
 }
 
-func (g eventGuide) public() eventGuide {
+// public is what attendees see. Breaks are left out unless withBreaks:
+// app versions released before breaks existed would offer to save and rate
+// them, so only clients that ask for breaks get them.
+func (g eventGuide) public(withBreaks bool) eventGuide {
 	out := eventGuide{Revision: g.Revision, Sessions: []guideSession{}, Activities: []guideActivity{}, FAQs: []guideFAQ{}}
 	for _, item := range g.Sessions {
-		if item.Published {
+		if item.Published && (withBreaks || item.Kind != "break") {
 			out.Sessions = append(out.Sessions, item)
 		}
 	}
@@ -102,17 +139,33 @@ func (g eventGuide) validate() error {
 		if err := check("session", s.ID, s.Title, s.Description, s.Location, s.Speakers); err != nil {
 			return err
 		}
-		if (s.StartsAt == "") != (s.EndsAt == "") {
-			return fmt.Errorf("provide both session start and end, or leave both blank")
+		if !slices.Contains(sessionKinds, s.Kind) {
+			return fmt.Errorf("session %q has an unknown type", s.Title)
 		}
-		if len(s.SpeakerIDs) > 30 {
+		if len(s.Label) > 120 || len(s.Track) > 120 {
+			return fmt.Errorf("session %q label and track are limited to 120 characters", s.Title)
+		}
+		if err := sessionTimes(s.Title, s.StartsAt, s.EndsAt); err != nil {
+			return err
+		}
+		if len(s.SpeakerIDs) > 60 {
 			return fmt.Errorf("session %q links too many speakers", s.Title)
 		}
-		if s.StartsAt != "" {
-			start, e1 := time.Parse(time.RFC3339, s.StartsAt)
-			end, e2 := time.Parse(time.RFC3339, s.EndsAt)
-			if e1 != nil || e2 != nil || !end.After(start) {
-				return fmt.Errorf("session times need timezone offsets and an end after the start")
+		if err := checkPeople(s.Title, s.People); err != nil {
+			return err
+		}
+		if len(s.Segments) > 40 {
+			return fmt.Errorf("session %q has too many running-order items", s.Title)
+		}
+		for _, seg := range s.Segments {
+			if strings.TrimSpace(seg.Title) == "" || len(seg.Title) > 300 || len(seg.Description) > 2000 {
+				return fmt.Errorf("every running-order item in %q needs a title (maximum 300 characters)", s.Title)
+			}
+			if err := sessionTimes(s.Title+": "+seg.Title, seg.StartsAt, seg.EndsAt); err != nil {
+				return err
+			}
+			if err := checkPeople(s.Title, seg.People); err != nil {
+				return err
 			}
 		}
 	}
@@ -150,6 +203,37 @@ func (g eventGuide) validate() error {
 	return checkHidden("venue", v.Hidden, venueHideable)
 }
 
+// sessionTimes accepts both times or neither, with offsets and in order.
+func sessionTimes(title, startsAt, endsAt string) error {
+	if (startsAt == "") != (endsAt == "") {
+		return fmt.Errorf("%q: provide both start and end, or leave both blank", title)
+	}
+	if startsAt == "" {
+		return nil
+	}
+	start, e1 := time.Parse(time.RFC3339, startsAt)
+	end, e2 := time.Parse(time.RFC3339, endsAt)
+	if e1 != nil || e2 != nil || !end.After(start) {
+		return fmt.Errorf("%q: times need timezone offsets and an end after the start", title)
+	}
+	return nil
+}
+
+func checkPeople(title string, people []guidePerson) error {
+	if len(people) > 30 {
+		return fmt.Errorf("session %q lists too many people", title)
+	}
+	for _, p := range people {
+		if strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 || len(p.Designation) > 600 {
+			return fmt.Errorf("every person in %q needs a name (maximum 200 characters)", title)
+		}
+		if !slices.Contains(personRoles, p.Role) {
+			return fmt.Errorf("%s in %q has an unknown role", p.Name, title)
+		}
+	}
+	return nil
+}
+
 var venueHideable = []string{"address", "arrival", "accessibility", "floor_plan_url", "help_email", "help_phone", "help_whatsapp"}
 
 // helpPhone accepts a blank value or a loosely formatted contact number.
@@ -181,7 +265,7 @@ func (a *App) publicEventGuide(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "event guide unavailable; please retry")
 		return
 	}
-	out, err := toJSONMap(g.public())
+	out, err := toJSONMap(g.public(r.URL.Query().Get("include") == "breaks"))
 	if err != nil {
 		fail(w, 503, "event guide unavailable; please retry")
 		return
