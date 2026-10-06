@@ -457,6 +457,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		a.freeLinksAPI(w, r, p, path)
 		return
 	}
+	if path == "speakers" || strings.HasPrefix(path, "speakers/") {
+		a.speakersAPI(w, r, p.ID, path)
+		return
+	}
 	switch {
 	case path == "registrations" && r.Method == "GET":
 		where, args, e := filter(r)

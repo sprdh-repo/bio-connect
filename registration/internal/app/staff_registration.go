@@ -31,6 +31,21 @@ type StaffRegistrationInput struct {
 // passes, and treats the logo as optional. Nothing is emailed unless Send is
 // set: there is no registration email, because nothing is left to pay.
 func (a *App) StaffCreate(ctx context.Context, in StaffRegistrationInput, key string, logo []byte, staff string) (string, error) {
+	tx, e := a.DB.Begin(ctx)
+	if e != nil {
+		return "", e
+	}
+	defer tx.Rollback(ctx)
+	rid, e := a.staffCreate(ctx, tx, in, key, logo, staff)
+	if e != nil {
+		return "", e
+	}
+	return rid, tx.Commit(ctx)
+}
+
+// staffCreate is StaffCreate inside the caller's transaction, so a caller can
+// record what the registration is for (a speaker's pass) atomically with it.
+func (a *App) staffCreate(ctx context.Context, tx pgx.Tx, in StaffRegistrationInput, key string, logo []byte, staff string) (string, error) {
 	if len(key) < 32 || len(key) > 128 {
 		return "", errors.New("a 32-128 character Idempotency-Key is required")
 	}
@@ -44,11 +59,7 @@ func (a *App) StaffCreate(ctx context.Context, in StaffRegistrationInput, key st
 	if in.Payment == "complimentary" && in.CouponCode != "" {
 		return "", errors.New("a coupon cannot be combined with a complimentary registration")
 	}
-	tx, e := a.DB.Begin(ctx)
-	if e != nil {
-		return "", e
-	}
-	defer tx.Rollback(ctx)
+	var e error
 	// Serialize retries, including requests that arrive before the first insert commits.
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", hash(key)); e != nil {
 		return "", e
@@ -70,7 +81,7 @@ func (a *App) StaffCreate(ctx context.Context, in StaffRegistrationInput, key st
 		if oldHash != rh {
 			return "", errors.New("this submission key was already used for different details")
 		}
-		return old, tx.Commit(ctx)
+		return old, nil
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
 		return "", e
@@ -160,5 +171,5 @@ func (a *App) StaffCreate(ctx context.Context, in StaffRegistrationInput, key st
 	if e = audit(ctx, tx, staff, rid, "staff_registered", detail); e != nil {
 		return "", e
 	}
-	return rid, tx.Commit(ctx)
+	return rid, nil
 }

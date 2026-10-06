@@ -235,6 +235,50 @@ main:has(.admin-page) > .eyebrow { display: none; }
 .mc-comment p { margin: 0 0 6px; white-space: pre-wrap; }
 .mc-comment footer { color: var(--muted); font-size: 12px; }
 
+/* ---- speakers ---- */
+.speaker-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; margin: 22px 0 14px; }
+.speaker-toolbar .admin-search { flex: 1 1 320px; max-width: 480px; }
+.speaker-toolbar .admin-result-count { margin: 0 0 10px; }
+.speaker-list { margin: 0; padding: 0; list-style: none; background: white; border: 1px solid var(--line); border-radius: 10px; }
+.speaker-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.25fr) 116px 210px; align-items: center; gap: 16px; padding: 12px 18px; transition: background 1.2s; }
+.speaker-row + .speaker-row { border-top: 1px solid rgba(16, 32, 27, 0.07); }
+.speaker-row.is-updated { background: #f4f9ea; }
+.speaker-avatar { display: grid; place-items: center; width: 40px; height: 40px; color: var(--forest); background: #eef4e0; border-radius: 50%; font-family: var(--display); font-size: 13px; font-weight: 700; }
+.speaker-who { min-width: 0; line-height: 1.35; }
+.speaker-who strong, .speaker-who > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.speaker-who strong { font-size: 14px; }
+.speaker-who > span { color: var(--muted); font-size: 12px; }
+.speaker-who .speaker-flag { display: inline-block; margin-top: 3px; padding: 1px 7px; color: #75500d; background: #fbf1dc; border-radius: 999px; font-size: 10px; font-weight: 700; }
+.speaker-contact { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.speaker-contact input { margin: 0; padding: 8px 10px; font-size: 13px; border-color: var(--line); }
+.speaker-contact input:hover { border-color: #7d8f85; }
+.speaker-contact input:focus { border-color: var(--forest); }
+.speaker-contact button { min-height: 36px; padding: 0 12px; font-size: 11px; }
+.speaker-state { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.speaker-state small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.speaker-pill { display: inline-block; padding: 4px 8px; border: 1px solid transparent; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.2; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.speaker-pill-muted { color: var(--muted); background: var(--cream); }
+.speaker-pill-pending { color: #75500d; background: #fbf1dc; border-color: #efd59f; }
+.speaker-pill-sent { color: #285b25; background: #eaf4df; border-color: #c9dfb6; }
+.speaker-pill-failed, .speaker-pill-cancelled { color: var(--danger); background: #fdecea; border-color: #efc4be; }
+.speaker-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; }
+.speaker-actions button, .speaker-actions .button { min-height: 34px; padding: 0 12px; font-size: 11px; }
+.speaker-actions .quiet { padding: 0 8px; }
+.speaker-open { font-family: var(--sans); font-size: 12px !important; letter-spacing: 0; text-transform: none; }
+.speaker-list .admin-empty { display: block; }
+.speaker-list .skeleton { margin: 6px 0; }
+@media (max-width: 1060px) {
+  .speaker-row { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px 12px; }
+  .speaker-contact { grid-column: 2 / -1; }
+  .speaker-state { grid-column: 3; grid-row: 1; align-items: flex-end; }
+  .speaker-actions { grid-column: 2 / -1; justify-content: flex-start; }
+  .speaker-actions:empty { display: none; }
+}
+@media (max-width: 520px) {
+  .speaker-row { padding: 12px 14px; }
+  .speaker-contact, .speaker-actions { grid-column: 1 / -1; }
+}
+
 .admin-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
 .summary-group { padding: 16px 18px 14px; background: white; border: 1px solid var(--line); border-radius: 10px; }
 .summary-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }

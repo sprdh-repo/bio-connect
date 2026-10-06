@@ -29,7 +29,7 @@ func TestRenderedPassVariants(t *testing.T) {
 		{"faculty", "FACULTY"}, {"industry", "INDUSTRY"},
 		{"startup", "STARTUP"}, {"student", "STUDENT"},
 		{"official", "OFFICIAL"}, {"organiser", "ORGANISER"}, {"sponsor", "SPONSOR"},
-		{"volunteer", "VOLUNTEER"},
+		{"volunteer", "VOLUNTEER"}, {"speaker", "SPEAKER"},
 	} {
 		t.Run(sample.category, func(t *testing.T) {
 			data, err := renderPass(name, organisation, role, sample.category, "", number, qr)
