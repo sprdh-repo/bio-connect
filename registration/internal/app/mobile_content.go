@@ -158,7 +158,7 @@ type adminSpeaker struct {
 var (
 	menuNames        = []string{"tabs", "home_shortcuts", "home_links", "guide"}
 	tabDestinations  = []string{"sessions", "speakers", "agenda"}
-	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "moments", "agenda", "contacts", "feedback", "hub", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
+	menuDestinations = []string{"sessions", "speakers", "venue", "activities", "faqs", "exhibitors", "moments", "selfie_frame", "agenda", "contacts", "feedback", "hub", "my_passes", "registration", "brochure", "product_launch", "sponsors", "leadership", "explore", "privacy", "link"}
 	// Old app builds parse these, so they can never be withheld.
 	eventHideable      = []string{"tagline", "hero_title", "description", "venue", "city", "brochure_url", "sponsorship_email", "privacy_url"}
 	launchHideable     = []string{"eyebrow", "title", "description", "deadline", "eligibility", "focus_areas", "apply_url"}

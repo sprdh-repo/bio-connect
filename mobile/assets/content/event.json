@@ -821,9 +821,21 @@
         "subtitle": "Find and save your event photos",
         "title": "Moments album",
         "url": ""
+      },
+      {
+        "key": "selfie_frame",
+        "subtitle": "Share that you are at Bio Connect",
+        "title": "Selfie frame",
+        "url": ""
       }
     ],
     "home_links": [
+      {
+        "key": "selfie_frame",
+        "subtitle": "Share that you are at Bio Connect",
+        "title": "Selfie frame",
+        "url": ""
+      },
       {
         "key": "sponsors",
         "subtitle": "",

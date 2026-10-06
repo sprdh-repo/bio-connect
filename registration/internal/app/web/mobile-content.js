@@ -13,7 +13,7 @@ const mobileDestinations = [
   ['sessions', 'Sessions'], ['speakers', 'Speakers'], ['agenda', 'My agenda'], ['contacts', 'Contacts (badge scanning)'],
   ['feedback', 'Feedback form'], ['hub', 'After the event'], ['venue', 'Venue & directions'], ['activities', 'Activities'],
   ['faqs', 'FAQs'], ['exhibitors', 'Exhibitors'], ['my_passes', 'My passes'], ['registration', 'Registration & passes'],
-  ['moments', 'Moments album'],
+  ['moments', 'Moments album'], ['selfie_frame', 'Selfie frame'],
   ['brochure', 'Event brochure'], ['product_launch', 'Product launch'], ['sponsors', 'Sponsors'], ['leadership', 'Leadership'],
   ['explore', 'Explore Bio Connect'], ['privacy', 'Privacy policy'], ['link', 'Custom link (web, email or phone)']
 ];
@@ -37,6 +37,7 @@ const mobileCopy = [
   ['Sponsors', [['sponsors.eyebrow', 'OUR SPONSORS'], ['sponsors.title', 'Shared purpose.\nGreater possibilities.'], ['sponsors.cta_eyebrow', 'BECOME A SPONSOR'], ['sponsors.cta_title', 'Help make the next\nconnection possible.'], ['sponsors.cta_button', 'Enquire about sponsorship']]],
   ['Leadership', [['leadership.eyebrow', 'GOVERNMENT OF KERALA'], ['leadership.title', 'The people convening\nthe conclave.'], ['leadership.cta_eyebrow', 'WORKING WITH THE ORGANISERS'], ['leadership.cta_title', 'Partner with\nBio Connect 4.0.'], ['leadership.cta_button', 'Contact the event team']]],
   ['Explore', [['explore.eyebrow', 'BIO CONNECT 4.0'], ['explore.title', 'Explore the ideas\nshaping tomorrow.'], ['explore.intro', 'Five themes drive the conversations, showcases and connections at Bio Connect 4.0.'], ['explore.programme_title', 'Built for connection.'], ['explore.programme_intro', 'The event brings science, enterprise and policy together through:']]],
+  ['Selfie frame', [['frame.share_text', 'Message shared with the photo (blank uses the chosen caption, dates and venue)']]],
   ['Registration', [['registration.title', 'Three ways\nto take part.'], ['registration.intro', 'Register for a delegate pass without leaving the app. Exhibition bookings continue on the secure event portal.'], ['registration.sponsorship', 'Sponsorships are arranged with the event team.']]],
   ['My agenda', [['agenda.eyebrow', 'YOUR DAY PLAN'], ['agenda.title', 'Your Bio Connect,\nyour way.']]],
   ['Contacts', [['contacts.eyebrow', 'PEOPLE YOU MET'], ['contacts.title', 'Every conversation,\nin one place.']]],

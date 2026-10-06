@@ -15,3 +15,18 @@ Built-in ImageGen tool, `ui-mockup` use case.
 
 The reference contains illustrative speaker information.
 The app uses the event website's current data instead.
+
+## Selfie frame artwork
+
+Generated with the Codex CLI's built-in image generation, then converted to WebP.
+The app places the photo in the empty areas and draws all text and the logo itself.
+
+> Decorative frame artwork for a social-media selfie frame for Bio Connect 4.0, a biotechnology conclave in Kerala, India.
+> Style: refined, editorial, premium science illustration; thin elegant line art with a subtle soft glow; Kerala botanicals (coconut palm fronds, black pepper vine with berry clusters, cardamom leaves, banana leaf) intertwined with a DNA double helix and a sparse molecular node network.
+> Strictly no text, letters, numbers, logos, people, faces or watermarks. Avoid neon gradients and clutter.
+>
+> `frame-forest`, portrait 1024x1536: deep forest green (#0b3329 fading to #051c17), line art in lime (#b9dc72) and warm gold (#e4ad54).
+> Ornament hugs the left edge, right edge and top corners, framing a plain arch-shaped window in the centre; the bottom 28% stays calm and dark for text.
+>
+> `frame-cream`, portrait 1024x1536: warm cream paper (#f3f1e9) with a faint fine grid, line art in deep forest green and warm gold.
+> Ornament clusters in the top-right and bottom-left corners only; the centre and lower-right stay plain.

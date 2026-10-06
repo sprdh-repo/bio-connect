@@ -97,6 +97,15 @@ void main() {
     expect(EventContent.fromJson(json).sponsors, isEmpty);
   });
 
+  test('the bundled menus offer the selfie frame', () {
+    final content = EventContent.fromJson(bundled());
+    expect(content.menu('home_links').first.key, 'selfie_frame');
+    expect(
+      visibleMenu(content, 'guide').map((e) => e.key),
+      contains('selfie_frame'),
+    );
+  });
+
   test('Moments is offered only for a configured positive album', () {
     final json = bundled();
     json['menus'] = {

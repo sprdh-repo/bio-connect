@@ -124,14 +124,16 @@ func TestMobileContentAPI(t *testing.T) {
 	}
 	// Migration 031 keeps every existing entry visible and seeds the released
 	// menus; 033 adds My agenda and Contacts, and the feedback pages switched
-	// off; 035 takes My agenda off the tabs and reorders Home.
+	// off; 035 takes My agenda off the tabs and reorders Home; 040 adds the
+	// selfie frame after Moments and first in the home links.
 	guide := m.Content.Menus["guide"]
 	if len(m.Speakers) != 56 || m.Speakers[0].ImageURL == "" || len(m.Content.Sponsors) != 9 || !m.Content.Sponsors[0].Published ||
 		len(m.Content.Leadership.Committee.Members) != 14 || !m.Content.Leadership.Committee.Members[0].Published || m.Content.Event.MomentsAlbumID != "" || m.Content.Event.ShowExhibitorRegistration ||
-		len(guide) != 16 || guide[0].Key != "agenda" || !guide[0].Published || guide[13].Key != "moments" ||
-		guide[14].Key != "feedback" || guide[14].Published || guide[15].Key != "hub" ||
+		len(guide) != 17 || guide[0].Key != "agenda" || !guide[0].Published || guide[13].Key != "moments" ||
+		guide[14].Key != "selfie_frame" || !guide[14].Published ||
+		guide[15].Key != "feedback" || guide[15].Published || guide[16].Key != "hub" ||
 		len(m.Content.Menus["tabs"]) != 2 || menuKeys(m.Content.Menus["home_shortcuts"]) != "speakers exhibitors venue agenda contacts moments" ||
-		menuKeys(m.Content.Menus["home_links"]) != "my_passes registration explore sponsors" ||
+		menuKeys(m.Content.Menus["home_links"]) != "selfie_frame my_passes registration explore sponsors" ||
 		m.Content.Feedback.Open || m.Content.Event.PrivacyURL == "" {
 		t.Fatalf("migrated content incomplete: %+v", m.Content.Menus)
 	}

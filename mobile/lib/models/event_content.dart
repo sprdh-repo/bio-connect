@@ -166,6 +166,7 @@ const destinationKeys = {
   'faqs',
   'exhibitors',
   'moments',
+  'selfie_frame',
   'my_passes',
   'registration',
   'brochure',

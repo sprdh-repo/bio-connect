@@ -12,6 +12,7 @@ import '../screens/hub_screen.dart';
 import '../screens/my_passes_screen.dart';
 import '../screens/moments_screen.dart';
 import '../screens/partners_screens.dart';
+import '../screens/selfie_frame_screen.dart';
 
 /// Lets menu entries switch to a bottom tab instead of pushing a page.
 class TabScope extends InheritedWidget {
@@ -39,6 +40,7 @@ const _icons = <String, IconData>{
   'faqs': Icons.help_outline,
   'exhibitors': Icons.storefront_outlined,
   'moments': Icons.photo_library_outlined,
+  'selfie_frame': Icons.add_a_photo_outlined,
   'my_passes': Icons.confirmation_number_outlined,
   'registration': Icons.how_to_reg_outlined,
   'brochure': Icons.article_outlined,
@@ -62,6 +64,7 @@ const _titles = <String, String>{
   'faqs': 'FAQs',
   'exhibitors': 'Exhibitors',
   'moments': 'Moments album',
+  'selfie_frame': 'Selfie frame',
   'my_passes': 'My passes',
   'registration': 'Registration & passes',
   'brochure': 'Event brochure',
@@ -173,6 +176,10 @@ void openDestination(
     'faqs' => const FaqScreen(),
     'exhibitors' => const ExhibitorsScreen(),
     'moments' => const MomentsScreen(),
+    'selfie_frame' => SelfieFrameScreen(
+      content.event,
+      title: entryTitle(entry),
+    ),
     'my_passes' => const MyPassesScreen(),
     'registration' => RegistrationScreen(content.event),
     'product_launch' => const ProductLaunchScreen(),

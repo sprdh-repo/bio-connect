@@ -31,6 +31,8 @@ App IDs and release signing are still placeholders and must be set before store 
 - Native delegate registration with live pass availability, validation and a secure handoff to payment.
 - My passes: email or WhatsApp OTP, optional admission QR scanning, secure saved passes and on-phone admission QR display.
 - Moments: consent-based selfie matching against the organizer's event album, processing updates, a private photo gallery, zoom, save and share.
+- Selfie frame: take a selfie (front or back camera, live inside the frame) or choose a photo, pick a caption ("I'm attending", "See you at", "I'm speaking at", "I'm exhibiting at"), one of three designs and post (1080 x 1350) or story (1080 x 1920) size, then save or share.
+  Pinch to reposition the photo. Staff can replace the shared message with the `frame.share_text` copy key.
 - My agenda: bookmark sessions, speakers and exhibitors; Now and Up next; clash warnings; offline session reminders; add sessions to the phone calendar.
 - Contacts: scan a badge to save someone's event profile, with private notes and tags and CSV or vCard export. Email and phone are shared only when the holder opts in from My passes.
 - Feedback and After Bio Connect: anonymous ratings for the event and sessions while staff keep feedback open, and a follow-up page for after the event.
@@ -72,6 +74,8 @@ The implemented screens use the website's actual content and assets.
 The design system follows the website's forest green, cream, lime and gold palette, with its DM Sans and Manrope fonts.
 
 The exact built-in ImageGen prompt is in `docs/design-prompt.md`.
+The selfie frame artwork (`assets/images/frame-forest.webp`, `assets/images/frame-cream.webp`) is also ImageGen output; its prompt is in the same file.
+The frame's text, logo and layout are drawn by the app, so event details stay accurate and sharp.
 
 ## Verify
 
