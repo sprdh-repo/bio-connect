@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:bio_connect_app/models/event_content.dart';
 import 'package:bio_connect_app/screens/selfie_frame_screen.dart';
 import 'package:bio_connect_app/services/photo_export.dart';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -56,6 +57,27 @@ Future<void> tapAndWait(WidgetTester tester, Finder target) async {
 }
 
 void main() {
+  test('only Android front-camera captures are flipped to match preview', () {
+    expect(
+      mirrorsSelfies(
+        CameraLensDirection.front,
+        platform: TargetPlatform.android,
+      ),
+      isTrue,
+    );
+    expect(
+      mirrorsSelfies(
+        CameraLensDirection.back,
+        platform: TargetPlatform.android,
+      ),
+      isFalse,
+    );
+    expect(
+      mirrorsSelfies(CameraLensDirection.front, platform: TargetPlatform.iOS),
+      isFalse,
+    );
+  });
+
   testWidgets('without a camera, offers the gallery instead', (tester) async {
     await tester.pumpWidget(app(FakeExport()));
     await tester.pump();

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:image_picker/image_picker.dart';
@@ -112,6 +112,10 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
   int _camera = 0;
   CameraController? _controller;
   String? _photo, _cameraError;
+
+  /// Whether the photo is shown flipped, so a selfie keeps the mirrored
+  /// look of the live preview.
+  bool _mirror = false;
   bool _busy = false;
   var _design = FrameDesign.spotlight;
   var _format = FrameFormat.post;
@@ -217,7 +221,10 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
     try {
       final image = await controller.takePicture();
       AppFeedback.success();
-      await _usePhoto(image.path);
+      await _usePhoto(
+        image.path,
+        mirror: mirrorsSelfies(_cameras[_camera].lensDirection),
+      );
     } catch (_) {
       if (mounted) _snack('Could not take the photo. Please try again.');
     } finally {
@@ -248,13 +255,16 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
     return image?.path;
   }
 
-  Future<void> _usePhoto(String path) async {
+  Future<void> _usePhoto(String path, {bool mirror = false}) async {
     if (!mounted) return;
     // Decode before showing, so the frame never exports a blank photo.
     await precacheImage(FileImage(File(path)), context);
     if (!mounted) return;
     _framing.value = Matrix4.identity();
-    setState(() => _photo = path);
+    setState(() {
+      _photo = path;
+      _mirror = mirror;
+    });
     await _stop();
   }
 
@@ -398,7 +408,10 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
         minScale: 1,
         maxScale: 4,
         child: SizedBox.expand(
-          child: Image.file(File(photo), fit: BoxFit.cover),
+          child: Transform.flip(
+            flipX: _mirror,
+            child: Image.file(File(photo), fit: BoxFit.cover),
+          ),
         ),
       );
     }
@@ -585,6 +598,13 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
     );
   }
 }
+
+/// Whether a capture from [lens] must be flipped to match the preview.
+/// Android previews the front camera mirrored but saves it unmirrored; the
+/// iOS plugin sets no photo mirroring, so its captures are left as taken.
+bool mirrorsSelfies(CameraLensDirection lens, {TargetPlatform? platform}) =>
+    lens == CameraLensDirection.front &&
+    (platform ?? defaultTargetPlatform) == TargetPlatform.android;
 
 String shareText(String caption, EventDetails event) {
   final place = event.venue.isEmpty ? '' : ' at ${event.venue}';
