@@ -12,9 +12,10 @@ import (
 
 // Speaker passes. Each speaker in the directory (the mobile content editor's
 // speaker list) can hold one complimentary pass in the staff-only "speaker"
-// category. Saving a speaker's email issues that pass without sending it;
-// staff send it with the ordinary review actions, so delivery, resend,
-// download and the audit trail all behave as for any other registration.
+// category. Staff first save a speaker's contact, which issues nothing; they
+// then issue the pass (not sent), and send it with the ordinary review
+// actions, so delivery, resend, download and the audit trail all behave as
+// for any other registration.
 
 type speakerPassRow struct {
 	ID           string `json:"id"`
@@ -23,6 +24,12 @@ type speakerPassRow struct {
 	Organization string `json:"organization"`
 	ImageURL     string `json:"image_url"`
 	Published    bool   `json:"published"`
+	// Contact is the saved email and phone, null until staff add them.
+	Contact *struct {
+		Email           string `json:"email"`
+		Phone           string `json:"phone"`
+		WhatsAppConsent bool   `json:"whatsapp_consent"`
+	} `json:"contact"`
 	// Registration is null until a pass is issued. A cancelled registration is
 	// still returned so staff can see why the speaker has no pass.
 	Registration *struct {
@@ -66,7 +73,13 @@ func (a *App) speakersAPI(w http.ResponseWriter, r *http.Request, staff, path st
 		if !decode(w, r, &in) {
 			return
 		}
-		rid, e := a.SaveSpeakerContact(r.Context(), parts[1], in.Email, in.Phone, in.WhatsAppConsent, r.Header.Get("Idempotency-Key"), staff)
+		if e := a.SaveSpeakerContact(r.Context(), parts[1], in.Email, in.Phone, in.WhatsAppConsent, staff); e != nil {
+			fail(w, 400, publicError(e))
+			return
+		}
+		respond(w, 200, map[string]bool{"ok": true})
+	case len(parts) == 3 && parts[2] == "pass" && r.Method == "POST":
+		rid, e := a.IssueSpeakerPass(r.Context(), parts[1], r.Header.Get("Idempotency-Key"), staff)
 		if e != nil {
 			fail(w, 400, publicError(e))
 			return
@@ -79,8 +92,10 @@ func (a *App) speakersAPI(w http.ResponseWriter, r *http.Request, staff, path st
 
 func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 	rows, e := a.DB.Query(ctx, `SELECT s.id,s.name,s.role,s.organization,s.image_url,s.published,
+		c.email,c.phone,c.whatsapp_consent,
 		r.id,r.reference,r.status,at.id,at.email,at.phone,at.whatsapp_consent,p.id,p.number,j.status,j.updated_at
 		FROM speakers s
+		LEFT JOIN speaker_contacts c ON c.speaker_id=s.id
 		LEFT JOIN speaker_registrations sr ON sr.speaker_id=s.id
 		LEFT JOIN registrations r ON r.id=sr.registration_id
 		LEFT JOIN LATERAL (SELECT id,email,phone,whatsapp_consent FROM attendees
@@ -96,12 +111,19 @@ func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 	out := []speakerPassRow{}
 	for rows.Next() {
 		var s speakerPassRow
-		var rid, ref, status, aid, email, phone, pid, number, job *string
-		var consent *bool
+		var cEmail, cPhone, rid, ref, status, aid, email, phone, pid, number, job *string
+		var cConsent, consent *bool
 		var at *time.Time
-		if e = rows.Scan(&s.ID, &s.Name, &s.Role, &s.Organization, &s.ImageURL, &s.Published,
+		if e = rows.Scan(&s.ID, &s.Name, &s.Role, &s.Organization, &s.ImageURL, &s.Published, &cEmail, &cPhone, &cConsent,
 			&rid, &ref, &status, &aid, &email, &phone, &consent, &pid, &number, &job, &at); e != nil {
 			return nil, e
+		}
+		if cEmail != nil {
+			s.Contact = &struct {
+				Email           string `json:"email"`
+				Phone           string `json:"phone"`
+				WhatsAppConsent bool   `json:"whatsapp_consent"`
+			}{*cEmail, *cPhone, *cConsent}
 		}
 		if rid != nil {
 			s.Registration = &struct {
@@ -135,45 +157,79 @@ func (a *App) speakerPasses(ctx context.Context) ([]speakerPassRow, error) {
 	return out, rows.Err()
 }
 
-// SaveSpeakerContact records a speaker's email and phone. The first save
-// issues their pass (approved, complimentary, not sent); later saves correct
-// the pass holder's contact details, which cancels any delivery still queued
-// to the old address. A speaker whose pass registration was cancelled gets a
-// new one. It returns the registration holding the pass.
-func (a *App) SaveSpeakerContact(ctx context.Context, speakerID, email, phone string, consent bool, key, staff string) (string, error) {
+// SaveSpeakerContact records a speaker's email and phone. It issues nothing.
+// When the speaker already holds a pass, its holder is corrected too, which
+// cancels any delivery still queued to the old address.
+func (a *App) SaveSpeakerContact(ctx context.Context, speakerID, email, phone string, consent bool, staff string) error {
+	email, phone = strings.ToLower(strings.TrimSpace(email)), strings.TrimSpace(phone)
+	if !validEmail(email) {
+		return errors.New("enter a valid email address")
+	}
+	if !validPhone(phone, true) {
+		return errors.New("phone must be international, like +919876543210")
+	}
+	if consent && phone == "" {
+		return errors.New("WhatsApp delivery needs a phone number")
+	}
+	tx, e := a.DB.Begin(ctx)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback(ctx)
+	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", "speaker-pass:"+speakerID); e != nil {
+		return e
+	}
+	if e = speakerExists(ctx, tx, speakerID); e != nil {
+		return e
+	}
+	if _, e = tx.Exec(ctx, `INSERT INTO speaker_contacts(speaker_id,email,phone,whatsapp_consent,updated_by) VALUES($1,$2,$3,$4,$5)
+		ON CONFLICT(speaker_id) DO UPDATE SET email=EXCLUDED.email,phone=EXCLUDED.phone,whatsapp_consent=EXCLUDED.whatsapp_consent,updated_by=EXCLUDED.updated_by,updated_at=now()`,
+		speakerID, email, phone, consent, staff); e != nil {
+		return e
+	}
+	if e = audit(ctx, tx, staff, "", "speaker_contact_saved", speakerID+" "+email); e != nil {
+		return e
+	}
+	rid, aid, name, designation, e := activeSpeakerPass(ctx, tx, speakerID)
+	if e != nil {
+		return e
+	}
+	if e = tx.Commit(ctx); e != nil || rid == "" {
+		return e
+	}
+	// Name and designation stay as issued, since staff may have corrected them on the registration.
+	return a.UpdateAttendee(ctx, rid, aid, staff, Attendee{Name: name, Designation: designation, Email: email, Phone: phone, WhatsAppConsent: consent})
+}
+
+// IssueSpeakerPass issues the speaker's complimentary pass from their saved
+// contact, approved and not sent. A speaker who already holds a pass keeps it;
+// one whose pass registration was cancelled gets a new one.
+func (a *App) IssueSpeakerPass(ctx context.Context, speakerID, key, staff string) (string, error) {
 	tx, e := a.DB.Begin(ctx)
 	if e != nil {
 		return "", e
 	}
 	defer tx.Rollback(ctx)
-	// One speaker, one pass: concurrent first saves must not issue two.
+	// One speaker, one pass: concurrent issues must not create two.
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))", "speaker-pass:"+speakerID); e != nil {
 		return "", e
 	}
-	var name, role, org string
-	if e = tx.QueryRow(ctx, "SELECT name,role,organization FROM speakers WHERE id=$1", speakerID).Scan(&name, &role, &org); e != nil {
-		if errors.Is(e, pgx.ErrNoRows) {
-			return "", errors.New("this speaker is no longer in the speaker list")
-		}
+	if e = speakerExists(ctx, tx, speakerID); e != nil {
 		return "", e
 	}
-	var rid, status string
-	var aid, aName, aDesignation *string
-	e = tx.QueryRow(ctx, `SELECT r.id,r.status,at.id,at.name,at.designation FROM speaker_registrations sr
-		JOIN registrations r ON r.id=sr.registration_id
-		LEFT JOIN LATERAL (SELECT id,name,designation FROM attendees
-			WHERE registration_id=r.id AND removed_at IS NULL ORDER BY position LIMIT 1) at ON true
-		WHERE sr.speaker_id=$1`, speakerID).Scan(&rid, &status, &aid, &aName, &aDesignation)
-	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-		return "", e
+	rid, _, _, _, e := activeSpeakerPass(ctx, tx, speakerID)
+	if e != nil || rid != "" {
+		return rid, e
 	}
-	if e == nil && status != "cancelled" && aid != nil {
-		// The pass exists: correct its holder. Name and designation stay as
-		// issued, since staff may have corrected them on the registration.
-		if e = tx.Commit(ctx); e != nil {
-			return "", e
-		}
-		return rid, a.UpdateAttendee(ctx, rid, *aid, staff, Attendee{Name: *aName, Designation: *aDesignation, Email: email, Phone: phone, WhatsAppConsent: consent})
+	var name, role, org, email, phone string
+	var consent bool
+	e = tx.QueryRow(ctx, `SELECT s.name,s.role,s.organization,c.email,c.phone,c.whatsapp_consent FROM speakers s
+		JOIN speaker_contacts c ON c.speaker_id=s.id WHERE s.id=$1`, speakerID).Scan(&name, &role, &org, &email, &phone, &consent)
+	if errors.Is(e, pgx.ErrNoRows) {
+		return "", errors.New("save this speaker's email before issuing their pass")
+	}
+	if e != nil {
+		return "", e
 	}
 	if org = strings.TrimSpace(org); org == "" {
 		org = "Speaker"
@@ -201,6 +257,36 @@ func (a *App) SaveSpeakerContact(ctx context.Context, speakerID, email, phone st
 		return "", e
 	}
 	return rid, tx.Commit(ctx)
+}
+
+func speakerExists(ctx context.Context, tx pgx.Tx, speakerID string) error {
+	var ok bool
+	if e := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM speakers WHERE id=$1)", speakerID).Scan(&ok); e != nil {
+		return e
+	}
+	if !ok {
+		return errors.New("this speaker is no longer in the speaker list")
+	}
+	return nil
+}
+
+// activeSpeakerPass returns the speaker's pass registration and its holder,
+// or an empty rid when they hold no pass (none issued, or cancelled).
+func activeSpeakerPass(ctx context.Context, tx pgx.Tx, speakerID string) (rid, aid, name, designation string, e error) {
+	var status string
+	var a, n, d *string
+	e = tx.QueryRow(ctx, `SELECT r.id,r.status,at.id,at.name,at.designation FROM speaker_registrations sr
+		JOIN registrations r ON r.id=sr.registration_id
+		LEFT JOIN LATERAL (SELECT id,name,designation FROM attendees
+			WHERE registration_id=r.id AND removed_at IS NULL ORDER BY position LIMIT 1) at ON true
+		WHERE sr.speaker_id=$1`, speakerID).Scan(&rid, &status, &a, &n, &d)
+	if errors.Is(e, pgx.ErrNoRows) || (e == nil && (status == "cancelled" || a == nil)) {
+		return "", "", "", "", nil
+	}
+	if e != nil {
+		return "", "", "", "", e
+	}
+	return rid, *a, *n, *d, nil
 }
 
 // clip shortens s to at most n runes, so directory text longer than a

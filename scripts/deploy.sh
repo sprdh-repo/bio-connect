@@ -10,7 +10,7 @@ SITE_URL="${SITE_URL%/}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-for command in aws curl; do
+for command in aws curl python3; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Error: $command is required." >&2
     exit 1
@@ -27,6 +27,14 @@ done
 if [[ ! -d assets ]]; then
   echo "Error: assets directory is missing." >&2
   exit 1
+fi
+
+# Speakers come from the registration backend, the same list the mobile app
+# shows. Write it into speakers.html and the home page teaser before upload.
+echo "Syncing speakers from the registration backend..."
+python3 scripts/sync-speakers.py
+if ! git diff --quiet -- speakers.html index.html assets/speakers || [[ -n "$(git ls-files --others --exclude-standard assets/speakers)" ]]; then
+  echo "Note: the speaker sync changed files. Commit them after this deploy so the repository matches the site."
 fi
 
 echo "Checking AWS credentials..."

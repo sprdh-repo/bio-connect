@@ -75,11 +75,20 @@ Returns the published speaker directory in its curated display order:
     "organization": "University of Virginia Health System",
     "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/jayakrishna-ambati.webp",
     "linkedin": ""
-  }]
+  }],
+  "version": "9a204980a14f84bf"
 }
 ```
 
 The endpoint permits anonymous cross-origin reads. Unpublished rows are omitted.
+`version` fingerprints the list and changes only when a published speaker changes.
+The website stamps it into `speakers.html` at deploy time and re-renders its cards only when the live version differs.
+Responses carry `Cache-Control: public, max-age=60`.
+
+### `GET /public/images/{sha256}.webp|.jpg`
+
+Serves a portrait uploaded through the mobile app editor.
+The file name is the image's SHA-256, so the response never changes: it carries `Cache-Control: public, max-age=31536000, immutable` and anonymous cross-origin access.
 
 ### `GET /public/badges/{qr_id}`
 
@@ -245,6 +254,7 @@ Roles are disjoint:
 | Route | Purpose |
 |---|---|
 | `GET /admin/me` | `{id, role}` |
+| `POST /admin/content-images` | Both roles. The raw bytes of a speaker portrait, a WebP or JPEG of exactly 480 x 600 up to 2 MB (the editor crops and tones it in the browser). Stored once per content hash; returns `{url}` under `/public/images/`. Speaker `image_url` accepts these URLs as well as public HTTPS links |
 | `GET/PUT /admin/mobile-content` | Both roles. Session `speaker_ids` must name speakers in the saved directory. The mobile app editor: `{revision, content, guide, speakers}`, where `content` is the stored app document (list entries carry `published`; `event`, `product_launch` and `leadership` carry `hidden`, the field names withheld from the app), `guide` is the event guide (`sessions`, `activities`, `faqs`, `venue`, the venue also with `hidden`), and `speakers` is the ordered directory `[{id, name, role, organization, image_url, linkedin, published}]`. `PUT` replaces all three atomically, returns the saved editor, and answers 409 when `revision` is stale. Links must be public HTTPS; up to 2 MB. Audited as `mobile_content.update` |
 | `GET /admin/feedback` | Both roles. `{open, summary, responses}`: `summary` is one row per rated target (`kind`, `session_id`, `title`, `responses`, `average` to one decimal, `ratings` counted by star), the event first and then programme order; `responses` lists every answer newest first. `?format=csv` downloads the responses with formula-injection protection |
 | `POST /admin/logout` | clears the session |
@@ -264,8 +274,9 @@ Roles are disjoint:
 | `POST /admin/registrations/{id}/category` | `{category_id, note}` moves an exhibitor registration that is not `cancelled` to another stall type. The pass allowance becomes the new stall's plus any extra passes granted earlier, and never drops below the attendees on the registration: moving to a smaller stall removes nobody, and the places beyond the new stall's allowance are kept as extra passes. The reference, issued passes and payments are unchanged; the fee due before approval follows the new stall. Nothing is sent |
 | `GET /admin/export?format=csv\|xlsx&sheet=&<same filters>` | CSV is one `sheet` (`Registrations`, `Attendees`, `Payments`, `Deliveries`); XLSX has all four. Cells that begin with `= + - @` are prefixed with `'`. 50,000-row cap. |
 | `POST /admin/categories` | `{id, open, free_open}` opens or closes a category; `open` governs paid registration and `free_open` governs free registration links. Omit either to leave it unchanged |
-| `GET /admin/speakers` | Every speaker in the directory with their speaker pass: `registration` (`id`, `reference`, `status`), `attendee` (`id`, `email`, `phone`, `whatsapp_consent`), active `pass` (`id`, `number`) and the latest email `delivery` (`status`, `at`); each is `null` until it exists |
-| `POST /admin/speakers/{id}` | `{email, phone, whatsapp_consent}` with an `Idempotency-Key`. The first save issues the speaker's complimentary `speaker` pass (approved, not sent); later saves correct the pass holder's contact. A cancelled speaker registration is replaced. Send with the ordinary review `send`/`resend` actions or `bulk-send` |
+| `GET /admin/speakers` | Every speaker in the directory with their saved `contact` (`email`, `phone`, `whatsapp_consent`) and speaker pass: `registration` (`id`, `reference`, `status`), `attendee` (`id`, `email`, `phone`, `whatsapp_consent`), active `pass` (`id`, `number`) and the latest email `delivery` (`status`, `at`); each is `null` until it exists |
+| `POST /admin/speakers/{id}` | `{email, phone, whatsapp_consent}` saves the speaker's contact and issues nothing. When the speaker already holds a pass, its holder is corrected too (queued deliveries to the old address are cancelled). Audited as `speaker_contact_saved` |
+| `POST /admin/speakers/{id}/pass` | With an `Idempotency-Key`, issues the speaker's complimentary `speaker` pass from their saved contact, approved and not sent; returns `{registration_id}`. A speaker who holds a pass keeps it; a cancelled one is replaced. Send with the ordinary review `send`/`resend` actions or `bulk-send` |
 | `POST /admin/bulk-send` | `{ids:[...], channel:""}` runs `send` for 1-100 approved registrations; returns per-id `queued` or the error |
 | `POST /admin/bulk-remind` | `{ids:[...]}` runs `payment_reminder` for 1-100 registrations; returns per-id `queued` or the error |
 | `POST /admin/retry` | `{id, confirm_uncertain, note}` requeues a `failed` or `uncertain` delivery. `uncertain` needs `confirm_uncertain:true` and a `note`. The prior job and its provider id are kept for late webhooks. |

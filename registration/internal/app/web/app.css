@@ -231,6 +231,22 @@ main:has(.admin-page) > .eyebrow { display: none; }
 .mc-chip { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 12px; background: var(--cream); border-radius: 30px; font-size: 13px; }
 .mc-chip .quiet { min-height: 28px; padding: 0 8px; font-size: 15px; }
 .mc-subhead { margin-top: 22px; }
+.mc-portrait { display: flex; align-items: flex-start; gap: 16px; }
+.mc-portrait-img { flex: none; width: 96px; height: 120px; object-fit: cover; background: var(--cream); border: 1px solid var(--line); border-radius: 8px; }
+.mc-portrait-empty { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.mc-portrait-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.mc-portrait button { min-height: 38px; margin-top: 6px; padding: 0 15px; font-size: 11px; }
+.portrait-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 22px 24px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+.portrait-dialog::backdrop { background: rgba(5, 28, 23, 0.55); }
+.portrait-dialog h2 { margin: 0 0 4px; font-size: 22px; }
+.portrait-dialog .actions { justify-content: flex-end; margin-top: 16px; }
+.portrait-stage { position: relative; width: min(100%, 288px); margin: 14px auto 12px; }
+.portrait-canvas { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; border-radius: 8px; cursor: grab; touch-action: none; }
+.portrait-canvas:active { cursor: grabbing; }
+/* Where portrait.py places a face: 36% of the height, centred 42% down. */
+.portrait-guide { position: absolute; left: 27.5%; top: 24%; width: 45%; height: 36%; border: 1.5px dashed rgba(255, 255, 255, 0.75); border-radius: 50%; box-shadow: 0 0 0 1px rgba(5, 28, 23, 0.25); pointer-events: none; }
+.portrait-zoom { display: flex; align-items: center; gap: 12px; }
+.portrait-zoom input { margin: 0; padding: 0; border: 0; accent-color: var(--forest); }
 .mc-comment { margin: 0 0 12px; padding: 12px 16px; background: var(--cream); border-radius: 10px; }
 .mc-comment p { margin: 0 0 6px; white-space: pre-wrap; }
 .mc-comment footer { color: var(--muted); font-size: 12px; }
@@ -243,6 +259,7 @@ main:has(.admin-page) > .eyebrow { display: none; }
 .speaker-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.25fr) 116px 210px; align-items: center; gap: 16px; padding: 12px 18px; transition: background 1.2s; }
 .speaker-row + .speaker-row { border-top: 1px solid rgba(16, 32, 27, 0.07); }
 .speaker-row.is-updated { background: #f4f9ea; }
+img.speaker-avatar { object-fit: cover; object-position: center 30%; }
 .speaker-avatar { display: grid; place-items: center; width: 40px; height: 40px; color: var(--forest); background: #eef4e0; border-radius: 50%; font-family: var(--display); font-size: 13px; font-weight: 700; }
 .speaker-who { min-width: 0; line-height: 1.35; }
 .speaker-who strong, .speaker-who > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -258,6 +275,7 @@ main:has(.admin-page) > .eyebrow { display: none; }
 .speaker-state small { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .speaker-pill { display: inline-block; padding: 4px 8px; border: 1px solid transparent; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1.2; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .speaker-pill-muted { color: var(--muted); background: var(--cream); }
+.speaker-pill-saved { color: var(--forest); background: #eef4e0; border-color: #d6e6bd; }
 .speaker-pill-pending { color: #75500d; background: #fbf1dc; border-color: #efd59f; }
 .speaker-pill-sent { color: #285b25; background: #eaf4df; border-color: #c9dfb6; }
 .speaker-pill-failed, .speaker-pill-cancelled { color: var(--danger); background: #fdecea; border-color: #efc4be; }

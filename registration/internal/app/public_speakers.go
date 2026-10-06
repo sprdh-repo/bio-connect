@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 )
 
@@ -21,7 +24,18 @@ func (a *App) publicSpeakers(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusServiceUnavailable, "speakers unavailable; please retry")
 		return
 	}
-	respond(w, http.StatusOK, map[string]any{"speakers": speakers})
+	// Short-lived, so an editor save reaches the website within a minute.
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	respond(w, http.StatusOK, map[string]any{"speakers": speakers, "version": speakersVersion(speakers)})
+}
+
+// speakersVersion fingerprints the published list. The website build stamps
+// it into speakers.html, and the page only re-renders its cards when the live
+// list carries a different version.
+func speakersVersion(speakers []publicSpeaker) string {
+	b, _ := json.Marshal(speakers)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:8])
 }
 
 func (a *App) loadPublicSpeakers(ctx context.Context) ([]publicSpeaker, error) {

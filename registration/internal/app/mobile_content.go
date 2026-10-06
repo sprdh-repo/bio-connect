@@ -386,7 +386,10 @@ func validMenuLink(s string) bool {
 	return false
 }
 
-func validateSpeakers(items []adminSpeaker) error {
+// validateSpeakers checks the speaker list. Portraits are public HTTPS links
+// or the editor's own uploads under uploads (the backend's image URL prefix,
+// which is plain HTTP in local development).
+func validateSpeakers(items []adminSpeaker, uploads string) error {
 	if len(items) > 500 {
 		return fmt.Errorf("too many speakers")
 	}
@@ -402,7 +405,8 @@ func validateSpeakers(items []adminSpeaker) error {
 		if err := textLimit("speaker", 300, s.Name, s.Role, s.Organization); err != nil {
 			return err
 		}
-		if !optionalHTTPS(s.ImageURL) || !optionalHTTPS(s.LinkedIn) {
+		own := uploads != "" && strings.HasPrefix(s.ImageURL, uploads) && contentImageFile.MatchString(strings.TrimPrefix(s.ImageURL, uploads))
+		if (!own && !optionalHTTPS(s.ImageURL)) || !optionalHTTPS(s.LinkedIn) {
 			return fmt.Errorf("speaker %q links must be public HTTPS URLs", s.Name)
 		}
 	}
@@ -558,7 +562,7 @@ func (a *App) adminMobileContent(w http.ResponseWriter, r *http.Request, p princ
 	}
 	normalizeContent(&m.Content)
 	normalizeGuide(&m.Guide)
-	for _, err := range []error{m.Content.validate(), m.Guide.validate(), validateSpeakers(m.Speakers), linkedSpeakers(m.Guide, m.Speakers)} {
+	for _, err := range []error{m.Content.validate(), m.Guide.validate(), validateSpeakers(m.Speakers, a.Config.BaseURL+"/api/v1/public/images/"), linkedSpeakers(m.Guide, m.Speakers)} {
 		if err != nil {
 			fail(w, 400, err.Error())
 			return

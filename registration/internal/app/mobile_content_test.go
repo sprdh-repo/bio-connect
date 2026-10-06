@@ -80,10 +80,10 @@ func TestMobileContentValidation(t *testing.T) {
 	if c.validate() == nil {
 		t.Fatal("zero moments album accepted")
 	}
-	if validateSpeakers([]adminSpeaker{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}}) == nil {
+	if validateSpeakers([]adminSpeaker{{ID: "a", Name: "A"}, {ID: "a", Name: "B"}}, "") == nil {
 		t.Fatal("duplicate speaker IDs accepted")
 	}
-	if validateSpeakers([]adminSpeaker{{ID: "Bad ID", Name: "A"}}) == nil {
+	if validateSpeakers([]adminSpeaker{{ID: "Bad ID", Name: "A"}}, "") == nil {
 		t.Fatal("malformed speaker ID accepted")
 	}
 }

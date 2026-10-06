@@ -21,21 +21,32 @@ func speakerRow(t *testing.T, a *App, id string) speakerPassRow {
 	return speakerPassRow{}
 }
 
-// Saving a speaker's email issues one approved, complimentary SPEAKER pass
-// from the directory details and sends nothing; a second save corrects the
-// holder instead of issuing another pass.
-func TestSpeakerPassIssuedOnceFromDirectory(t *testing.T) {
+// Saving a speaker's email stores it and issues nothing. Issuing then creates
+// one approved, complimentary SPEAKER pass from the directory details, sends
+// nothing, and is idempotent; a later contact change corrects the holder.
+func TestSpeakerContactThenPass(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
 	const speaker = "beena-pillai"
 
-	if s := speakerRow(t, a, speaker); s.Registration != nil || s.Pass != nil {
-		t.Fatalf("speaker starts with a pass: %+v", s)
+	if _, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid); err == nil || !strings.Contains(err.Error(), "save this speaker's email") {
+		t.Fatalf("issue without contact: %v", err)
 	}
-	rid, err := a.SaveSpeakerContact(ctx, speaker, " Beena@Example.org ", "", false, key(1), sid)
-	if err != nil {
+	if err := a.SaveSpeakerContact(ctx, speaker, " Beena@Example.org ", "", false, sid); err != nil {
 		t.Fatalf("save: %v", err)
+	}
+	s := speakerRow(t, a, speaker)
+	if s.Contact == nil || s.Contact.Email != "beena@example.org" || s.Registration != nil || s.Pass != nil {
+		t.Fatalf("row after save = %+v", s)
+	}
+	if n := count(t, a, "SELECT count(*) FROM registrations WHERE category_id='speaker'"); n != 0 {
+		t.Fatalf("saving a contact issued %d registrations", n)
+	}
+
+	rid, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid)
+	if err != nil {
+		t.Fatalf("issue: %v", err)
 	}
 	r, err := a.registration(ctx, rid)
 	if err != nil {
@@ -44,27 +55,22 @@ func TestSpeakerPassIssuedOnceFromDirectory(t *testing.T) {
 	if r.Status != "approved" || r.CategoryID != "speaker" || !r.Complimentary || r.Institution != "BRIC-Rajiv Gandhi Centre for Biotechnology" || !strings.HasPrefix(r.Reference, "BC4-SK-") {
 		t.Fatalf("registration = %+v", r)
 	}
-	s := speakerRow(t, a, speaker)
-	if s.Attendee == nil || s.Attendee.Email != "beena@example.org" || s.Pass == nil || s.Delivery != nil {
-		t.Fatalf("row after save = %+v", s)
-	}
-	if n := count(t, a, "SELECT count(*) FROM attendees WHERE registration_id=$1 AND name='Dr. Beena Pillai' AND designation='Director'", rid); n != 1 {
-		t.Fatal("pass holder not taken from the directory")
+	if n := count(t, a, "SELECT count(*) FROM attendees WHERE registration_id=$1 AND name='Dr. Beena Pillai' AND designation='Director' AND email='beena@example.org'", rid); n != 1 {
+		t.Fatal("pass holder not taken from the directory and contact")
 	}
 	if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE registration_id=$1", rid); n != 0 {
-		t.Fatalf("saving queued %d deliveries", n)
+		t.Fatalf("issuing queued %d deliveries", n)
+	}
+	if again, err := a.IssueSpeakerPass(ctx, speaker, key(3), sid); err != nil || again != rid {
+		t.Fatalf("second issue = %s, %v; want the same registration", again, err)
 	}
 
-	again, err := a.SaveSpeakerContact(ctx, speaker, "beena.pillai@example.org", "+919876543210", true, key(2), sid)
-	if err != nil || again != rid {
-		t.Fatalf("second save = %s, %v; want the same registration", again, err)
-	}
-	if n := count(t, a, "SELECT count(*) FROM registrations WHERE category_id='speaker'"); n != 1 {
-		t.Fatalf("speaker registrations = %d, want 1", n)
+	if err := a.SaveSpeakerContact(ctx, speaker, "beena.pillai@example.org", "+919876543210", true, sid); err != nil {
+		t.Fatal(err)
 	}
 	s = speakerRow(t, a, speaker)
-	if s.Attendee.Email != "beena.pillai@example.org" || s.Attendee.Phone != "+919876543210" || !s.Attendee.WhatsAppConsent {
-		t.Fatalf("contact not corrected: %+v", s.Attendee)
+	if s.Attendee.Email != "beena.pillai@example.org" || s.Attendee.Phone != "+919876543210" || !s.Attendee.WhatsAppConsent || s.Contact.Email != "beena.pillai@example.org" {
+		t.Fatalf("contact not corrected: %+v %+v", s.Attendee, s.Contact)
 	}
 
 	if err := a.Review(ctx, rid, sid, ReviewInput{Action: "send", Channel: "email"}); err != nil {
@@ -75,13 +81,16 @@ func TestSpeakerPassIssuedOnceFromDirectory(t *testing.T) {
 	}
 }
 
-// A cancelled speaker pass is replaced by a new registration on the next save.
+// A cancelled speaker pass is replaced by a new registration on the next issue.
 func TestSpeakerPassReissuedAfterCancellation(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
 	const speaker = "t-p-singh"
-	first, err := a.SaveSpeakerContact(ctx, speaker, "tp@example.org", "", false, key(1), sid)
+	if err := a.SaveSpeakerContact(ctx, speaker, "tp@example.org", "", false, sid); err != nil {
+		t.Fatal(err)
+	}
+	first, err := a.IssueSpeakerPass(ctx, speaker, key(1), sid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +100,7 @@ func TestSpeakerPassReissuedAfterCancellation(t *testing.T) {
 	if s := speakerRow(t, a, speaker); s.Registration == nil || s.Registration.Status != "cancelled" || s.Pass != nil {
 		t.Fatalf("cancelled row = %+v", s)
 	}
-	second, err := a.SaveSpeakerContact(ctx, speaker, "tp@example.org", "", false, key(2), sid)
+	second, err := a.IssueSpeakerPass(ctx, speaker, key(2), sid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,21 +112,25 @@ func TestSpeakerPassReissuedAfterCancellation(t *testing.T) {
 	}
 }
 
-func TestSpeakerPassRejectsBadInput(t *testing.T) {
+func TestSpeakerContactRejectsBadInput(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
-	if _, err := a.SaveSpeakerContact(ctx, "no-such-speaker", "x@example.org", "", false, key(1), sid); err == nil || !strings.Contains(err.Error(), "no longer in the speaker list") {
-		t.Fatalf("unknown speaker: %v", err)
+	for name, c := range map[string][3]string{
+		"unknown speaker": {"no-such-speaker", "x@example.org", ""},
+		"invalid email":   {"t-p-singh", "not-an-email", ""},
+		"space in email":  {"t-p-singh", "a b@example.org", ""},
+		"bad phone":       {"t-p-singh", "tp@example.org", "98765"},
+	} {
+		if err := a.SaveSpeakerContact(ctx, c[0], c[1], c[2], false, sid); err == nil {
+			t.Fatalf("%s accepted", name)
+		}
 	}
-	if _, err := a.SaveSpeakerContact(ctx, "t-p-singh", "not-an-email", "", false, key(2), sid); err == nil {
-		t.Fatal("invalid email accepted")
-	}
-	if _, err := a.SaveSpeakerContact(ctx, "t-p-singh", "tp@example.org", "", true, key(3), sid); err == nil {
+	if err := a.SaveSpeakerContact(ctx, "t-p-singh", "tp@example.org", "", true, sid); err == nil {
 		t.Fatal("WhatsApp consent without a phone accepted")
 	}
-	if n := count(t, a, "SELECT count(*) FROM registrations WHERE category_id='speaker'"); n != 0 {
-		t.Fatalf("rejected saves left %d registrations", n)
+	if n := count(t, a, "SELECT count(*) FROM speaker_contacts"); n != 0 {
+		t.Fatalf("rejected saves left %d contacts", n)
 	}
 }
 

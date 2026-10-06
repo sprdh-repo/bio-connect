@@ -318,12 +318,16 @@ if (speakerGrid) {
     text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   /* Name, role and organisation only - not the screen-reader text on the
      LinkedIn and profile controls, or "linkedin" would match every card. */
-  const speakers = [...speakerGrid.querySelectorAll(".speaker")].map((card) => ({
-    card,
-    text: compact(
-      [...card.querySelectorAll(".speaker-name, .speaker-role, .speaker-org")].map((node) => node.textContent).join(" "),
-    ),
-  }));
+  let speakers = [];
+  const indexSpeakers = () => {
+    speakers = [...speakerGrid.querySelectorAll(".speaker")].map((card) => ({
+      card,
+      text: compact(
+        [...card.querySelectorAll(".speaker-name, .speaker-role, .speaker-org")].map((node) => node.textContent).join(" "),
+      ),
+    }));
+  };
+  indexSpeakers();
 
   const filterSpeakers = () => {
     const query = input.value.trim();
@@ -404,7 +408,7 @@ if (speakerGrid) {
 
   const closeProfile = () => dialog.close();
 
-  speakers.forEach(({ card }) => {
+  const addProfileButton = (card) => {
     const name = card.querySelector(".speaker-name").textContent;
     const open = document.createElement("button");
     open.type = "button";
@@ -425,7 +429,8 @@ if (speakerGrid) {
       card.querySelector(".speaker-meta").append(actions);
     }
     actions.append(open);
-  });
+  };
+  speakers.forEach(({ card }) => addProfileButton(card));
 
   stepButtons.forEach((button) =>
     button.addEventListener("click", () => stepSpeaker(Number(button.dataset.speakerDialogStep))),
@@ -447,6 +452,63 @@ if (speakerGrid) {
     current?.querySelector(".speaker-open").focus({ preventScroll: true });
     current?.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
   });
+
+  /* The cards are written into the page at deploy time from the registration
+     backend's speaker list, which also feeds the mobile app. If that list has
+     changed since (a different version), rebuild the cards from it so the page
+     is never behind the app. It waits until the page is idle and does nothing
+     when the versions match, so the normal visit costs one small request. */
+  const speakersEndpoint = "https://reg.bioconnect.kerala.gov.in/api/v1/public/speakers";
+  const speakerCard = (speaker, previous) => {
+    const card = document.createElement("li");
+    card.className = "speaker reveal visible";
+    card.dataset.speakerId = speaker.id;
+    /* A speaker already on the page keeps the portrait the site serves. */
+    let portrait = previous?.querySelector(".speaker-portrait")?.cloneNode(true);
+    if (!portrait) {
+      portrait = document.createElement("div");
+      portrait.className = "speaker-portrait";
+      const img = Object.assign(document.createElement("img"), { src: speaker.image_url, width: 480, height: 600, alt: "", loading: "lazy", decoding: "async" });
+      if (speaker.image_url) portrait.append(img);
+    }
+    const meta = document.createElement("div");
+    meta.className = "speaker-meta";
+    const line = (tag, className, value) => Object.assign(document.createElement(tag), { className, textContent: value });
+    meta.append(line("h3", "speaker-name", speaker.name), line("p", "speaker-role", speaker.role), line("p", "speaker-org", speaker.organization));
+    if (speaker.linkedin) {
+      const actions = line("div", "speaker-actions", "");
+      const link = Object.assign(document.createElement("a"), { className: "speaker-linkedin", href: speaker.linkedin, target: "_blank", rel: "noopener noreferrer" });
+      link.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-linkedin" /></svg>`;
+      link.append(line("span", "sr-only", `${speaker.name} on LinkedIn (opens in a new tab)`));
+      actions.append(link);
+      meta.append(actions);
+    }
+    card.append(portrait, meta);
+    return card;
+  };
+  const refreshSpeakers = async () => {
+    if (!speakerGrid.dataset.speakersVersion || dialog.open) return;
+    let data;
+    try {
+      const response = await fetch(speakersEndpoint, { credentials: "omit" });
+      if (!response.ok) return;
+      data = await response.json();
+    } catch {
+      return;
+    }
+    const list = Array.isArray(data?.speakers) ? data.speakers : [];
+    if (!data?.version || data.version === speakerGrid.dataset.speakersVersion || !list.length || dialog.open) return;
+    const previous = new Map([...speakerGrid.querySelectorAll("[data-speaker-id]")].map((card) => [card.dataset.speakerId, card]));
+    const cards = list.map((speaker) => speakerCard(speaker, previous.get(speaker.id)));
+    speakerGrid.replaceChildren(...cards);
+    speakerGrid.dataset.speakersVersion = data.version;
+    indexSpeakers();
+    cards.forEach(addProfileButton);
+    filterSpeakers();
+  };
+  const whenIdle = window.requestIdleCallback || ((callback) => setTimeout(callback, 1));
+  if (document.readyState === "complete") whenIdle(refreshSpeakers);
+  else window.addEventListener("load", () => whenIdle(refreshSpeakers), { once: true });
 }
 
 /* Registration tabs: one panel at a time, with roving focus across the tablist. */

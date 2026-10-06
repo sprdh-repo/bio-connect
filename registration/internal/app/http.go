@@ -115,6 +115,7 @@ func (a *App) Handler() http.Handler {
 	m.HandleFunc("GET /api/v1/public/app-content", a.publicAppContent)
 	m.HandleFunc("GET /api/v1/public/event-guide", a.publicEventGuide)
 	m.HandleFunc("GET /api/v1/public/speakers", a.publicSpeakers)
+	m.HandleFunc("GET /api/v1/public/images/{file}", a.publicContentImage)
 	m.HandleFunc("GET /api/v1/public/exhibitors", a.publicExhibitors)
 	m.HandleFunc("GET /api/v1/public/exhibitors/logos/{file}", a.publicExhibitorLogo)
 	m.HandleFunc("POST /api/v1/recovery", a.recover)
@@ -154,7 +155,7 @@ func (a *App) Handler() http.Handler {
 			permissionsPolicy = "camera=(self), microphone=(), geolocation=()"
 		}
 		w.Header().Set("Permissions-Policy", permissionsPolicy)
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: "+websiteOrigin+"; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		if a.Config.Production {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
@@ -404,6 +405,12 @@ func filter(r *http.Request) (string, []any, error) {
 	}
 	return ` WHERE (r.reference ILIKE $1 OR r.institution ILIKE $1 OR r.email ILIKE $1 OR r.contact_name ILIKE $1 OR EXISTS(SELECT 1 FROM attendees a WHERE a.registration_id=r.id AND a.removed_at IS NULL AND (a.name ILIKE $1 OR a.email ILIKE $1)) OR ($6<>'' AND (replace(r.reference,'-','') ILIKE '%'||$6::text||'%' OR EXISTS(SELECT 1 FROM passes pn WHERE pn.registration_id=r.id AND replace(pn.number,'-','') ILIKE '%'||$6::text||'%')))) AND ($2='' OR r.category_id=$2) AND ($3='' OR r.status=$3) AND ($4::timestamptz IS NULL OR r.created_at >= $4) AND ($5::timestamptz IS NULL OR r.created_at < $5)`, args, nil
 }
+
+// websiteOrigin is the public event website. Speaker portraits published
+// before editor uploads existed are served from it, and the staff console
+// shows them.
+const websiteOrigin = "https://bioconnect.kerala.gov.in"
+
 func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	p, e := a.staff(r)
 	if e != nil {
@@ -430,6 +437,11 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "mobile-content" {
 		a.adminMobileContent(w, r, p)
+		return
+	}
+	// Editor uploads belong to the mobile content editor, which both roles use.
+	if path == "content-images" {
+		a.uploadContentImage(w, r, p.ID)
 		return
 	}
 	// Feedback is anonymous app content, so both roles can read it, like the editor.

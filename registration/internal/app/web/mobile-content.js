@@ -95,6 +95,27 @@ async function mobileContentPage() {
     return `<div class="mc-field full"><div class="mc-label"><label for="${id}">Linked speakers</label></div><div class="mc-chips">${chips || '<span class="muted">None linked</span>'}</div>
       <select id="${id}" data-link="${esc(path)}"><option value="">Link a speaker…</option>${options}</select><p class="help">Linked speakers show this session on their profile, and attendees who save a speaker see it in their day plan. Save new speakers before linking them.</p></div>`;
   }
+  // A speaker's portrait: a preview and an upload that frames any photo into
+  // the website's 4:5 duotone format (portrait.js) before storing it.
+  function portraitField(path, item) {
+    const url = item.image_url, id = `mc-f${++fieldId}`;
+    const preview = url ? `<img class="mc-portrait-img" src="${esc(url)}" width="96" height="120" alt="">` : '<span class="mc-portrait-img mc-portrait-empty" aria-hidden="true">No photo</span>';
+    return `<div class="mc-field full mc-portrait">${preview}<div><div class="mc-label"><label for="${id}">Portrait</label></div>
+      <input id="${id}" class="mc-portrait-file" type="file" accept="image/jpeg,image/png,image/webp" data-portrait="${esc(path)}">
+      <button type="button" class="secondary" data-portrait-pick="${esc(id)}">${url ? 'Replace portrait' : 'Upload portrait'}</button>
+      <p class="help">Choose any clear headshot. You frame it, and it gets the same green tone as the website portraits.</p></div></div>`;
+  }
+  async function uploadPortrait(input) {
+    const file = input.files[0];
+    input.value = '';
+    if (!file) return;
+    const blob = await cropPortrait(file);
+    if (!blob) return;
+    const out = await api('/admin/content-images', { method: 'POST', body: blob, headers: { 'Content-Type': blob.type } });
+    mobileSet(state, `${input.dataset.portrait}.image_url`, out.url);
+    changed(); render();
+    message('Portrait uploaded. Save to publish it to the app and website.');
+  }
   async function feedbackReport() {
     const box = document.getElementById('mc-feedback');
     if (!box) return;
@@ -167,7 +188,7 @@ async function mobileContentPage() {
     </div></section>`,
     speakers: () => `<section class="card"><h2>Speakers</h2><p class="help">Shown in this order in the app.</p>${listOf('speakers', {
       noun: 'speaker', blank: () => ({ id: '', name: '', role: '', organization: '', image_url: '', linkedin: '', published: false }), title: i => i.name,
-      fields: p => `${input(`${p}.name`, 'Name', 'text', { required: true })}${input(`${p}.role`, 'Role')}${input(`${p}.organization`, 'Organisation', 'text', { full: true })}${input(`${p}.image_url`, 'Portrait URL (HTTPS)', 'url')}${input(`${p}.linkedin`, 'LinkedIn URL', 'url')}`
+      fields: (p, item) => `${input(`${p}.name`, 'Name', 'text', { required: true })}${input(`${p}.role`, 'Role')}${input(`${p}.organization`, 'Organisation', 'text', { full: true })}${portraitField(p, item)}${input(`${p}.linkedin`, 'LinkedIn URL', 'url')}${input(`${p}.image_url`, 'Portrait URL (HTTPS)', 'url', { help: 'Filled in by Upload portrait. Paste a link only for a portrait hosted elsewhere.' })}`
     })}</section>`,
     sponsors: () => `<section class="card"><h2>Sponsors</h2><div class="fields">${input('content.sponsors_intro', 'Introduction', 'textarea')}</div></section><section class="card"><h3>Sponsor list</h3>${listOf('content.sponsors', {
       noun: 'sponsor', blank: () => ({ name: '', category: '', description: '', logo_url: '', website_url: '', published: false }), title: i => i.name,
@@ -240,7 +261,9 @@ async function mobileContentPage() {
   app.oninput = app.onchange = e => {
     if (!active()) return;
     const el = e.target;
-    if (el.dataset.path) {
+    if (el.dataset.portrait) {
+      if (e.type === 'change') uploadPortrait(el).catch(err => message(err.message, true));
+    } else if (el.dataset.path) {
       const t = el.dataset.type;
       let v = t === 'checkbox' ? el.checked : el.value;
       if (t === 'datetime-local') v = v ? `${v}:00+05:30` : '';
@@ -269,7 +292,9 @@ async function mobileContentPage() {
     const b = e.target.closest('button');
     if (!b || !active()) return;
     try {
-      if (b.id === 'mc-back') {
+      if (b.dataset.portraitPick) {
+        document.getElementById(b.dataset.portraitPick).click();
+      } else if (b.id === 'mc-back') {
         if (dirty && !confirm('Leave without saving your changes?')) return;
         leave();
         history.pushState(null, '', '/admin');
