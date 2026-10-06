@@ -16,6 +16,7 @@ import '../providers/content_provider.dart';
 import '../widgets/saving.dart';
 import 'agenda_screen.dart';
 import 'delegate_registration_screen.dart';
+import 'selfie_frame_screen.dart';
 
 void showGuidePage(BuildContext context, Widget page) =>
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
@@ -30,7 +31,13 @@ class AttendeeHomeScreen extends StatelessWidget {
       content.text('home.button', 'View sessions'),
     );
     final shortcuts = visibleMenu(content, 'home_shortcuts');
-    final links = visibleMenu(content, 'home_links');
+    final allLinks = visibleMenu(content, 'home_links');
+    // A published selfie frame link becomes the banner under the shortcuts.
+    final frame = allLinks.where((e) => e.key == 'selfie_frame').firstOrNull;
+    final links = [
+      for (final entry in allLinks)
+        if (entry.key != 'selfie_frame') entry,
+    ];
     final noticeTitle = content.override('home.notice_title');
     final noticeMessage = content.override('home.notice_message');
     final count = content.guide.sessions.length;
@@ -148,6 +155,13 @@ class AttendeeHomeScreen extends StatelessWidget {
               },
             ),
           ],
+          if (frame != null) ...[
+            const SizedBox(height: 16),
+            Reveal(
+              order: 2 + shortcuts.length,
+              child: SelfieFramePromo(content, frame),
+            ),
+          ],
           // Staff announcements take the place of the programme summary.
           if (noticeTitle != null || noticeMessage != null) ...[
             const SizedBox(height: 24),
@@ -238,6 +252,163 @@ class _QuickLink extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Invites attendees to make and share a selfie frame, worded for the days
+/// before, during or after the event.
+class SelfieFramePromo extends StatelessWidget {
+  const SelfieFramePromo(this.content, this.entry, {super.key, this.now});
+  final EventContent content;
+  final MenuEntry entry;
+
+  /// Tests fix the date; the app uses the phone's clock.
+  final DateTime? now;
+
+  @override
+  Widget build(BuildContext context) {
+    final (eyebrow, title) = switch (eventPhase(
+      content.event,
+      now ?? DateTime.now(),
+    )) {
+      EventPhase.before => (
+        'SHARE THE NEWS',
+        "Tell your network\nyou're coming.",
+      ),
+      EventPhase.during => ('YOU ARE HERE', "Tell your network\nyou're here."),
+      EventPhase.after => ('THANKS FOR COMING', 'Share that you\nwere there.'),
+    };
+    void open() => openSelfieFrame(
+      context,
+      content,
+      title: entryTitle(entry),
+      caption: frameCaption(content.event, now ?? DateTime.now()),
+    );
+    return Pressable(
+      child: Material(
+        color: forest,
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: open,
+          child: Ink(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/frame-forest.webp'),
+                fit: BoxFit.cover,
+                alignment: Alignment(0, -.55),
+              ),
+            ),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xF2051C17),
+                    Color(0xB30B3329),
+                    Color(0x330B3329),
+                  ],
+                  stops: [0, .6, 1],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            content.text('frame.promo_eyebrow', eyebrow),
+                            style: const TextStyle(
+                              color: lime,
+                              fontSize: 10,
+                              letterSpacing: 1.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            content.text('frame.promo_title', title),
+                            style: const TextStyle(
+                              fontFamily: 'Manrope',
+                              color: Colors.white,
+                              fontSize: 20,
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            onPressed: open,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: lime,
+                              foregroundColor: forest,
+                              minimumSize: const Size(0, 42),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.add_a_photo_outlined,
+                              size: 19,
+                            ),
+                            label: Text(
+                              content.text(
+                                'frame.promo_button',
+                                'Create your frame',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const _ArchPreview(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small gold arch, echoing the Arch frame design.
+class _ArchPreview extends StatelessWidget {
+  const _ArchPreview();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 74,
+    height: 96,
+    padding: const EdgeInsets.all(4),
+    decoration: const BoxDecoration(
+      border: Border.fromBorderSide(BorderSide(color: gold, width: 1.4)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(37),
+        bottom: Radius.circular(10),
+      ),
+    ),
+    child: const DecoratedBox(
+      decoration: BoxDecoration(
+        color: Color(0x33B9DC72),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(33),
+          bottom: Radius.circular(7),
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.face_retouching_natural_outlined,
+          color: lime,
+          size: 30,
         ),
       ),
     ),

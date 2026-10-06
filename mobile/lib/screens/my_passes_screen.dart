@@ -12,9 +12,11 @@ import '../providers/content_provider.dart';
 import '../providers/pass_wallet.dart';
 import '../services/content_service.dart';
 import '../services/pass_service.dart';
+import '../widgets/destinations.dart';
 import '../widgets/interaction.dart';
 import '../widgets/motion.dart';
 import 'qr_scanner_screen.dart';
+import 'selfie_frame_screen.dart';
 
 /// Debug builds on a device show a sample pass while none are saved, so the
 /// pass design can be checked without an issued registration. Never in release
@@ -229,6 +231,7 @@ class _MyPassesScreenState extends State<MyPassesScreen>
               _SharingPanel(wallet: _wallet, pass: pass),
               const SizedBox(height: 18),
             ],
+            if (hasPasses) _FramePrompt(_wallet.passes.first),
             // Still reachable for a colleague's or a second registration's
             // pass, but below the passes rather than above them.
             if (hasPasses) ...[
@@ -244,6 +247,90 @@ class _MyPassesScreenState extends State<MyPassesScreen>
               style: TextStyle(color: muted, height: 1.5),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Once a pass is saved, invites its holder to share that they are going,
+/// with a caption for their role. Shown while staff offer the selfie frame.
+class _FramePrompt extends StatelessWidget {
+  const _FramePrompt(this.pass);
+  final AdmissionPass pass;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = context.watch<ContentProvider?>()?.content;
+    final entry = content == null ? null : selfieFrameEntry(content);
+    if (content == null || entry == null) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final title = switch (eventPhase(content.event, now)) {
+      EventPhase.before => "You're registered. Share it.",
+      EventPhase.during => "You're here. Share it.",
+      EventPhase.after => 'Share that you were there.',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Pressable(
+        child: Material(
+          color: forest,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => openSelfieFrame(
+              context,
+              content,
+              title: entryTitle(entry),
+              caption: frameCaption(
+                content.event,
+                now,
+                passCategory: pass.category,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: lime.withValues(alpha: .18),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.add_a_photo_outlined,
+                      color: lime,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Post your photo in a Bio Connect frame.',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: lime),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

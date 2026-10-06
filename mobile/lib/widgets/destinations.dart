@@ -144,6 +144,31 @@ List<MenuEntry> visibleMenu(EventContent content, String name) {
   ];
 }
 
+/// The published selfie frame entry, from the home links or the Guide, so
+/// prompts elsewhere appear only while staff offer the frame.
+MenuEntry? selfieFrameEntry(EventContent content) {
+  for (final name in ['home_links', 'guide']) {
+    for (final entry in visibleMenu(content, name)) {
+      if (entry.key == 'selfie_frame') return entry;
+    }
+  }
+  return null;
+}
+
+void openSelfieFrame(
+  BuildContext context,
+  EventContent content, {
+  String? caption,
+  String title = '',
+}) => showGuidePage(
+  context,
+  SelfieFrameScreen(
+    content.event,
+    title: title.isEmpty ? _titles['selfie_frame']! : title,
+    caption: caption,
+  ),
+);
+
 const tabKeys = {'sessions', 'speakers', 'agenda'};
 
 /// Bottom tabs staff have published, in order, by destination key.

@@ -42,7 +42,38 @@ const frameCaptions = [
   'See you at',
   "I'm speaking at",
   "I'm exhibiting at",
+  'I was at',
 ];
+
+enum EventPhase { before, during, after }
+
+/// Where today falls against the event dates, on the phone's calendar.
+EventPhase eventPhase(EventDetails event, DateTime now) {
+  DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
+  final today = day(now);
+  if (today.isBefore(day(event.startDate))) return EventPhase.before;
+  if (today.isAfter(day(event.endDate))) return EventPhase.after;
+  return EventPhase.during;
+}
+
+/// The caption a frame opens with: the holder's role when a pass shows one,
+/// otherwise one that fits the days before, during or after the event.
+String frameCaption(
+  EventDetails event,
+  DateTime now, {
+  String passCategory = '',
+}) {
+  final phase = eventPhase(event, now);
+  if (phase == EventPhase.after) return 'I was at';
+  final category = passCategory.toLowerCase();
+  if (category.contains('speaker')) return "I'm speaking at";
+  if (category.contains('exhibit') ||
+      category.contains('stall') ||
+      category.contains('table space')) {
+    return "I'm exhibiting at";
+  }
+  return phase == EventPhase.before ? 'See you at' : "I'm attending";
+}
 
 /// Exported width in pixels for every format.
 const frameExportWidth = 1080.0;
@@ -56,6 +87,7 @@ class SelfieFrameScreen extends StatefulWidget {
     this.export = const PhotoExport(),
     this.cameras,
     this.pickImage,
+    this.caption,
   });
   final EventDetails event;
   final String title;
@@ -64,6 +96,9 @@ class SelfieFrameScreen extends StatefulWidget {
   /// Tests replace the device cameras and the gallery picker.
   final Future<List<CameraDescription>> Function()? cameras;
   final Future<String?> Function()? pickImage;
+
+  /// The caption to start with; by default one that fits today.
+  final String? caption;
 
   @override
   State<SelfieFrameScreen> createState() => _SelfieFrameScreenState();
@@ -80,7 +115,14 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
   bool _busy = false;
   var _design = FrameDesign.spotlight;
   var _format = FrameFormat.post;
-  var _caption = frameCaptions.first;
+  late var _caption =
+      widget.caption ?? frameCaption(widget.event, DateTime.now());
+
+  /// The opening caption leads, so it is visible in the chip row.
+  late final _captions = [
+    _caption,
+    ...frameCaptions.where((caption) => caption != _caption),
+  ];
 
   @override
   void initState() {
@@ -413,7 +455,7 @@ class _SelfieFrameScreenState extends State<SelfieFrameScreen>
     children: [
       _ChipRow(
         children: [
-          for (final caption in frameCaptions)
+          for (final caption in _captions)
             ChoiceChip(
               label: Text(caption),
               selected: _caption == caption,

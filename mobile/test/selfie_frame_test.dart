@@ -39,6 +39,7 @@ Widget app(FakeExport export, {String? photo}) => MaterialApp(
     export: export,
     cameras: () async => [],
     pickImage: () async => photo,
+    caption: "I'm attending",
   ),
 );
 
