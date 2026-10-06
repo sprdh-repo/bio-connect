@@ -10,7 +10,7 @@ import UserNotifications
   ) -> Bool {
     // Lets session reminders appear while the app is open, and their taps
     // reach flutter_local_notifications.
-    UNUserNotificationCenter.current().delegate = self
+    UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
