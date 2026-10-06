@@ -190,7 +190,8 @@ td button, td .button { min-height: 32px; padding: 0 12px; font-size: 11px; }
 /* ---- staff console ---- */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .admin-page { margin-top: -12px; }
-.admin-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+main:has(.admin-page) > .eyebrow { display: none; }
+.admin-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
 .admin-heading h1 { margin: 0; font-size: clamp(32px, 4vw, 46px); }
 .admin-kicker { margin: 0 0 5px; color: #4f7f3b; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .admin-intro { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
@@ -198,6 +199,11 @@ td button, td .button { min-height: 32px; padding: 0 12px; font-size: 11px; }
 .admin-header-actions button, .admin-export button, .admin-export .button, .admin-pagination button { min-height: 38px; padding: 0 15px; font-size: 11px; }
 .quiet { min-height: 38px; padding: 0 8px; color: var(--muted); background: transparent; border-color: transparent; }
 .quiet:hover { color: var(--forest); background: var(--cream); transform: none; }
+.admin-tools { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 18px -10px 0; padding-bottom: 10px; }
+.admin-tools::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; border-bottom: 1px solid var(--line); }
+.tool-link { min-height: 34px; padding: 0 10px; color: var(--forest); background: transparent; font-family: var(--sans); font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+.tool-link:hover { background: var(--cream); transform: none; }
+.tool-signout { margin-left: auto; color: var(--muted); font-weight: 500; }
 
 /* ---- mobile app editor ---- */
 .mc-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
@@ -411,6 +417,8 @@ button.is-busy { cursor: progress; }
   .admin-filters { grid-template-columns: 1fr; }
   .admin-search { grid-column: auto; }
   .admin-header-actions button, .admin-export > * { flex: 1 1 100%; }
+  .admin-header-actions { flex-wrap: nowrap; }
+  .admin-header-actions .quiet { flex: 0 0 auto; }
   .page-numbers { display: none; }
   .page-compact { display: inline; }
   .page-step { padding: 0 10px; }
