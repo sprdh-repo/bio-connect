@@ -213,7 +213,10 @@ void main() {
     'a session saved from the programme appears in My agenda with its clash',
     (tester) async {
       final json = jsonDecode(
-        await rootBundle.loadString('assets/content/event.json'),
+        utf8.decode(
+          (await rootBundle.load('assets/content/event.json')).buffer
+              .asUint8List(),
+        ),
       ) as Map<String, dynamic>;
       json['event_guide'] = {
         'sessions': [

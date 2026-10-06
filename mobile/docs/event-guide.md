@@ -11,7 +11,7 @@ Empty values are left out of the screens, menu entries whose page would be empty
 
 1. Deploy the backend; it applies `031_mobile_content_control.sql` on start.
 2. Sign in to the staff console and choose **Mobile app** (or open `/admin?view=mobile`).
-3. Pick a section: Event, Menus, Headings & text, Sessions, Activities, FAQs, Venue & help, Speakers, Sponsors & partners, Leadership, Product launch, Themes & highlights, or Feedback.
+3. Pick a section: Event, Menus, Headings & text, Programme, Activities, FAQs, Venue & help, Speakers, Sponsors & partners, Leadership, Product launch, Themes & highlights, or Feedback.
 4. Edit, reorder with the arrows, and tick **Show in app** on each entry that is ready.
    Tick **Hide in app** beside a field to keep its value in the console while withholding it from phones.
 5. Select **Save all changes**.
@@ -35,6 +35,13 @@ Removing an entry applies only after saving.
 - **Sponsors, partners, leaders, committee members, themes, speakers, sessions, activities and FAQs**: each entry has its own **Show in app** switch.
 
 Session times are entered in India time and stored with `+05:30`; the app shows IST regardless of the device timezone.
+
+The **Programme** section edits the timetable that both the app and the website's Programme page show.
+Each session has a type, an optional label above its title (such as "Panel Discussion 1"), a track, and its people, each with the designation printed for that session and an optional link to the speaker directory.
+Linked people show their portrait and profile, and the session appears on their speaker page.
+A **Break or registration** entry is a divider in the timetable that attendees cannot save, rate or set reminders for.
+A **Ceremony** has a running order: timed items, each with its own speakers, and untimed notes such as "Media interaction, if any".
+Sessions are folded to one line; open one to edit it, and use **Sort by start time** after adding entries.
 Both times can be left blank while unconfirmed.
 Links must be public HTTPS URLs.
 Theme images may be a bundled `assets/images/...` path or an HTTPS URL.

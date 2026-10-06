@@ -22,7 +22,10 @@ void main() {
     tester,
   ) async {
     final json = jsonDecode(
-      await rootBundle.loadString('assets/content/event.json'),
+      utf8.decode(
+        (await rootBundle.load('assets/content/event.json')).buffer
+            .asUint8List(),
+      ),
     ) as Map<String, dynamic>;
     json['event_guide'] = {
       'sessions': [
@@ -61,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sessions').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('09/10/2026'));
+    await tester.tap(find.textContaining('Fri 9 Oct'));
     await tester.pumpAndSettle();
     expect(find.text('Innovation forum'), findsOneWidget);
     expect(find.text('Opening discussion'), findsNothing);
@@ -70,7 +73,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Opening discussion'));
     await tester.pumpAndSettle();
-    expect(find.text('08/10/2026\n09:00 - 10:00 IST'), findsOneWidget);
+    expect(find.text('Thu 8 Oct\n09:00 - 10:00 IST'), findsOneWidget);
     expect(find.text('Dr Test'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -127,7 +130,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sessions').last);
     await tester.pumpAndSettle();
-    expect(find.text('Session timetable to be announced'), findsOneWidget);
+    // The bundled snapshot carries the programme, so it shows offline.
+    expect(find.text('Session timetable to be announced'), findsNothing);
+    expect(find.text('Search sessions, speakers or topics'), findsOneWidget);
     await tester.tap(find.text('Guide').last);
     await tester.pumpAndSettle();
     // Sections with nothing published are not offered at all.

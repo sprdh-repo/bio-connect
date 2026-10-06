@@ -140,8 +140,9 @@ class Agenda extends ChangeNotifier {
   }
 
   /// Saved sessions that are still published, in programme order.
-  List<GuideSession> sessions(EventContent content) =>
-      sortSessions(content.guide.sessions.where((s) => hasSession(s.id)));
+  List<GuideSession> sessions(EventContent content) => sortSessions(
+    content.guide.sessions.where((s) => s.plannable && hasSession(s.id)),
+  );
 
   List<Speaker> speakers(EventContent content) =>
       content.speakers.where((s) => hasSpeaker(s.id)).toList();
@@ -158,7 +159,7 @@ class Agenda extends ChangeNotifier {
     }
     return sortSessions(
       content.guide.sessions.where(
-        (s) => ids.contains(s.id) && !hasSession(s.id),
+        (s) => s.plannable && ids.contains(s.id) && !hasSession(s.id),
       ),
     );
   }
@@ -221,12 +222,24 @@ int reminderId(String sessionId) {
   return h;
 }
 
-/// Timed sessions by start, then untimed ones by title.
-List<GuideSession> sortSessions(Iterable<GuideSession> items) =>
-    items.toList()..sort((a, b) {
-      if (a.startsAt == null) {
-        return b.startsAt == null ? a.title.compareTo(b.title) : 1;
+/// Timed sessions by start, the shorter first when two start together, then
+/// untimed ones by title. Otherwise the published order holds.
+List<GuideSession> sortSessions(Iterable<GuideSession> items) {
+  final list = items.toList();
+  final order = {for (final (i, s) in list.indexed) s: i};
+  return list..sort((a, b) {
+    if (a.startsAt == null || b.startsAt == null) {
+      if (a.startsAt != b.startsAt) return a.startsAt == null ? 1 : -1;
+      final byTitle = a.title.compareTo(b.title);
+      if (byTitle != 0) return byTitle;
+    } else {
+      final byStart = a.startsAt!.compareTo(b.startsAt!);
+      if (byStart != 0) return byStart;
+      if (a.endsAt != null && b.endsAt != null) {
+        final byEnd = a.endsAt!.compareTo(b.endsAt!);
+        if (byEnd != 0) return byEnd;
       }
-      if (b.startsAt == null) return -1;
-      return a.startsAt!.compareTo(b.startsAt!);
-    });
+    }
+    return order[a]!.compareTo(order[b]!);
+  });
+}

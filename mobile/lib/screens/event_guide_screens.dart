@@ -491,30 +491,44 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
-  String query = '', selectedDay = 'All days';
+  static const allDays = 'All days';
+  String query = '';
+
+  /// Null until the attendee picks a day: then today during the event,
+  /// otherwise every day.
+  String? selectedDay;
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ContentProvider>();
     final content = state.content!;
     final agenda = context.watch<Agenda>();
+    final now = agenda.now();
     final sessions = sortSessions(content.guide.sessions);
     final days = sessions
         .where((s) => s.startsAt != null)
-        .map((s) => sessionDay(s.startsAt!))
+        .map((s) => sessionDayLabel(s.startsAt!))
         .toSet()
         .toList();
-    final activeDay = days.contains(selectedDay) ? selectedDay : 'All days';
+    final today = sessionDayLabel(now);
+    final wanted = selectedDay ?? (days.contains(today) ? today : allDays);
+    final activeDay = days.contains(wanted) ? wanted : allDays;
+    final terms = query.toLowerCase().split(RegExp(r'\s+'))
+      ..removeWhere((t) => t.isEmpty);
     final filtered = sessions
         .where(
           (s) =>
-              (activeDay == 'All days' ||
+              (activeDay == allDays ||
                   (s.startsAt != null &&
-                      sessionDay(s.startsAt!) == activeDay)) &&
-              '${s.title} ${s.speakers} ${s.location}'.toLowerCase().contains(
-                query.toLowerCase(),
-              ),
+                      sessionDayLabel(s.startsAt!) == activeDay)) &&
+              terms.every(s.searchText.contains),
         )
         .toList();
+    // A search shows what matched; breaks only frame the full timetable.
+    final shown = terms.isEmpty
+        ? filtered
+        : filtered.where((s) => s.plannable).toList();
+    final live = sessions.where((s) => s.plannable && s.liveAt(now)).toList();
     return LiveRefresh(
       onRefresh: state.load,
       child: ListView(
@@ -550,20 +564,27 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ),
             ],
           ] else ...[
+            if (live.isNotEmpty) ...[
+              _HappeningNow(live),
+              const SizedBox(height: 18),
+            ],
             GuideSearchField(
-              label: 'Search sessions, speakers or halls',
+              label: 'Search sessions, speakers or topics',
               onChanged: (v) => setState(() => query = v),
             ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
-                for (final day in ['All days', ...days])
+                for (final day in [allDays, ...days])
                   ChoiceChip(
-                    label: Text(day),
+                    label: Text(
+                      day == today && day != allDays ? '$day · Today' : day,
+                    ),
                     selected: activeDay == day,
                     onSelected: (_) {
-                      if (selectedDay != day) {
+                      if (activeDay != day) {
                         AppFeedback.selection();
                         FocusScope.of(context).unfocus();
                         setState(() => selectedDay = day);
@@ -572,47 +593,394 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (filtered.isEmpty)
+            const SizedBox(height: 8),
+            if (shown.isEmpty) ...[
+              const SizedBox(height: 8),
               const GuideNotice(
                 title: 'No matching sessions',
                 message: 'Try a different search or choose another day.',
                 icon: Icons.search_off,
               ),
-            for (final session in filtered)
-              Card(
-                color: cream,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  title: Text(
-                    session.title,
-                    style: const TextStyle(fontFamily: 'Manrope'),
-                  ),
-                  subtitle: switch ([
-                    if (session.startsAt case final start?)
-                      '${sessionDay(start)} · ${sessionTime(start)} IST',
-                    if (session.location.isNotEmpty) session.location,
-                  ]) {
-                    [] => null,
-                    final lines => Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(lines.join('\n')),
-                    ),
-                  },
-                  trailing: SaveIcon(
-                    saved: agenda.hasSession(session.id),
-                    label: session.title,
-                    onPressed: () => toggleSavedSession(context, session),
-                  ),
-                  onTap: () =>
-                      showGuidePage(context, SessionDetailScreen(session.id)),
+            ],
+            for (final (i, session) in shown.indexed) ...[
+              if (session.startsAt != null &&
+                  (i == 0 ||
+                      shown[i - 1].startsAt == null ||
+                      sessionDayLabel(shown[i - 1].startsAt!) !=
+                          sessionDayLabel(session.startsAt!)))
+                _DayHeading(session.startsAt!, days),
+              if (session.startsAt == null &&
+                  (i == 0 || shown[i - 1].startsAt != null))
+                const _DayHeadingText('Time to be confirmed'),
+              if (session.isBreak)
+                _BreakRow(session)
+              else
+                _SessionCard(
+                  session,
+                  live: session.liveAt(now),
+                  saved: agenda.hasSession(session.id),
                 ),
-              ),
+            ],
           ],
         ],
       ),
     );
   }
+}
+
+/// "DAY 1 · THU 8 OCT", numbered across the whole programme.
+class _DayHeading extends StatelessWidget {
+  const _DayHeading(this.day, this.days);
+  final DateTime day;
+  final List<String> days;
+  @override
+  Widget build(BuildContext context) {
+    final label = sessionDayLabel(day);
+    final n = days.indexOf(label) + 1;
+    return _DayHeadingText(days.length > 1 ? 'Day $n · $label' : label);
+  }
+}
+
+class _DayHeadingText extends StatelessWidget {
+  const _DayHeadingText(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(2, 22, 2, 10),
+    child: Semantics(
+      header: true,
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: forest,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.4,
+        ),
+      ),
+    ),
+  );
+}
+
+/// What kind of entry a session is, when staff gave it no label.
+String sessionKindLabel(GuideSession s) => switch (s.kind) {
+  'talk' => 'Talk',
+  'panel' => 'Panel discussion',
+  'ceremony' => 'Ceremony',
+  'social' => 'Evening programme',
+  'break' => 'Break',
+  _ => 'Session',
+};
+
+/// One line about who is on stage, for the timetable.
+String sessionPeopleSummary(GuideSession s) {
+  if (s.segments.isNotEmpty) {
+    final n = s.segments.where((g) => g.startsAt != null).length;
+    return 'Running order · $n ${n == 1 ? 'item' : 'items'}';
+  }
+  final moderator = s.people.where((p) => p.role == 'moderator').firstOrNull;
+  final panel = s.people.where((p) => p.role == 'panelist').length;
+  final others = s.people.where(
+    (p) => p.role != 'moderator' && p.role != 'panelist',
+  );
+  if (moderator != null || panel > 0) {
+    return [
+      if (moderator != null) 'Moderated by ${moderator.name}',
+      if (panel > 0) '$panel ${panel == 1 ? 'panellist' : 'panellists'}',
+    ].join(' · ');
+  }
+  if (others.length == 1) {
+    final p = others.first;
+    // A keynote titled with its speaker's name needs only the designation.
+    return p.name == s.title ? p.designation : p.name;
+  }
+  if (others.isNotEmpty) return others.map((p) => p.name).join(', ');
+  return s.structured ? '' : s.speakers.split('\n').first;
+}
+
+class _SessionCard extends StatelessWidget {
+  const _SessionCard(this.session, {required this.live, required this.saved});
+  final GuideSession session;
+  final bool live, saved;
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    final summary = sessionPeopleSummary(s);
+    final meta = [
+      if (s.location.isNotEmpty) s.location,
+      if (s.track.isNotEmpty) s.track,
+    ];
+    return Pressable(
+      child: Card(
+        color: Colors.white,
+        margin: const EdgeInsets.only(bottom: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: live
+              ? const BorderSide(color: forest, width: 1.5)
+              : BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => showGuidePage(context, SessionDetailScreen(s.id)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 4, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 50,
+                  child: s.startsAt == null
+                      ? const Text('TBC', style: TextStyle(color: muted))
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sessionTime(s.startsAt!),
+                              style: const TextStyle(
+                                fontFamily: 'Manrope',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            if (s.endsAt != null)
+                              Text(
+                                sessionTime(s.endsAt!),
+                                style: const TextStyle(
+                                  color: muted,
+                                  fontSize: 12,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (live) ...[
+                            const _LiveBadge(),
+                            const SizedBox(width: 8),
+                          ],
+                          Flexible(
+                            child: Text(
+                              (s.label.isEmpty ? sessionKindLabel(s) : s.label)
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                color: forest,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        s.title,
+                        style: const TextStyle(
+                          fontFamily: 'Manrope',
+                          fontSize: 16,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (summary.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          summary,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: muted,
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          meta.join(' · '),
+                          style: const TextStyle(
+                            color: forest,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                SaveIcon(
+                  saved: saved,
+                  label: s.title,
+                  onPressed: () => toggleSavedSession(context, s),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LiveBadge extends StatelessWidget {
+  const _LiveBadge();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: lime,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: const Text(
+      'NOW',
+      style: TextStyle(
+        color: deepForest,
+        fontSize: 9,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1,
+      ),
+    ),
+  );
+}
+
+/// Tea, lunch and registration: part of the day's shape, not something to plan.
+class _BreakRow extends StatelessWidget {
+  const _BreakRow(this.session);
+  final GuideSession session;
+  @override
+  Widget build(BuildContext context) {
+    final s = session;
+    final title = s.title.toLowerCase();
+    final icon = title.contains('lunch') || title.contains('dinner')
+        ? Icons.restaurant_outlined
+        : title.contains('registration')
+        ? Icons.badge_outlined
+        : Icons.local_cafe_outlined;
+    return Semantics(
+      container: true,
+      label: [s.title, if (s.startsAt != null) sessionSpan(s)].join(', '),
+      excludeSemantics: true,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        decoration: BoxDecoration(
+          color: cream,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 50,
+              child: Text(
+                s.startsAt == null ? '' : sessionTime(s.startsAt!),
+                style: const TextStyle(
+                  color: muted,
+                  fontSize: 13,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(icon, size: 18, color: muted),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                s.title,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (s.endsAt != null)
+              Text(
+                'until ${sessionTime(s.endsAt!)}',
+                style: const TextStyle(color: muted, fontSize: 12),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The sessions under way, above the timetable while the event runs.
+class _HappeningNow extends StatelessWidget {
+  const _HappeningNow(this.sessions);
+  final List<GuideSession> sessions;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: forest,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            _LiveBadge(),
+            SizedBox(width: 8),
+            Text(
+              'HAPPENING NOW',
+              style: TextStyle(
+                color: lime,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        for (final s in sessions)
+          InkWell(
+            onTap: () => showGuidePage(context, SessionDetailScreen(s.id)),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Manrope',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          [
+                            'Until ${sessionTime(s.endsAt!)}',
+                            if (s.location.isNotEmpty) s.location,
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: Color(0xCCFFFFFF),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class SessionDetailScreen extends StatelessWidget {
@@ -624,11 +992,12 @@ class SessionDetailScreen extends StatelessWidget {
     final content = state.content!;
     final agenda = context.watch<Agenda>();
     final items = content.guide.sessions.where((s) => s.id == id);
+    final plannable = items.isNotEmpty && items.first.plannable;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Session details'),
         actions: [
-          if (items.isNotEmpty)
+          if (plannable)
             SaveIcon(
               saved: agenda.hasSession(id),
               label: 'this session',
@@ -655,7 +1024,9 @@ class SessionDetailScreen extends StatelessWidget {
                 builder: (context) {
                   final s = items.first;
                   final saved = agenda.hasSession(s.id);
-                  final clashes = agenda.clashesFor(s, content);
+                  final clashes = plannable
+                      ? agenda.clashesFor(s, content)
+                      : const <GuideSession>[];
                   final linked = [
                     for (final id in s.speakerIds) ?content.speaker(id),
                   ];
@@ -663,15 +1034,44 @@ class SessionDetailScreen extends StatelessWidget {
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 36),
                     children: [
-                      TitleText(s.title),
-                      const SizedBox(height: 18),
-                      SaveButton(
-                        saved: saved,
-                        onPressed: () => toggleSavedSession(context, s),
+                      Row(
+                        children: [
+                          if (s.liveAt(agenda.now())) ...[
+                            const _LiveBadge(),
+                            const SizedBox(width: 8),
+                          ],
+                          Flexible(
+                            child: Eyebrow(
+                              (s.label.isEmpty ? sessionKindLabel(s) : s.label)
+                                  .toUpperCase(),
+                            ),
+                          ),
+                        ],
                       ),
-                      if (s.startsAt != null && s.endsAt != null) ...[
+                      const SizedBox(height: 8),
+                      TitleText(s.title),
+                      if (s.track.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Chip(
+                            label: Text(s.track),
+                            backgroundColor: cream,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 18),
+                      if (plannable)
+                        SaveButton(
+                          saved: saved,
+                          onPressed: () => toggleSavedSession(context, s),
+                        ),
+                      if (plannable &&
+                          s.startsAt != null &&
+                          s.endsAt != null) ...[
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
                           onPressed: () => addSessionsToCalendar(context, [s]),
@@ -692,11 +1092,11 @@ class SessionDetailScreen extends StatelessWidget {
                           ].join('\n'),
                         ),
                       ],
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 6),
                       if (s.startsAt case final start?)
                         _DetailBlock(
                           'When',
-                          '${sessionDay(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
+                          '${sessionDayLabel(start)}\n${sessionTime(start)}${s.endsAt == null ? '' : ' - ${sessionTime(s.endsAt!)}'} IST',
                           icon: Icons.schedule_rounded,
                         ),
                       if (s.location.isNotEmpty)
@@ -705,14 +1105,23 @@ class SessionDetailScreen extends StatelessWidget {
                           s.location,
                           icon: Icons.place_outlined,
                         ),
-                      if (s.speakers.isNotEmpty)
+                      if (s.description.isNotEmpty)
+                        _DetailBlock(
+                          'About the session',
+                          s.description,
+                          icon: Icons.notes_rounded,
+                        ),
+                      if (s.people.isNotEmpty) _PeoplePanel(s),
+                      if (s.segments.isNotEmpty) _RunningOrder(s.segments),
+                      // Content saved before people were structured.
+                      if (!s.structured && s.speakers.isNotEmpty)
                         _DetailBlock(
                           'Speakers',
                           s.speakers,
                           icon: Icons.people_outline_rounded,
                         ),
-                      if (linked.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                      if (!s.structured && linked.isNotEmpty) ...[
+                        const SizedBox(height: 14),
                         for (final speaker in linked)
                           GuideCard(
                             Icons.person_outline,
@@ -726,14 +1135,7 @@ class SessionDetailScreen extends StatelessWidget {
                               SpeakerDetailScreen(speaker),
                             ),
                           ),
-                        const SizedBox(height: 12),
                       ],
-                      if (s.description.isNotEmpty)
-                        _DetailBlock(
-                          'About the session',
-                          s.description,
-                          icon: Icons.notes_rounded,
-                        ),
                     ],
                   );
                 },
@@ -741,6 +1143,252 @@ class SessionDetailScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The people on a session, grouped by their part in it.
+class _PeoplePanel extends StatelessWidget {
+  const _PeoplePanel(this.session);
+  final GuideSession session;
+  @override
+  Widget build(BuildContext context) {
+    final people = session.people;
+    final speaking = people
+        .where((p) => !const {'moderator', 'panelist', 'host'}.contains(p.role))
+        .toList();
+    final groups = [
+      (session.kind == 'panel' ? 'In conversation' : 'Speaker', speaking),
+      ('Moderator', people.where((p) => p.role == 'moderator').toList()),
+      ('Panellists', people.where((p) => p.role == 'panelist').toList()),
+      ('Host', people.where((p) => p.role == 'host').toList()),
+    ].where((g) => g.$2.isNotEmpty);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: DetailPanel(
+        padding: 8,
+        children: [
+          for (final (i, (title, list)) in groups.indexed) ...[
+            if (i > 0) const Divider(height: 18, color: cream),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 2),
+              child: Text(
+                (list.length > 1 && title == 'Speaker' ? 'Speakers' : title)
+                    .toUpperCase(),
+                style: const TextStyle(
+                  color: muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            for (final p in list) _PersonTile(p),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A person with a portrait when they are in the speaker directory, whose
+/// profile it then opens; initials otherwise.
+class _PersonTile extends StatelessWidget {
+  const _PersonTile(this.person, {this.compact = false});
+  final SessionPerson person;
+  final bool compact;
+  @override
+  Widget build(BuildContext context) {
+    final speaker = person.speakerId.isEmpty
+        ? null
+        : context.read<ContentProvider>().content?.speaker(person.speakerId);
+    final size = compact ? 36.0 : 48.0;
+    final avatar = ClipOval(
+      child: SizedBox.square(
+        dimension: size,
+        child: speaker != null && speaker.image.isNotEmpty
+            ? ColoredBox(
+                color: cream,
+                child: SpeakerImage(speaker, width: size),
+              )
+            : ColoredBox(
+                color: cream,
+                child: Center(
+                  child: Text(
+                    personInitials(person.name),
+                    style: TextStyle(
+                      color: forest,
+                      fontWeight: FontWeight.w700,
+                      fontSize: compact ? 12 : 15,
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          person.name,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: compact ? 13 : 14,
+          ),
+        ),
+        if (person.designation.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            person.designation,
+            style: TextStyle(
+              color: muted,
+              fontSize: compact ? 11.5 : 12.5,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ],
+    );
+    final row = Padding(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: compact ? 6 : 8),
+      child: Row(
+        children: [
+          avatar,
+          const SizedBox(width: 12),
+          Expanded(child: text),
+          if (speaker != null)
+            const Icon(Icons.chevron_right, color: forest, size: 20),
+        ],
+      ),
+    );
+    if (speaker == null) return row;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => showGuidePage(context, SpeakerDetailScreen(speaker)),
+      child: Semantics(
+        button: true,
+        hint: 'Opens their speaker profile',
+        child: row,
+      ),
+    );
+  }
+}
+
+/// Up to two initials, ignoring honorifics such as "Dr." or "Shri.".
+String personInitials(String name) {
+  final words = name
+      .replaceAll(
+        RegExp(
+          r'\b(dr|prof|mr|mrs|ms|shri|smt|padma bhushan|padma shri|ias)\b\.?',
+          caseSensitive: false,
+        ),
+        ' ',
+      )
+      .split(RegExp(r'[\s.]+'))
+      .where((w) => w.isNotEmpty && RegExp(r'[A-Za-z]').hasMatch(w[0]))
+      .toList();
+  if (words.isEmpty) return '';
+  final last = words.length > 1 ? words.last[0] : '';
+  return (words.first[0] + last).toUpperCase();
+}
+
+/// A ceremony's running order as a timeline.
+class _RunningOrder extends StatelessWidget {
+  const _RunningOrder(this.segments);
+  final List<SessionSegment> segments;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 14),
+    child: DetailPanel(
+      padding: 18,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.format_list_numbered_rounded, color: forest, size: 20),
+            SizedBox(width: 10),
+            Text(
+              'Running order',
+              style: TextStyle(fontFamily: 'Manrope', fontSize: 17),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        for (final (i, g) in segments.indexed)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 46,
+                  child: Text(
+                    g.startsAt == null ? '' : sessionTime(g.startsAt!),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 18,
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: g.startsAt == null ? cream : lime,
+                          border: Border.all(color: forest, width: 1.5),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      if (i < segments.length - 1)
+                        Expanded(child: Container(width: 1.5, color: cream)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          g.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: g.startsAt == null ? muted : ink,
+                          ),
+                        ),
+                        if (g.description.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            g.description,
+                            style: const TextStyle(
+                              color: muted,
+                              fontSize: 12.5,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                        for (final p in g.people)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Transform.translate(
+                              offset: const Offset(-10, 0),
+                              child: _PersonTile(p, compact: true),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class VenueScreen extends StatelessWidget {

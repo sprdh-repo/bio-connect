@@ -29,41 +29,136 @@ class EventGuide {
   );
 }
 
+/// One entry in the programme. A break (tea, lunch, registration) is a
+/// divider in the timetable: it cannot be saved, rated or reminded about.
 class GuideSession {
   const GuideSession({
     required this.id,
     required this.title,
+    this.kind = '',
+    this.label = '',
+    this.track = '',
     this.description = '',
     this.startsAt,
     this.endsAt,
     this.location = '',
+    this.people = const [],
+    this.segments = const [],
     this.speakers = '',
     this.speakerIds = const [],
   });
-  final String id, title, description, location, speakers;
+  final String id, title, kind, label, track, description, location, speakers;
   final DateTime? startsAt, endsAt;
 
-  /// Speakers from the directory that staff linked to this session.
+  /// People as printed in the programme, in order.
+  final List<SessionPerson> people;
+
+  /// A ceremony's running order.
+  final List<SessionSegment> segments;
+
+  /// Speakers from the directory linked to this session or its running order.
   final List<String> speakerIds;
 
-  /// Whether both sessions have times and they share any minute.
+  bool get isBreak => kind == 'break';
+
+  /// Whether attendees can save, rate and be reminded about it.
+  bool get plannable => !isBreak;
+
+  /// Whether the programme lists people or a running order, rather than only
+  /// the plain speakers line of older content.
+  bool get structured => people.isNotEmpty || segments.isNotEmpty;
+
+  /// Everything a search should match, including every person named.
+  String get searchText => [
+    title,
+    label,
+    track,
+    location,
+    speakers,
+    for (final p in [...people, for (final s in segments) ...s.people])
+      '${p.name} ${p.designation}',
+    for (final s in segments) s.title,
+  ].join(' ').toLowerCase();
+
+  /// Whether both sessions can be planned, have times and share any minute.
   bool clashesWith(GuideSession other) =>
       other.id != id &&
+      plannable &&
+      other.plannable &&
       startsAt != null &&
       endsAt != null &&
       other.startsAt != null &&
       other.endsAt != null &&
       startsAt!.isBefore(other.endsAt!) &&
       other.startsAt!.isBefore(endsAt!);
+
+  /// Whether it is under way at [at].
+  bool liveAt(DateTime at) =>
+      startsAt != null &&
+      endsAt != null &&
+      !startsAt!.isAfter(at) &&
+      endsAt!.isAfter(at);
+
   factory GuideSession.fromJson(Map<String, dynamic> j) => GuideSession(
     id: str(j['id']),
     title: str(j['title']),
+    kind: str(j['kind']),
+    label: str(j['label']),
+    track: str(j['track']),
     description: str(j['description']),
     startsAt: DateTime.tryParse(str(j['starts_at'])),
     endsAt: DateTime.tryParse(str(j['ends_at'])),
     location: str(j['location']),
+    people: SessionPerson.list(j['people']),
+    segments: maps(j['segments'])
+        .map(SessionSegment.fromJson)
+        .where((s) => s.title.isNotEmpty)
+        .toList(),
     speakers: str(j['speakers']),
     speakerIds: strings(j['speaker_ids']),
+  );
+}
+
+/// A person on a session, with the designation printed for that session.
+class SessionPerson {
+  const SessionPerson({
+    required this.name,
+    this.designation = '',
+    this.role = '',
+    this.speakerId = '',
+  });
+  final String name, designation, role, speakerId;
+  static List<SessionPerson> list(Object? json) => maps(json)
+      .map(
+        (p) => SessionPerson(
+          name: str(p['name']),
+          designation: str(p['designation']),
+          role: str(p['role']),
+          speakerId: str(p['speaker_id']),
+        ),
+      )
+      .where((p) => p.name.isNotEmpty)
+      .toList();
+}
+
+/// One item in a ceremony's running order.
+class SessionSegment {
+  const SessionSegment({
+    required this.title,
+    this.description = '',
+    this.startsAt,
+    this.endsAt,
+    this.people = const [],
+  });
+  final String title, description;
+  final DateTime? startsAt, endsAt;
+  final List<SessionPerson> people;
+  factory SessionSegment.fromJson(Map<String, dynamic> j) => SessionSegment(
+    title: str(j['title']),
+    description: str(j['description']),
+    startsAt: DateTime.tryParse(str(j['starts_at'])),
+    endsAt: DateTime.tryParse(str(j['ends_at'])),
+    people: SessionPerson.list(j['people']),
   );
 }
 
@@ -140,4 +235,26 @@ String sessionTime(DateTime value) {
 String sessionDay(DateTime value) {
   final t = indiaTime(value);
   return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}';
+}
+
+const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const _monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// A short day label in IST, like "Thu 8 Oct".
+String sessionDayLabel(DateTime value) {
+  final t = indiaTime(value);
+  return '${_weekdays[t.weekday - 1]} ${t.day} ${_monthNames[t.month - 1]}';
 }

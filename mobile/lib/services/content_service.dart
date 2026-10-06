@@ -38,12 +38,17 @@ class CurrentContentService implements ContentService {
     'BIO_CONNECT_API_BASE_URL',
     defaultValue: 'https://reg.bioconnect.kerala.gov.in',
   );
-  String get appContentUrl => '$apiBaseUrl/api/v1/public/app-content';
+  // Breaks are only sent to app versions that show them as breaks.
+  String get appContentUrl =>
+      '$apiBaseUrl/api/v1/public/app-content?include=breaks';
   String get exhibitorsUrl => '$apiBaseUrl/api/v1/public/exhibitors';
 
   @override
   Future<EventContent> loadEvent() async {
-    final source = await rootBundle.loadString('assets/content/event.json');
+    // Read and decode directly: loadString hands assets over 50 KB to a
+    // background isolate, which is slower to start than this small decode.
+    final bytes = await rootBundle.load('assets/content/event.json');
+    final source = utf8.decode(bytes.buffer.asUint8List());
     return EventContent.fromJson(jsonDecode(source) as Map<String, dynamic>);
   }
 

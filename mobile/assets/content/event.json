@@ -727,7 +727,1409 @@
     "activities": [],
     "faqs": [],
     "revision": 3,
-    "sessions": [],
+    "sessions": [
+      {
+        "description": "",
+        "ends_at": "2026-10-08T09:45:00+05:30",
+        "id": "d1-registration",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-08T08:00:00+05:30",
+        "title": "Registration",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T11:40:00+05:30",
+        "id": "d1-inaugural",
+        "kind": "ceremony",
+        "label": "",
+        "location": "Grand Ball Room",
+        "people": [],
+        "segments": [
+          {
+            "description": "",
+            "ends_at": "2026-10-08T10:03:00+05:30",
+            "people": [
+              {
+                "designation": "",
+                "name": "Master of Ceremonies",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:00:00+05:30",
+            "title": "Opening Remarks"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T10:10:00+05:30",
+            "people": [
+              {
+                "designation": "Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam",
+                "name": "Shri. Snehil Kumar Singh IAS",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:03:00+05:30",
+            "title": "Welcome Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T10:20:00+05:30",
+            "people": [
+              {
+                "designation": "Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam",
+                "name": "Shri. A. P. M. Mohammed Hanish IAS",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:10:00+05:30",
+            "title": "Context Setting - Biotechnology & Lifesciences: Next Development Leap"
+          },
+          {
+            "description": "Audio-visual presentation on the flagship project portfolio - Bio 360 Life Sciences Park.",
+            "ends_at": "2026-10-08T10:25:00+05:30",
+            "people": [],
+            "starts_at": "2026-10-08T10:20:00+05:30",
+            "title": "Launch of Vision AV - Shaping the Future of Life"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T10:40:00+05:30",
+            "people": [
+              {
+                "designation": "Hon'ble Minister for Industries, IT & AI, Government of Keralam",
+                "name": "Shri. P. K. Kunhalikutty",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:25:00+05:30",
+            "title": "Presidential Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T10:50:00+05:30",
+            "people": [
+              {
+                "designation": "Hon'ble Minister for Health & Devaswoms, Government of Keralam",
+                "name": "Shri. K. Muraleedharan",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:40:00+05:30",
+            "title": "Distinguished Address - Guest of Honour"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:00:00+05:30",
+            "people": [
+              {
+                "designation": "Hon'ble Minister for Agriculture, Government of Keralam",
+                "name": "Shri. T. Siddique",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T10:50:00+05:30",
+            "title": "Distinguished Address - Guest of Honour"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:15:00+05:30",
+            "people": [
+              {
+                "designation": "Hon'ble Chief Minister, Government of Keralam",
+                "name": "Shri. V. D. Satheesan",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T11:00:00+05:30",
+            "title": "Inaugural Address - Next Development Leap"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:20:00+05:30",
+            "people": [
+              {
+                "designation": "Founding Director, Center for Advanced Vision Science (CAVS) & CEO, Inflammasomes, USA",
+                "name": "Dr. Jayakrishna Ambati",
+                "role": "",
+                "speaker_id": "jayakrishna-ambati"
+              }
+            ],
+            "starts_at": "2026-10-08T11:15:00+05:30",
+            "title": "Special Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:25:00+05:30",
+            "people": [],
+            "starts_at": "2026-10-08T11:20:00+05:30",
+            "title": "Honouring the Guests & EOI Receipts"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:30:00+05:30",
+            "people": [
+              {
+                "designation": "Chairman, KSIDC & KLIP, Government of Keralam",
+                "name": "Shri. C. Balagopal",
+                "role": "",
+                "speaker_id": "c-balagopal"
+              }
+            ],
+            "starts_at": "2026-10-08T11:25:00+05:30",
+            "title": "Special Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:35:00+05:30",
+            "people": [
+              {
+                "designation": "Director, KLIP & CEO, MagGenome Technologies",
+                "name": "Dr. C. N. Ramchand",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T11:30:00+05:30",
+            "title": "Introducing Bio Connect 4.0 - Theme"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-08T11:40:00+05:30",
+            "people": [
+              {
+                "designation": "GM (i/c), KSIDC & Chief Executive Officer, KLIP",
+                "name": "Shri. Jose Kurian Mundackal",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-08T11:35:00+05:30",
+            "title": "Vote of Thanks"
+          },
+          {
+            "description": "",
+            "ends_at": "",
+            "people": [],
+            "starts_at": "",
+            "title": "Media interaction, if any"
+          },
+          {
+            "description": "",
+            "ends_at": "",
+            "people": [],
+            "starts_at": "",
+            "title": "Inaugural session concludes; the event commences"
+          }
+        ],
+        "speaker_ids": [
+          "jayakrishna-ambati",
+          "c-balagopal"
+        ],
+        "speakers": "10:00 Opening Remarks: Master of Ceremonies\n10:03 Welcome Address: Shri. Snehil Kumar Singh IAS, Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam\n10:10 Context Setting - Biotechnology & Lifesciences: Next Development Leap: Shri. A. P. M. Mohammed Hanish IAS, Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam\n10:20 Launch of Vision AV - Shaping the Future of Life\n10:25 Presidential Address: Shri. P. K. Kunhalikutty, Hon'ble Minister for Industries, IT & AI, Government of Keralam\n10:40 Distinguished Address - Guest of Honour: Shri. K. Muraleedharan, Hon'ble Minister for Health & Devaswoms, Government of Keralam\n10:50 Distinguished Address - Guest of Honour: Shri. T. Siddique, Hon'ble Minister for Agriculture, Government of Keralam\n11:00 Inaugural Address - Next Development Leap: Shri. V. D. Satheesan, Hon'ble Chief Minister, Government of Keralam\n11:15 Special Address: Dr. Jayakrishna Ambati, Founding Director, Center for Advanced Vision Science (CAVS) & CEO, Inflammasomes, USA\n11:20 Honouring the Guests & EOI Receipts\n11:25 Special Address: Shri. C. Balagopal, Chairman, KSIDC & KLIP, Government of Keralam\n11:30 Introducing Bio Connect 4.0 - Theme: Dr. C. N. Ramchand, Director, KLIP & CEO, MagGenome Technologies\n11:35 Vote of Thanks: Shri. Jose Kurian Mundackal, GM (i/c), KSIDC & Chief Executive Officer, KLIP\nMedia interaction, if any\nInaugural session concludes; the event commences",
+        "starts_at": "2026-10-08T10:00:00+05:30",
+        "title": "Inaugural Session & Exhibit Inauguration",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T11:50:00+05:30",
+        "id": "d1-tea-1",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-08T11:40:00+05:30",
+        "title": "Tea Break",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T12:05:00+05:30",
+        "id": "d1-keynote-ramasami",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Former Secretary, Indian Science and Technology",
+            "name": "Padma Bhushan Prof. T. Ramasami",
+            "role": "",
+            "speaker_id": "thirumalachari-ramasami"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "thirumalachari-ramasami"
+        ],
+        "speakers": "Padma Bhushan Prof. T. Ramasami, Former Secretary, Indian Science and Technology",
+        "starts_at": "2026-10-08T11:50:00+05:30",
+        "title": "Padma Bhushan Prof. T. Ramasami",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T12:20:00+05:30",
+        "id": "d1-keynote-hanish",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam",
+            "name": "Shri. A. P. M. Mohammed Hanish IAS",
+            "role": "",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "Shri. A. P. M. Mohammed Hanish IAS, Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam",
+        "starts_at": "2026-10-08T12:05:00+05:30",
+        "title": "Shri. A. P. M. Mohammed Hanish IAS",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T12:35:00+05:30",
+        "id": "d1-keynote-ambati",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Founding Director, Center for Advanced Vision Science (CAVS); University of Virginia School of Medicine, USA; President and CEO, Inflammasomes",
+            "name": "Dr. Jayakrishna Ambati",
+            "role": "",
+            "speaker_id": "jayakrishna-ambati"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "jayakrishna-ambati"
+        ],
+        "speakers": "Dr. Jayakrishna Ambati, Founding Director, Center for Advanced Vision Science (CAVS); University of Virginia School of Medicine, USA; President and CEO, Inflammasomes",
+        "starts_at": "2026-10-08T12:20:00+05:30",
+        "title": "Dr. Jayakrishna Ambati",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T12:50:00+05:30",
+        "id": "d1-keynote-minhaj-alam",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Additional Chief Secretary, Agriculture & Commissioner, Agriculture Production, Industries (Coir) and Home & Vigilance, Government of Keralam",
+            "name": "Shri. Minhaj Alam IAS",
+            "role": "",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "Shri. Minhaj Alam IAS, Additional Chief Secretary, Agriculture & Commissioner, Agriculture Production, Industries (Coir) and Home & Vigilance, Government of Keralam",
+        "starts_at": "2026-10-08T12:35:00+05:30",
+        "title": "Shri. Minhaj Alam IAS",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T13:05:00+05:30",
+        "id": "d1-keynote-snehil",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam",
+            "name": "Shri. Snehil Kumar Singh IAS",
+            "role": "",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "Shri. Snehil Kumar Singh IAS, Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam",
+        "starts_at": "2026-10-08T12:50:00+05:30",
+        "title": "Shri. Snehil Kumar Singh IAS",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T13:50:00+05:30",
+        "id": "d1-lunch",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-08T13:05:00+05:30",
+        "title": "Networking Lunch",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T14:00:00+05:30",
+        "id": "d1-keynote-miersch",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "CSO, Simisco Biologics, Canada",
+            "name": "Dr. Shane Miersch",
+            "role": "",
+            "speaker_id": "shane-miersch"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "shane-miersch"
+        ],
+        "speakers": "Dr. Shane Miersch, CSO, Simisco Biologics, Canada",
+        "starts_at": "2026-10-08T13:50:00+05:30",
+        "title": "Dr. Shane Miersch",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T14:40:00+05:30",
+        "id": "panel-1",
+        "kind": "panel",
+        "label": "Panel Discussion 1",
+        "location": "",
+        "people": [
+          {
+            "designation": "Head, Data and Qualitative Sciences, Bristol Myers Squibb",
+            "name": "Dr. Mahesh Iyer",
+            "role": "moderator",
+            "speaker_id": "mahesh-iyer"
+          },
+          {
+            "designation": "Principal Scientist, Tata Consultancy Services (TCS)",
+            "name": "Dr. Naveen Sivadasan",
+            "role": "panelist",
+            "speaker_id": "naveen-sivadasan"
+          },
+          {
+            "designation": "CEO & Co-Founder, Locksmith Bio",
+            "name": "Dr. Ajitesh Lunge",
+            "role": "panelist",
+            "speaker_id": "ajitesh-harihar-lunge"
+          },
+          {
+            "designation": "Director, Business Strategy, LTM",
+            "name": "Dr. Siddharth Joshi",
+            "role": "panelist",
+            "speaker_id": "siddharth-m-joshi"
+          },
+          {
+            "designation": "CEO, Capla GmbH",
+            "name": "Dr. Vinodh Kumar Adithya",
+            "role": "panelist",
+            "speaker_id": "vinodh-kumar-adithya"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "mahesh-iyer",
+          "naveen-sivadasan",
+          "ajitesh-harihar-lunge",
+          "siddharth-m-joshi",
+          "vinodh-kumar-adithya"
+        ],
+        "speakers": "Moderator: Dr. Mahesh Iyer, Head, Data and Qualitative Sciences, Bristol Myers Squibb\nDr. Naveen Sivadasan, Principal Scientist, Tata Consultancy Services (TCS)\nDr. Ajitesh Lunge, CEO & Co-Founder, Locksmith Bio\nDr. Siddharth Joshi, Director, Business Strategy, LTM\nDr. Vinodh Kumar Adithya, CEO, Capla GmbH",
+        "starts_at": "2026-10-08T14:00:00+05:30",
+        "title": "Transforming Life Sciences Through Digital Innovation",
+        "track": "AI"
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T15:30:00+05:30",
+        "id": "panel-2",
+        "kind": "panel",
+        "label": "Panel Discussion 2",
+        "location": "",
+        "people": [
+          {
+            "designation": "Surgical Oncologist, Apollo Hospital, Chennai",
+            "name": "Dr. C. S. Mani",
+            "role": "moderator",
+            "speaker_id": "c-s-mani"
+          },
+          {
+            "designation": "Vice President, Zydus Lifesciences Limited",
+            "name": "Dr. Ravi Trivedi",
+            "role": "panelist",
+            "speaker_id": "ravi-trivedi"
+          },
+          {
+            "designation": "Chief Executive Officer, T Therapeutics LLC",
+            "name": "Dr. Preveen Ramamoorthy",
+            "role": "panelist",
+            "speaker_id": "preveen-ramamoorthy"
+          },
+          {
+            "designation": "CSO, Simisco Biologics, Canada",
+            "name": "Dr. Shane Miersch",
+            "role": "panelist",
+            "speaker_id": "shane-miersch"
+          },
+          {
+            "designation": "Professor, Indian Institute of Technology Bombay",
+            "name": "Dr. Rahul Purwar",
+            "role": "panelist",
+            "speaker_id": "rahul-purwar"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "c-s-mani",
+          "ravi-trivedi",
+          "preveen-ramamoorthy",
+          "shane-miersch",
+          "rahul-purwar"
+        ],
+        "speakers": "Moderator: Dr. C. S. Mani, Surgical Oncologist, Apollo Hospital, Chennai\nDr. Ravi Trivedi, Vice President, Zydus Lifesciences Limited\nDr. Preveen Ramamoorthy, Chief Executive Officer, T Therapeutics LLC\nDr. Shane Miersch, CSO, Simisco Biologics, Canada\nDr. Rahul Purwar, Professor, Indian Institute of Technology Bombay",
+        "starts_at": "2026-10-08T14:40:00+05:30",
+        "title": "From Discovery to Next-Generation Healthcare",
+        "track": "Biopharma"
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T15:55:00+05:30",
+        "id": "d1-fireside",
+        "kind": "panel",
+        "label": "Fireside Chat",
+        "location": "",
+        "people": [
+          {
+            "designation": "Founding Director, Centre for Advanced Vision Science (CAVS); University of Virginia School of Medicine, USA; President and CEO, Inflammasomes",
+            "name": "Dr. Jayakrishna Ambati",
+            "role": "",
+            "speaker_id": "jayakrishna-ambati"
+          },
+          {
+            "designation": "CEO & Founder, MagGenome Technologies",
+            "name": "Dr. C. N. Ramchand",
+            "role": "",
+            "speaker_id": ""
+          },
+          {
+            "designation": "",
+            "name": "Ms. Vachas",
+            "role": "host",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "jayakrishna-ambati"
+        ],
+        "speakers": "Dr. Jayakrishna Ambati, Founding Director, Centre for Advanced Vision Science (CAVS); University of Virginia School of Medicine, USA; President and CEO, Inflammasomes\nDr. C. N. Ramchand, CEO & Founder, MagGenome Technologies\nHost: Ms. Vachas",
+        "starts_at": "2026-10-08T15:30:00+05:30",
+        "title": "Beyond Generics: From Molecular Discovery to Global Innovation",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T16:10:00+05:30",
+        "id": "d1-tea-2",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-08T15:55:00+05:30",
+        "title": "Tea Break",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T16:20:00+05:30",
+        "id": "d1-presentation-medtech",
+        "kind": "talk",
+        "label": "Presentation",
+        "location": "",
+        "people": [
+          {
+            "designation": "Special Officer, Kerala Medical Technology Consortium",
+            "name": "Shri. C. Padmakumar",
+            "role": "",
+            "speaker_id": "c-padmakumar"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "c-padmakumar"
+        ],
+        "speakers": "Shri. C. Padmakumar, Special Officer, Kerala Medical Technology Consortium",
+        "starts_at": "2026-10-08T16:10:00+05:30",
+        "title": "The Rs. 40,000 Crore MedTech Opportunity for Keralam",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T16:55:00+05:30",
+        "id": "panel-3",
+        "kind": "panel",
+        "label": "Panel Discussion 3",
+        "location": "",
+        "people": [
+          {
+            "designation": "Special Officer, KMTC",
+            "name": "Shri. C. Padmakumar",
+            "role": "moderator",
+            "speaker_id": "c-padmakumar"
+          },
+          {
+            "designation": "Founder & CEO, i2R Labs",
+            "name": "Shri. Balakrishnan T. P.",
+            "role": "panelist",
+            "speaker_id": "balakrishnan-t-p"
+          },
+          {
+            "designation": "General Secretary, KMDIA; MD, Jayon Implants Pvt. Ltd.",
+            "name": "Shri. T. C. Jayasankar",
+            "role": "panelist",
+            "speaker_id": "t-c-jayasankar"
+          },
+          {
+            "designation": "Managing Director, Mariya Healthcare Pvt. Ltd.",
+            "name": "Shri. Joseph Jose",
+            "role": "panelist",
+            "speaker_id": "joseph-jose"
+          },
+          {
+            "designation": "Treasurer, KMDIA; Director, Heka Medicals India Pvt. Ltd.",
+            "name": "Shri. Binu Augustin",
+            "role": "panelist",
+            "speaker_id": "binu-augustin"
+          },
+          {
+            "designation": "Vice President, Head Corporate Communications, Agappe Diagnostics Ltd.",
+            "name": "Shri. Sudhir Nair",
+            "role": "panelist",
+            "speaker_id": "sudhir-krishnan-nair"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "c-padmakumar",
+          "balakrishnan-t-p",
+          "t-c-jayasankar",
+          "joseph-jose",
+          "binu-augustin",
+          "sudhir-krishnan-nair"
+        ],
+        "speakers": "Moderator: Shri. C. Padmakumar, Special Officer, KMTC\nShri. Balakrishnan T. P., Founder & CEO, i2R Labs\nShri. T. C. Jayasankar, General Secretary, KMDIA; MD, Jayon Implants Pvt. Ltd.\nShri. Joseph Jose, Managing Director, Mariya Healthcare Pvt. Ltd.\nShri. Binu Augustin, Treasurer, KMDIA; Director, Heka Medicals India Pvt. Ltd.\nShri. Sudhir Nair, Vice President, Head Corporate Communications, Agappe Diagnostics Ltd.",
+        "starts_at": "2026-10-08T16:10:00+05:30",
+        "title": "Realising the Kerala MedTech Vision 2032",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T17:45:00+05:30",
+        "id": "panel-4",
+        "kind": "panel",
+        "label": "Panel Discussion 4",
+        "location": "",
+        "people": [
+          {
+            "designation": "Chairman, KSIDC & KLIP",
+            "name": "Shri. C. Balagopal",
+            "role": "moderator",
+            "speaker_id": "c-balagopal"
+          },
+          {
+            "designation": "CMD, KIMS Health",
+            "name": "Dr. M. I. Sahadulla",
+            "role": "panelist",
+            "speaker_id": "m-i-sahadulla"
+          },
+          {
+            "designation": "Executive Director - Operations, HLL Lifecare",
+            "name": "Shri. Mukund R. Pillai",
+            "role": "panelist",
+            "speaker_id": "r-mukund"
+          },
+          {
+            "designation": "Managing Director, Terumo BCT",
+            "name": "Shri. Sathish Kumar",
+            "role": "panelist",
+            "speaker_id": "sathish-kumar-g"
+          },
+          {
+            "designation": "CTO / Technical Director, Ox Devices",
+            "name": "Shri. Praveen Sagar",
+            "role": "panelist",
+            "speaker_id": "praveen-sagar"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "c-balagopal",
+          "m-i-sahadulla",
+          "r-mukund",
+          "sathish-kumar-g",
+          "praveen-sagar"
+        ],
+        "speakers": "Moderator: Shri. C. Balagopal, Chairman, KSIDC & KLIP\nDr. M. I. Sahadulla, CMD, KIMS Health\nShri. Mukund R. Pillai, Executive Director - Operations, HLL Lifecare\nShri. Sathish Kumar, Managing Director, Terumo BCT\nShri. Praveen Sagar, CTO / Technical Director, Ox Devices",
+        "starts_at": "2026-10-08T16:55:00+05:30",
+        "title": "The Trivandrum Medical Device Cluster",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T18:05:00+05:30",
+        "id": "d1-keynote-pappu",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "CEO, Nipro Medical India",
+            "name": "Shri. Milind Pappu",
+            "role": "",
+            "speaker_id": "milind-pappu"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "milind-pappu"
+        ],
+        "speakers": "Shri. Milind Pappu, CEO, Nipro Medical India",
+        "starts_at": "2026-10-08T17:45:00+05:30",
+        "title": "Shri. Milind Pappu",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-08T18:50:00+05:30",
+        "id": "panel-5",
+        "kind": "panel",
+        "label": "Panel Discussion 5",
+        "location": "",
+        "people": [
+          {
+            "designation": "Director, MCC",
+            "name": "Dr. B. Satheesan",
+            "role": "moderator",
+            "speaker_id": "satheesan-b"
+          },
+          {
+            "designation": "Country Director & General Manager, Haier Biomedical, South Asia",
+            "name": "Dr. Piyush Das",
+            "role": "panelist",
+            "speaker_id": "piyush-das"
+          },
+          {
+            "designation": "Director, Innovation & Partnerships, Believers Church Medical College Hospital",
+            "name": "Dr. Philip Mathew",
+            "role": "panelist",
+            "speaker_id": "philip-mathew"
+          },
+          {
+            "designation": "Early-stage Investor, Partner, Beyond Next Ventures, India",
+            "name": "Shri. Jay Krishnan",
+            "role": "panelist",
+            "speaker_id": "jay-krishnan"
+          },
+          {
+            "designation": "CV Jacob Faculty & PI - Nano-Bioengineering, CUSAT",
+            "name": "Dr. Sreeja Narayanan",
+            "role": "panelist",
+            "speaker_id": "sreeja-narayanan"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "satheesan-b",
+          "piyush-das",
+          "philip-mathew",
+          "jay-krishnan",
+          "sreeja-narayanan"
+        ],
+        "speakers": "Moderator: Dr. B. Satheesan, Director, MCC\nDr. Piyush Das, Country Director & General Manager, Haier Biomedical, South Asia\nDr. Philip Mathew, Director, Innovation & Partnerships, Believers Church Medical College Hospital\nShri. Jay Krishnan, Early-stage Investor, Partner, Beyond Next Ventures, India\nDr. Sreeja Narayanan, CV Jacob Faculty & PI - Nano-Bioengineering, CUSAT",
+        "starts_at": "2026-10-08T18:05:00+05:30",
+        "title": "Innovation, Investment & Commercialisation of Medical Technologies",
+        "track": ""
+      },
+      {
+        "description": "Featuring national and international musical instruments.",
+        "ends_at": "2026-10-08T22:00:00+05:30",
+        "id": "d1-gala",
+        "kind": "social",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-08T19:00:00+05:30",
+        "title": "Cultural Program, Gala Dinner & Entertainment",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T09:10:00+05:30",
+        "id": "d2-opening",
+        "kind": "talk",
+        "label": "",
+        "location": "",
+        "people": [
+          {
+            "designation": "GM, KSIDC & CEO, KLIP",
+            "name": "Shri. Jose Kurian Mundackal",
+            "role": "",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "Shri. Jose Kurian Mundackal, GM, KSIDC & CEO, KLIP",
+        "starts_at": "2026-10-09T09:00:00+05:30",
+        "title": "Opening Remarks",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T09:20:00+05:30",
+        "id": "d2-keynote-pillai",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Director, RGCB, Thiruvananthapuram",
+            "name": "Dr. Beena Pillai",
+            "role": "",
+            "speaker_id": "beena-pillai"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "beena-pillai"
+        ],
+        "speakers": "Dr. Beena Pillai, Director, RGCB, Thiruvananthapuram",
+        "starts_at": "2026-10-09T09:10:00+05:30",
+        "title": "Dr. Beena Pillai",
+        "track": ""
+      },
+      {
+        "description": "Trends in biologic drug development, manufacturing scale-up and regulatory pathways.",
+        "ends_at": "2026-10-09T10:00:00+05:30",
+        "id": "panel-6",
+        "kind": "panel",
+        "label": "Panel Discussion 6",
+        "location": "",
+        "people": [
+          {
+            "designation": "Oncologist, Medical Centre, Kerala Cancer Care, Ernakulam",
+            "name": "Dr. Aju Mathew",
+            "role": "moderator",
+            "speaker_id": "aju-mathew"
+          },
+          {
+            "designation": "Principal Lawyer, Amicus",
+            "name": "Shri. Murali Neelakantan",
+            "role": "panelist",
+            "speaker_id": "murali-neelakantan"
+          },
+          {
+            "designation": "Co-founder & CEO, Luxmatra Innovations Pvt. Ltd.",
+            "name": "Dr. Girish Chundayil Madathil",
+            "role": "panelist",
+            "speaker_id": "girish-chundayil-madathil"
+          },
+          {
+            "designation": "Professor, Department of Pathology and Laboratory Medicine, University of Saskatchewan, Canada",
+            "name": "Prof. Ron Geyer",
+            "role": "panelist",
+            "speaker_id": "ron-geyer"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "aju-mathew",
+          "murali-neelakantan",
+          "girish-chundayil-madathil",
+          "ron-geyer"
+        ],
+        "speakers": "Moderator: Dr. Aju Mathew, Oncologist, Medical Centre, Kerala Cancer Care, Ernakulam\nShri. Murali Neelakantan, Principal Lawyer, Amicus\nDr. Girish Chundayil Madathil, Co-founder & CEO, Luxmatra Innovations Pvt. Ltd.\nProf. Ron Geyer, Professor, Department of Pathology and Laboratory Medicine, University of Saskatchewan, Canada",
+        "starts_at": "2026-10-09T09:20:00+05:30",
+        "title": "Next-Gen Biologics: From Discovery to Market",
+        "track": "Future Healthcare & Cancer"
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T11:00:00+05:30",
+        "id": "panel-7",
+        "kind": "panel",
+        "label": "Panel Discussion 7",
+        "location": "",
+        "people": [
+          {
+            "designation": "Director & Chief Physician, Sunethri Ayurvedashram & Research Centre",
+            "name": "Dr. Vaidya Prasad",
+            "role": "moderator",
+            "speaker_id": "vaidya-m-prasad"
+          },
+          {
+            "designation": "Former Senior Research Officer, DSU, Government Ayurveda College",
+            "name": "Dr. Sanjeev Kumar",
+            "role": "panelist",
+            "speaker_id": "p-sanjeev-kumar"
+          },
+          {
+            "designation": "General Manager of Research and Development (R&D), Sreedhareeyam Ayurvedic Eye Hospital & Research Centre",
+            "name": "Dr. D. G. Namboothiri",
+            "role": "panelist",
+            "speaker_id": "d-g-namboothiri"
+          },
+          {
+            "designation": "Principal Scientist, Vaidyaratnam",
+            "name": "Dr. Ashish G. R.",
+            "role": "panelist",
+            "speaker_id": "ashish-g-r"
+          },
+          {
+            "designation": "Chief Executive Officer, Incubation Centre for Ayurveda Innovation and Entrepreneurship",
+            "name": "Dr. Sujith Eranezhath",
+            "role": "panelist",
+            "speaker_id": "sujith-subash-eranezhath"
+          },
+          {
+            "designation": "Executive Director, Vaidyaratnam Group",
+            "name": "Dr. Yadu Mooss",
+            "role": "panelist",
+            "speaker_id": "yadu-narayanan-mooss"
+          },
+          {
+            "designation": "Associate Professor, Government Ayurveda College",
+            "name": "Dr. Rajmohan V.",
+            "role": "panelist",
+            "speaker_id": "rajmohan-v"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "vaidya-m-prasad",
+          "p-sanjeev-kumar",
+          "d-g-namboothiri",
+          "ashish-g-r",
+          "sujith-subash-eranezhath",
+          "yadu-narayanan-mooss",
+          "rajmohan-v"
+        ],
+        "speakers": "Moderator: Dr. Vaidya Prasad, Director & Chief Physician, Sunethri Ayurvedashram & Research Centre\nDr. Sanjeev Kumar, Former Senior Research Officer, DSU, Government Ayurveda College\nDr. D. G. Namboothiri, General Manager of Research and Development (R&D), Sreedhareeyam Ayurvedic Eye Hospital & Research Centre\nDr. Ashish G. R., Principal Scientist, Vaidyaratnam\nDr. Sujith Eranezhath, Chief Executive Officer, Incubation Centre for Ayurveda Innovation and Entrepreneurship\nDr. Yadu Mooss, Executive Director, Vaidyaratnam Group\nDr. Rajmohan V., Associate Professor, Government Ayurveda College",
+        "starts_at": "2026-10-09T10:00:00+05:30",
+        "title": "From Kerala's Heritage to a Global Investment Opportunity",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T11:10:00+05:30",
+        "id": "d2-tea-1",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-09T11:00:00+05:30",
+        "title": "Tea Break",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T12:00:00+05:30",
+        "id": "panel-8",
+        "kind": "panel",
+        "label": "Panel Discussion 8",
+        "location": "",
+        "people": [
+          {
+            "designation": "Director, Kerala Academy of Sciences (KAS)",
+            "name": "Prof. G. M. Nair",
+            "role": "moderator",
+            "speaker_id": "g-m-nair"
+          },
+          {
+            "designation": "Founder & CEO, Elmentoz Research",
+            "name": "Dr. Jayashankar Das",
+            "role": "panelist",
+            "speaker_id": "jayashankar-das"
+          },
+          {
+            "designation": "Founder and Managing Director, Molecules Biolabs",
+            "name": "Dr. Sreeraj Gopi",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Chairman & Director, Wellness Solutions",
+            "name": "Dr. Sreekumar",
+            "role": "panelist",
+            "speaker_id": "sreekumar-appukuttan-nair"
+          },
+          {
+            "designation": "R&D Head, WellGenome Pvt. Ltd.",
+            "name": "Dr. Vinaya K. K.",
+            "role": "panelist",
+            "speaker_id": "vinaya-k-k"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "g-m-nair",
+          "jayashankar-das",
+          "sreekumar-appukuttan-nair",
+          "vinaya-k-k"
+        ],
+        "speakers": "Moderator: Prof. G. M. Nair, Director, Kerala Academy of Sciences (KAS)\nDr. Jayashankar Das, Founder & CEO, Elmentoz Research\nDr. Sreeraj Gopi, Founder and Managing Director, Molecules Biolabs\nDr. Sreekumar, Chairman & Director, Wellness Solutions\nDr. Vinaya K. K., R&D Head, WellGenome Pvt. Ltd.",
+        "starts_at": "2026-10-09T11:10:00+05:30",
+        "title": "Nutraceuticals: Unlocking Kerala's Next Wave of Health and Wellness Business",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T12:30:00+05:30",
+        "id": "panel-9",
+        "kind": "panel",
+        "label": "Panel Discussion 9",
+        "location": "",
+        "people": [
+          {
+            "designation": "Senior Scientific Advisor, Govt. of India",
+            "name": "Dr. Raj Shirumalla",
+            "role": "moderator",
+            "speaker_id": "raj-shirumalla"
+          },
+          {
+            "designation": "Principal Scientist & Business Lead, DSS Takara Biosciences, India",
+            "name": "Dr. Aniruddha Bhati",
+            "role": "panelist",
+            "speaker_id": "aniruddha-bhati"
+          },
+          {
+            "designation": "Founder, Chairman & MD, Vipragen Biosciences Pvt. Ltd, India",
+            "name": "Dr. Chandrasekharan",
+            "role": "panelist",
+            "speaker_id": "s-chandrashekaran"
+          },
+          {
+            "designation": "Chief Executive Officer, NeoDX, India",
+            "name": "Shri. Harkaran Dhingra",
+            "role": "panelist",
+            "speaker_id": "harkaran-dhingra"
+          },
+          {
+            "designation": "Professor, AIIMS",
+            "name": "Prof. T. P. Singh",
+            "role": "panelist",
+            "speaker_id": "t-p-singh"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "raj-shirumalla",
+          "aniruddha-bhati",
+          "s-chandrashekaran",
+          "harkaran-dhingra",
+          "t-p-singh"
+        ],
+        "speakers": "Moderator: Dr. Raj Shirumalla, Senior Scientific Advisor, Govt. of India\nDr. Aniruddha Bhati, Principal Scientist & Business Lead, DSS Takara Biosciences, India\nDr. Chandrasekharan, Founder, Chairman & MD, Vipragen Biosciences Pvt. Ltd, India\nShri. Harkaran Dhingra, Chief Executive Officer, NeoDX, India\nProf. T. P. Singh, Professor, AIIMS",
+        "starts_at": "2026-10-09T12:00:00+05:30",
+        "title": "Make in India: Transforming Innovation into Manufacturing, Markets and Economic Growth",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T13:20:00+05:30",
+        "id": "panel-10",
+        "kind": "panel",
+        "label": "Panel Discussion 10",
+        "location": "",
+        "people": [
+          {
+            "designation": "CEO, MedScape Pharma & MagGenome Technologies Pvt. Ltd.",
+            "name": "Dr. C. N. Ramchand",
+            "role": "moderator",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Co-Founder, President & CEO, Nord Metallics; Co-founder Director & Chief Strategy Officer, Bharat Biome / Indus Biome Life Sciences Pvt. Ltd.",
+            "name": "Shri. Bijoy Nair",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Consultant - Strategy & Business Development, ABLE",
+            "name": "Shri. Balasubramanya S.",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Chief Operating Officer, IPTIF",
+            "name": "Dr. Rijesh Krishna",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Director, EY",
+            "name": "Shri. Ramjee Pallela",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "CEO, KRIBS & BioNest",
+            "name": "Dr. Ampady",
+            "role": "panelist",
+            "speaker_id": "k-ampady"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "k-ampady"
+        ],
+        "speakers": "Moderator: Dr. C. N. Ramchand, CEO, MedScape Pharma & MagGenome Technologies Pvt. Ltd.\nShri. Bijoy Nair, Co-Founder, President & CEO, Nord Metallics; Co-founder Director & Chief Strategy Officer, Bharat Biome / Indus Biome Life Sciences Pvt. Ltd.\nShri. Balasubramanya S., Consultant - Strategy & Business Development, ABLE\nDr. Rijesh Krishna, Chief Operating Officer, IPTIF\nShri. Ramjee Pallela, Director, EY\nDr. Ampady, CEO, KRIBS & BioNest",
+        "starts_at": "2026-10-09T12:30:00+05:30",
+        "title": "Kerala's Bioeconomy: Building a Sustainable Future Through Innovation and Investment",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T14:00:00+05:30",
+        "id": "d2-lunch",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-09T13:20:00+05:30",
+        "title": "Networking Lunch",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T14:15:00+05:30",
+        "id": "d2-keynote-geyer",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Professor, Department of Pathology and Laboratory Medicine, University of Saskatchewan, Canada",
+            "name": "Prof. Ron Geyer",
+            "role": "",
+            "speaker_id": "ron-geyer"
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "ron-geyer"
+        ],
+        "speakers": "Prof. Ron Geyer, Professor, Department of Pathology and Laboratory Medicine, University of Saskatchewan, Canada",
+        "starts_at": "2026-10-09T14:00:00+05:30",
+        "title": "Prof. Ron Geyer",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T15:05:00+05:30",
+        "id": "panel-11",
+        "kind": "panel",
+        "label": "Panel Discussion 11",
+        "location": "",
+        "people": [
+          {
+            "designation": "Former Deputy Director General (Fisheries), ICAR",
+            "name": "Dr. Meenakumari",
+            "role": "moderator",
+            "speaker_id": "b-meenakumari"
+          },
+          {
+            "designation": "President, Q Life Consumer Products Pvt. Ltd., a NeST Group company",
+            "name": "Shri. S. K. Menon",
+            "role": "panelist",
+            "speaker_id": "s-k-menon"
+          },
+          {
+            "designation": "Founder & CEO, Certitude Farms",
+            "name": "Shri. Venkatachalam",
+            "role": "panelist",
+            "speaker_id": "venkatachalam"
+          },
+          {
+            "designation": "CEO & Director, Khadkeshwara Farms and Food Pvt. Ltd.",
+            "name": "Shri. Harshvardhan Joshi",
+            "role": "panelist",
+            "speaker_id": ""
+          },
+          {
+            "designation": "Co-founder, Sr. Vice President, Strategic Initiatives; Co-founder, MD & CEO, Bharat Biome / Indus Biome Life Sciences Pvt. Ltd.",
+            "name": "Shri. Raj Dash",
+            "role": "panelist",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [
+          "b-meenakumari",
+          "s-k-menon",
+          "venkatachalam"
+        ],
+        "speakers": "Moderator: Dr. Meenakumari, Former Deputy Director General (Fisheries), ICAR\nShri. S. K. Menon, President, Q Life Consumer Products Pvt. Ltd., a NeST Group company\nShri. Venkatachalam, Founder & CEO, Certitude Farms\nShri. Harshvardhan Joshi, CEO & Director, Khadkeshwara Farms and Food Pvt. Ltd.\nShri. Raj Dash, Co-founder, Sr. Vice President, Strategic Initiatives; Co-founder, MD & CEO, Bharat Biome / Indus Biome Life Sciences Pvt. Ltd.",
+        "starts_at": "2026-10-09T14:15:00+05:30",
+        "title": "Innovations for Food Security and Sustainability",
+        "track": "Agrifood"
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T15:25:00+05:30",
+        "id": "d2-keynote-sharmila",
+        "kind": "talk",
+        "label": "Keynote Address",
+        "location": "",
+        "people": [
+          {
+            "designation": "Principal Secretary, Health & Family Welfare, Ayush, Food & Civil Supplies and Consumer Affairs Department",
+            "name": "Dr. Sharmila Mary Joseph IAS",
+            "role": "",
+            "speaker_id": ""
+          }
+        ],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "Dr. Sharmila Mary Joseph IAS, Principal Secretary, Health & Family Welfare, Ayush, Food & Civil Supplies and Consumer Affairs Department",
+        "starts_at": "2026-10-09T15:05:00+05:30",
+        "title": "Dr. Sharmila Mary Joseph IAS",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T16:25:00+05:30",
+        "id": "d2-product-launch",
+        "kind": "",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-09T15:25:00+05:30",
+        "title": "Product Launch",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T16:45:00+05:30",
+        "id": "d2-tea",
+        "kind": "break",
+        "label": "",
+        "location": "",
+        "people": [],
+        "segments": [],
+        "speaker_ids": [],
+        "speakers": "",
+        "starts_at": "2026-10-09T16:25:00+05:30",
+        "title": "Tea Break",
+        "track": ""
+      },
+      {
+        "description": "",
+        "ends_at": "2026-10-09T18:00:00+05:30",
+        "id": "d2-valedictory",
+        "kind": "ceremony",
+        "label": "",
+        "location": "Grand Ball Room",
+        "people": [],
+        "segments": [
+          {
+            "description": "",
+            "ends_at": "2026-10-09T16:48:00+05:30",
+            "people": [
+              {
+                "designation": "",
+                "name": "Master of Ceremonies",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T16:45:00+05:30",
+            "title": "Opening Remarks"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:00:00+05:30",
+            "people": [
+              {
+                "designation": "Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam",
+                "name": "Shri. Snehil Kumar Singh IAS",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T16:48:00+05:30",
+            "title": "Welcome Address and Key Outcomes of Bio Connect 4.0"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:10:00+05:30",
+            "people": [
+              {
+                "designation": "Chairman, KSIDC & KLIP, Government of Keralam",
+                "name": "Shri. C. Balagopal",
+                "role": "",
+                "speaker_id": "c-balagopal"
+              }
+            ],
+            "starts_at": "2026-10-09T17:00:00+05:30",
+            "title": "Special Address - Global & Government Perspective"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:15:00+05:30",
+            "people": [
+              {
+                "designation": "Director, KLIP & CEO, MagGenome Technologies",
+                "name": "Dr. C. N. Ramchand",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:10:00+05:30",
+            "title": "Scientific Sessions: Key Insights & Takeaways"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:20:00+05:30",
+            "people": [
+              {
+                "designation": "Director, KLIP & Managing Director, KINFRA",
+                "name": "Shri. Santhosh Koshy Thomas",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:15:00+05:30",
+            "title": "Felicitation Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:25:00+05:30",
+            "people": [
+              {
+                "designation": "Founder and Managing Director, Molecules Biolabs",
+                "name": "Dr. Sreeraj Gopi",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:20:00+05:30",
+            "title": "Bio Connect 4.0 - Industry Perspectives"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:30:00+05:30",
+            "people": [
+              {
+                "designation": "Director, KLIP & Special Officer, Kerala Medical Technology Consortium",
+                "name": "Shri. C. Padmakumar",
+                "role": "",
+                "speaker_id": "c-padmakumar"
+              }
+            ],
+            "starts_at": "2026-10-09T17:25:00+05:30",
+            "title": "Special Address - Investment Facilitation in Health Sciences"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:40:00+05:30",
+            "people": [
+              {
+                "designation": "Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam",
+                "name": "Shri. A. P. M. Mohammed Hanish IAS",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:30:00+05:30",
+            "title": "The Way Forward - From Commitments to Groundbreaking"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T17:55:00+05:30",
+            "people": [
+              {
+                "designation": "Hon'ble Minister for Industries, IT & AI, Government of Keralam",
+                "name": "Shri. P. K. Kunhalikutty",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:40:00+05:30",
+            "title": "Valedictory Address"
+          },
+          {
+            "description": "",
+            "ends_at": "2026-10-09T18:00:00+05:30",
+            "people": [
+              {
+                "designation": "General Manager (IF&IP and HR), KSIDC, Government of Keralam",
+                "name": "Shri. Varghese Malakkaran",
+                "role": "",
+                "speaker_id": ""
+              }
+            ],
+            "starts_at": "2026-10-09T17:55:00+05:30",
+            "title": "Vote of Thanks and Official Closing of Bio Connect 4.0"
+          },
+          {
+            "description": "",
+            "ends_at": "",
+            "people": [],
+            "starts_at": "",
+            "title": "Event concludes"
+          }
+        ],
+        "speaker_ids": [
+          "c-balagopal",
+          "c-padmakumar"
+        ],
+        "speakers": "16:45 Opening Remarks: Master of Ceremonies\n16:48 Welcome Address and Key Outcomes of Bio Connect 4.0: Shri. Snehil Kumar Singh IAS, Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam\n17:00 Special Address - Global & Government Perspective: Shri. C. Balagopal, Chairman, KSIDC & KLIP, Government of Keralam\n17:10 Scientific Sessions: Key Insights & Takeaways: Dr. C. N. Ramchand, Director, KLIP & CEO, MagGenome Technologies\n17:15 Felicitation Address: Shri. Santhosh Koshy Thomas, Director, KLIP & Managing Director, KINFRA\n17:20 Bio Connect 4.0 - Industry Perspectives: Dr. Sreeraj Gopi, Founder and Managing Director, Molecules Biolabs\n17:25 Special Address - Investment Facilitation in Health Sciences: Shri. C. Padmakumar, Director, KLIP & Special Officer, Kerala Medical Technology Consortium\n17:30 The Way Forward - From Commitments to Groundbreaking: Shri. A. P. M. Mohammed Hanish IAS, Addl. Chief Secretary, Industries & Commerce, External Cooperation, Revenue (Waqf), Government of Keralam\n17:40 Valedictory Address: Shri. P. K. Kunhalikutty, Hon'ble Minister for Industries, IT & AI, Government of Keralam\n17:55 Vote of Thanks and Official Closing of Bio Connect 4.0: Shri. Varghese Malakkaran, General Manager (IF&IP and HR), KSIDC, Government of Keralam\nEvent concludes",
+        "starts_at": "2026-10-09T16:45:00+05:30",
+        "title": "Valedictory Session",
+        "track": ""
+      }
+    ],
     "venue": {
       "accessibility": "",
       "address": "",

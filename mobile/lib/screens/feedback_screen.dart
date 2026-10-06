@@ -27,6 +27,7 @@ class FeedbackScreen extends StatelessWidget {
     final started = sortSessions(
       content.guide.sessions.where(
         (s) =>
+            s.plannable &&
             !savedIds.contains(s.id) &&
             (s.startsAt == null || s.startsAt!.isBefore(agenda.now())),
       ),
