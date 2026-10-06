@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var ErrConflict = errors.New("registration changed or action is not allowed in this state")
@@ -340,6 +341,9 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 						return errors.New("the exhibitor must upload the institution logo before approval")
 					}
 				}
+				if e = referenceFree(ctx, tx, ref); e != nil {
+					return e
+				}
 				_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
 				id,registration_id,bank_reference,payment_date,amount_paise,
 				verified_at,verified_by,verified_reference,verified_date,verified_amount_paise,beneficiary_confirmed
@@ -352,10 +356,13 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 				if latest != in.PaymentID {
 					return errors.New("review the latest payment submission")
 				}
+				if e = referenceFree(ctx, tx, ref); e != nil {
+					return e
+				}
 				_, e = tx.Exec(ctx, `UPDATE payment_submissions SET verified_at=now(),verified_by=$2,verified_reference=$3,verified_date=$4,verified_amount_paise=$5,beneficiary_confirmed=true WHERE id=$1`, latest, staff, ref, date, in.VerifiedAmountPaise)
 			}
 			if e != nil {
-				return fmt.Errorf("bank reference is already approved or payment could not be verified: %w", e)
+				return paymentVerifyError(e)
 			}
 		}
 		if _, e = tx.Exec(ctx, "UPDATE registrations SET status='approved',approved_at=now(),approved_by=$2,review_note=$3,updated_at=now() WHERE id=$1", rid, staff, in.Note); e != nil {
@@ -479,6 +486,34 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 		return e
 	}
 	return tx.Commit(ctx)
+}
+
+// referenceFree refuses a bank reference that already approved a registration
+// (the approved_transaction index), naming that registration so the reviewer
+// can tell a reused reference from a typo. It runs before the write because a
+// failed insert aborts the transaction and the holder could no longer be read.
+func referenceFree(ctx context.Context, tx pgx.Tx, ref string) error {
+	var holder string
+	e := tx.QueryRow(ctx, `SELECT r.reference FROM payment_submissions p JOIN registrations r ON r.id=p.registration_id
+		WHERE p.verified_reference=$1 AND p.verified_at IS NOT NULL LIMIT 1`, ref).Scan(&holder)
+	if errors.Is(e, pgx.ErrNoRows) {
+		return nil
+	}
+	if e != nil {
+		return e
+	}
+	return fmt.Errorf("bank reference %s is already approved for %s; check the bank statement before approving", ref, holder)
+}
+
+// paymentVerifyError describes a failed payment write without leaking database
+// text, which publicError would replace with a generic message. A concurrent
+// approval can still take the reference between referenceFree and the write.
+func paymentVerifyError(e error) error {
+	var pg *pgconn.PgError
+	if errors.As(e, &pg) && pg.Code == "23505" {
+		return errors.New("this bank reference was just approved for another registration; check the bank statement before approving")
+	}
+	return e
 }
 
 // nextReference allocates the next number in a category's series, "BC4-EX-0007".

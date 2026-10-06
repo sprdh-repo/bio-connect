@@ -21,6 +21,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // These tests need a throwaway PostgreSQL. Point TEST_DATABASE_URL at one; the
@@ -622,11 +624,34 @@ func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
 	inB.Email = "second@example.com"
 	ridB, _, _ := a.Create(ctx, inB, key(2), nil)
 	payDelegate(t, a, ridB, dueNow(t, a, ridB))
-	if err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", dueNow(t, a, ridB)); err == nil {
+	err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", dueNow(t, a, ridB))
+	if err == nil {
 		t.Fatal("reused an already-approved bank transaction reference")
+	}
+	// The reviewer must see which registration holds the reference, not the
+	// generic database-failure text publicError substitutes for SQL errors.
+	regA, _ := a.registration(ctx, ridA)
+	if msg := publicError(err); !strings.Contains(msg, "SBISHARED") || !strings.Contains(msg, regA.Reference) {
+		t.Fatalf("message = %q, want the reference and %s", msg, regA.Reference)
 	}
 	if status(t, a, ridB) != "awaiting_review" {
 		t.Fatalf("B advanced despite duplicate reference: %s", status(t, a, ridB))
+	}
+
+	// Staff entry with a paid, already-approved reference gets the same message.
+	in := staffInput(delegateInput("industry"), "paid")
+	in.Attendees[0].Email, in.Email = "third@example.com", "third@example.com"
+	in.VerifiedReference, in.VerifiedDate, in.VerifiedAmountPaise = "SBISHARED", today(a), dueNow(t, a, ridB)
+	if _, err := a.StaffCreate(ctx, in, key(3), nil, sid); err == nil || !strings.Contains(publicError(err), regA.Reference) {
+		t.Fatalf("staff entry with a used reference: %v", err)
+	}
+}
+
+// A unique violation from a concurrent approval is reported in plain words.
+func TestPaymentVerifyErrorHidesDatabaseText(t *testing.T) {
+	got := paymentVerifyError(&pgconn.PgError{Code: "23505", ConstraintName: "approved_transaction"})
+	if msg := publicError(got); !strings.Contains(msg, "already approved") && !strings.Contains(msg, "just approved") {
+		t.Fatalf("message = %q", msg)
 	}
 }
 
