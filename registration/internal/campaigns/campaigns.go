@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-//go:embed invitation app-launch event-reminder plain-reminder
+//go:embed invitation app-launch event-reminder plain-reminder event-today
 var files embed.FS
 
 var ist = time.FixedZone("IST", 19800)
@@ -28,9 +28,10 @@ type Template struct {
 	Registrants bool
 	// Attach each recipient's own PDF pass; only pass holders can receive it.
 	AttachPass bool
-	// Dated copy refuses sends from this instant.
-	Until      time.Time
-	html, text string
+	// Dated copy is sendable from From (zero: any time) until Until. Tests
+	// and previews only need the copy not to have expired.
+	From, Until time.Time
+	html, text  string
 }
 
 type Image struct {
@@ -67,6 +68,15 @@ var registry = map[string]Template{
 		Registrants: true,
 		Until:       time.Date(2026, 10, 8, 0, 0, 0, 0, ist),
 	},
+	// Says "today", so it is sendable only on day one, at any hour.
+	"event-today": {
+		ID: "event-today", Label: "Event day with pass",
+		Description: "Day-one email with each person's PDF pass attached, how to get in and the programme.",
+		Subject:     "Bio Connect 4.0 is on today: your pass and how to get in",
+		Registrants: true, AttachPass: true,
+		From:  time.Date(2026, 10, 8, 0, 0, 0, 0, ist),
+		Until: time.Date(2026, 10, 9, 0, 0, 0, 0, ist),
+	},
 }
 
 func init() {
@@ -101,8 +111,14 @@ func All() []Template {
 	return out
 }
 
-// Open reports whether the template may still be sent at now.
-func (t Template) Open(now time.Time) bool { return now.Before(t.Until) }
+// Open reports whether the template may be sent to recipients at now.
+func (t Template) Open(now time.Time) bool {
+	return !now.Before(t.From) && now.Before(t.Until)
+}
+
+// Expired reports whether the copy is past its send-by time, after which not
+// even a test may go out.
+func (t Template) Expired(now time.Time) bool { return !now.Before(t.Until) }
 
 // Render personalises the HTML and plain-text bodies. An empty name gives a
 // generic greeting.

@@ -409,8 +409,11 @@ func run() error {
 		return nil
 	}
 	// Templates are deliberately dated; require a copy update once they go stale.
-	if !tmpl.Open(now()) {
+	if tmpl.Expired(now()) {
 		return fmt.Errorf("%s template expired on %s; update the copy and cutoff before sending", *templateName, tmpl.Until.Format("2 January 2006"))
+	}
+	if *send && !tmpl.Open(now()) {
+		return fmt.Errorf("%s can be sent from %s; only tests go out before then", *templateName, tmpl.From.Format("2 January 2006 15:04 MST"))
 	}
 	token := os.Getenv("POSTMARK_SERVER_TOKEN")
 	from, err := address(os.Getenv("POSTMARK_FROM_ADDRESS"))

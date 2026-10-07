@@ -292,7 +292,7 @@ func TestCampaignLiveDeliveryPayloadRetryAndWebhook(t *testing.T) {
 	}
 	last := payloads[len(payloads)-1]
 	meta := last["Metadata"].(map[string]any)
-	if last["MessageStream"] != "broadcast" || meta["application"] != "bioconnect4" || meta["campaign_id"] != created.ID || len(last["Attachments"].([]any)) != 10 {
+	if last["MessageStream"] != "broadcast" || meta["application"] != "bioconnect4" || meta["campaign_id"] != created.ID || len(last["Attachments"].([]any)) != 11 {
 		t.Fatalf("bad payload: stream=%v meta=%v", last["MessageStream"], meta)
 	}
 	if html := last["HtmlBody"].(string); !strings.Contains(html, last["To"].(string)) || !strings.Contains(html, "{{{ pm:unsubscribe }}}") {
@@ -474,4 +474,36 @@ func dumpRecipients(t *testing.T, a *App) string {
 		fmt.Fprintln(&b, v...)
 	}
 	return b.String()
+}
+
+func TestCampaignSendWindowOpensOnTheDay(t *testing.T) {
+	c := newCampaignHarness(t, "reviewer")
+	seedCampaignAudience(t, c.a)
+	body := approvedAudience(nil)
+	body["template_id"] = "event-today"
+	// The evening before: preview, count and test, but no send.
+	c.a.Now = func() time.Time { return time.Date(2026, 10, 7, 23, 59, 0, 0, india) }
+	if got := c.audience(body); got != 4 {
+		t.Fatalf("audience before opening: %d", got)
+	}
+	if rr := c.request("POST", "/api/v1/admin/campaigns/test", map[string]any{"template_id": "event-today"}); rr.Code != 200 {
+		t.Fatalf("test before opening returned %d: %s", rr.Code, rr.Body.String())
+	}
+	body["expected_count"] = 4
+	if rr := c.request("POST", "/api/v1/admin/campaigns", body); rr.Code != 400 || !strings.Contains(rr.Body.String(), "can be sent from 8 October 2026, 00:00 IST") {
+		t.Fatalf("send before opening returned %d: %s", rr.Code, rr.Body.String())
+	}
+	rr := c.request("GET", "/api/v1/admin/campaigns", nil)
+	if !strings.Contains(rr.Body.String(), `"id":"event-today"`) {
+		t.Fatal("upcoming email missing from the list")
+	}
+	// On the day it sends; the next day it is gone.
+	c.a.Now = func() time.Time { return time.Date(2026, 10, 8, 15, 0, 0, 0, india) }
+	if rr := c.request("POST", "/api/v1/admin/campaigns", body); rr.Code != 201 {
+		t.Fatalf("send on the day returned %d: %s", rr.Code, rr.Body.String())
+	}
+	c.a.Now = func() time.Time { return time.Date(2026, 10, 9, 0, 0, 0, 0, india) }
+	if rr := c.request("POST", "/api/v1/admin/campaigns/test", map[string]any{"template_id": "event-today"}); rr.Code != 400 {
+		t.Fatalf("test after expiry returned %d", rr.Code)
+	}
 }

@@ -116,13 +116,18 @@ func checkAudienceForTemplate(t campaigns.Template, in audience) error {
 	return nil
 }
 
-func (a *App) campaignTemplate(id string) (campaigns.Template, error) {
+// campaignTemplate returns a template staff may use. Previews, audience
+// counts and tests only need it unexpired; a real send needs its window open.
+func (a *App) campaignTemplate(id string, send bool) (campaigns.Template, error) {
 	t, ok := campaigns.Get(id)
 	if !ok || !t.Registrants {
 		return t, errors.New("choose an email to send")
 	}
-	if !t.Open(a.Now()) {
+	if t.Expired(a.Now()) {
 		return t, errors.New("this email is past its send-by date")
+	}
+	if send && !t.Open(a.Now()) {
+		return t, errors.New("this email can be sent from " + t.From.In(india).Format("2 January 2006, 15:04") + " IST")
 	}
 	return t, nil
 }
@@ -140,7 +145,7 @@ func (a *App) campaignsAPI(w http.ResponseWriter, r *http.Request, p principal, 
 		if !decode(w, r, &in) {
 			return
 		}
-		t, e := a.campaignTemplate(in.TemplateID)
+		t, e := a.campaignTemplate(in.TemplateID, false)
 		if e == nil {
 			e = checkAudienceForTemplate(t, in.Audience)
 		}
@@ -185,7 +190,7 @@ func (a *App) listCampaigns(w http.ResponseWriter, r *http.Request) {
 	templates := []map[string]any{}
 	for _, t := range campaigns.All() {
 		if t.Registrants {
-			templates = append(templates, map[string]any{"id": t.ID, "label": t.Label, "description": t.Description, "subject": t.Subject, "send_by": t.Until, "open": t.Open(a.Now()), "attach_pass": t.AttachPass})
+			templates = append(templates, map[string]any{"id": t.ID, "label": t.Label, "description": t.Description, "subject": t.Subject, "send_by": t.Until, "send_from": t.From, "open": t.Open(a.Now()), "expired": t.Expired(a.Now()), "attach_pass": t.AttachPass})
 		}
 	}
 	items, e := a.queryMaps(r, `SELECT cp.id,cp.template_id,cp.subject,cp.audience,cp.created_at,cp.cancelled_at,s.email AS created_by,`+campaignCounts+`
@@ -221,7 +226,7 @@ func (a *App) createCampaign(w http.ResponseWriter, r *http.Request, p principal
 	if !decode(w, r, &in) {
 		return
 	}
-	t, e := a.campaignTemplate(in.TemplateID)
+	t, e := a.campaignTemplate(in.TemplateID, true)
 	if e == nil {
 		e = checkAudienceForTemplate(t, in.Audience)
 	}
@@ -375,7 +380,7 @@ func (a *App) sendCampaignTest(w http.ResponseWriter, r *http.Request, p princip
 	if !decode(w, r, &in) {
 		return
 	}
-	t, e := a.campaignTemplate(in.TemplateID)
+	t, e := a.campaignTemplate(in.TemplateID, false)
 	if e != nil {
 		fail(w, 400, e.Error())
 		return

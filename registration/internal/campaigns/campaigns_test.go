@@ -55,10 +55,25 @@ func TestAppLaunchContent(t *testing.T) {
 		}
 	}
 	images, _ := tmpl.Images()
-	if len(images) != 10 {
-		t.Fatalf("got %d inline images, want 10", len(images))
+	if len(images) != 11 {
+		t.Fatalf("got %d inline images, want 11", len(images))
 	}
 	if !tmpl.Open(time.Date(2026, 10, 9, 23, 0, 0, 0, ist)) || tmpl.Open(time.Date(2026, 10, 10, 0, 0, 0, 0, ist)) {
 		t.Fatal("app-launch cutoff should be the end of 9 October IST")
+	}
+}
+
+func TestEventTodayWindow(t *testing.T) {
+	tmpl, _ := Get("event-today")
+	before, day, after := time.Date(2026, 10, 7, 23, 59, 0, 0, ist), time.Date(2026, 10, 8, 18, 0, 0, 0, ist), time.Date(2026, 10, 9, 0, 0, 0, 0, ist)
+	if tmpl.Open(before) || tmpl.Expired(before) || !tmpl.Open(day) || tmpl.Open(after) || !tmpl.Expired(after) {
+		t.Fatal("event-today must be sendable only on 8 October IST")
+	}
+	if !tmpl.AttachPass {
+		t.Fatal("event-today attaches the pass")
+	}
+	h, p := tmpl.Render("", "x@example.com")
+	if strings.Contains(strings.ToLower(h+p), "tomorrow") {
+		t.Fatal("day-of copy must not say tomorrow")
 	}
 }
