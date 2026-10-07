@@ -507,3 +507,53 @@ func TestCampaignSendWindowOpensOnTheDay(t *testing.T) {
 		t.Fatalf("test after expiry returned %d", rr.Code)
 	}
 }
+
+// Postmark refuses the whole message (422, ErrorCode 300) when a metadata name
+// exceeds 20 characters or a value 80. This fake enforces the same limits.
+func TestCampaignMetadataFitsPostmarkLimits(t *testing.T) {
+	c := newCampaignHarness(t, "reviewer")
+	seedCampaignAudience(t, c.a)
+	postmark := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var p struct{ Metadata map[string]string }
+		json.NewDecoder(r.Body).Decode(&p)
+		for k, v := range p.Metadata {
+			if len(k) > 20 || len(v) > 80 {
+				w.WriteHeader(422)
+				json.NewEncoder(w).Encode(map[string]any{"ErrorCode": 300, "Message": "Invalid metadata content."})
+				return
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]any{"ErrorCode": 0, "MessageID": "pm-" + id()})
+	}))
+	defer postmark.Close()
+	c.a.Config.LiveDelivery, c.a.Config.PostmarkAPIBase = true, postmark.URL
+	if rr := c.request("POST", "/api/v1/admin/campaigns/test", map[string]any{"template_id": "app-launch"}); rr.Code != 200 {
+		t.Fatalf("test send rejected: %d %s", rr.Code, rr.Body.String())
+	}
+	body := approvedAudience(nil)
+	body["expected_count"] = 4
+	c.request("POST", "/api/v1/admin/campaigns", body)
+	for {
+		worked, err := c.a.CampaignWorkOnce(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !worked {
+			break
+		}
+	}
+	if n := count(t, c.a, "SELECT count(*) FROM campaign_recipients WHERE status='accepted'"); n != 4 {
+		t.Fatalf("%d accepted, want 4\n%s", n, dumpRecipients(t, c.a))
+	}
+}
+
+func TestPostmarkRejectionKeepsErrorCode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(422)
+		w.Write([]byte(`{"ErrorCode":300,"Message":"Invalid metadata content."}`))
+	}))
+	defer srv.Close()
+	if r := providerRequest(context.Background(), srv.URL, "X-Postmark-Server-Token", "t", map[string]string{}, "email"); r.Status != "failed" || r.Code != "postmark_300" {
+		t.Fatalf("got %+v", r)
+	}
+}

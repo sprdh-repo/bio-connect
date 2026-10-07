@@ -386,6 +386,11 @@ func providerRequest(ctx context.Context, url, header, credential string, payloa
 		return sendResult{Status: "uncertain", Code: "provider_5xx"}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Postmark explains a 422 with its own ErrorCode; keep it for diagnosis.
+		var pm struct{ ErrorCode int }
+		if channel == "email" && json.Unmarshal(body, &pm) == nil && pm.ErrorCode != 0 {
+			return sendResult{Status: "failed", Code: fmt.Sprintf("postmark_%d", pm.ErrorCode)}
+		}
 		return sendResult{Status: "failed", Code: fmt.Sprintf("provider_http_%d", resp.StatusCode)}
 	}
 	var v struct {

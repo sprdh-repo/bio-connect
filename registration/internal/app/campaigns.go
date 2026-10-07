@@ -464,6 +464,8 @@ func (a *App) sendCampaignEmail(ctx context.Context, t campaigns.Template, subje
 	}
 	attachments = append(attachments, extra...)
 	htmlBody, textBody := t.Render(name, email)
+	// Postmark rejects the whole message if a metadata name exceeds 20
+	// characters or a value 80; TestCampaignMetadataFitsPostmarkLimits guards it.
 	meta := map[string]string{"application": "bioconnect4", "template": t.ID}
 	for k, v := range metadata {
 		meta[k] = v
@@ -528,7 +530,7 @@ func (a *App) CampaignWorkOnce(ctx context.Context) (bool, error) {
 			extra, result = a.campaignPass(ctx, passID)
 		}
 		if result.Status == "" {
-			result = a.sendCampaignEmail(ctx, t, "", email, name, extra, map[string]string{"campaign_id": cid, "campaign_recipient_id": rid})
+			result = a.sendCampaignEmail(ctx, t, "", email, name, extra, map[string]string{"campaign_id": cid, "recipient_id": rid})
 		}
 	}
 	backoff := 0
