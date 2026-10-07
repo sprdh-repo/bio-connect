@@ -474,6 +474,10 @@ func (a *App) adminAPI(w http.ResponseWriter, r *http.Request) {
 		a.speakersAPI(w, r, p.ID, path)
 		return
 	}
+	if path == "campaigns" || strings.HasPrefix(path, "campaigns/") {
+		a.campaignsAPI(w, r, p, path)
+		return
+	}
 	switch {
 	case path == "registrations" && r.Method == "GET":
 		where, args, e := filter(r)

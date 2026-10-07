@@ -110,6 +110,24 @@ Check PDF wording, field overflow, category alignment, and QR scanning without a
 go test -run 'TestRenderedPassVariants|TestPassFitsMaximumLengthFields' ./internal/app/
 ```
 
+## Email campaigns
+
+Reviewers send prepared emails to registered participants from **Email campaigns** in the staff console (`/admin?view=campaigns`).
+Choose an email, narrow the audience by registration status, type, category, active pass and venue check-in, check the live recipient count and preview, send yourself a test, then send.
+Recipients are attendees (the identity My passes and the venue use), one copy per email address, fixed when the campaign is confirmed.
+If the audience changes between review and sending, the send is refused until it is reviewed again.
+"Skip people who were already sent this email" excludes anyone a previous campaign of the same email reached or attempted.
+
+`campaign_recipients` is the send queue.
+A dedicated worker sends one message at a time on the Postmark Broadcasts stream (`POSTMARK_BROADCAST_STREAM`, default `broadcast`), separately from passes and OTPs.
+Rate-limited sends retry with backoff; an interrupted or ambiguous send is marked uncertain and never resent automatically.
+The campaign page shows progress and each recipient's outcome, and can cancel unsent messages.
+Delivered and Failed come from Postmark webhooks, so the Broadcasts stream needs the same delivery and bounce webhook as the transactional stream.
+Creating, cancelling and test-sending are recorded in the audit history.
+
+Templates are code, in `internal/campaigns/<id>/` (`email.html`, `email.txt` and inline `cid:` images), registered in `internal/campaigns/campaigns.go` with a subject and a send-by date.
+Only templates marked `Registrants` appear in the console; `cmd/marketing` sends the same templates to external contact lists.
+
 ## Social posters
 
 The console at `/admin` carries a poster studio for speaker reveals, session

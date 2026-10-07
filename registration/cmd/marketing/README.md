@@ -2,7 +2,7 @@
 
 Run from `registration/` with the existing Go toolchain.
 The HTML and plain-text invitation follow the website and registration email styling.
-Edit `invitation.html` and `invitation.txt` together to change the copy.
+Templates live in `internal/campaigns/<id>/` (shared with the admin console); edit `email.html` and `email.txt` together.
 This early-bird version refuses live sends after 30 September 2026 in India time.
 
 ## Preview and validate contacts
@@ -122,7 +122,7 @@ No registration application deployment is required.
 
 ## Mobile app announcement
 
-`--template app-launch` sends the app announcement in `app-launch/` to registered participants.
+`--template app-launch` sends the app announcement in `internal/campaigns/app-launch/` to registered participants.
 Its images are attached inline (`cid:`), so no static deployment is needed; `preview.html` uses local copies.
 The copy names each recipient's email address because My passes verifies against the attendee email.
 It refuses live sends from 10 October 2026 in India time.

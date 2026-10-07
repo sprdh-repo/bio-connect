@@ -5,17 +5,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"embed"
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"html"
 	"io"
-	"io/fs"
-	"mime"
 	"net"
 	"net/http"
 	"net/mail"
@@ -27,6 +23,8 @@ import (
 	"syscall"
 	"time"
 
+	"bioconnect/registration/internal/campaigns"
+
 	"github.com/xuri/excelize/v2"
 )
 
@@ -36,70 +34,17 @@ var (
 	lookupHost = net.DefaultResolver.LookupHost
 )
 
-//go:embed invitation.html
-var invitation string
-
-//go:embed invitation.txt
-var plain string
-
-//go:embed app-launch
-var appLaunch embed.FS
-
 // Overridable in tests so dated templates can be exercised after they expire.
 var now = time.Now
 
-var ist = time.FixedZone("IST", 19800)
-
-// emailTemplate is one broadcast. Images in Files are attached inline and
-// referenced from the HTML as cid:<name>, so nothing needs to be deployed.
-// __GREETING__ and __EMAIL__ are replaced per recipient.
-type emailTemplate struct {
-	Subject, HTML, Text string
-	// Dated copy refuses live sends from this instant.
-	Until time.Time
-	Files fs.FS
-}
-
-var templates = map[string]emailTemplate{
-	"invitation": {Subject: "Bio Connect 4.0: register now for Kerala's life sciences summit", HTML: invitation, Text: plain, Until: time.Date(2026, 10, 1, 0, 0, 0, 0, ist)},
-	"app-launch": {Subject: "Your Bio Connect 4.0 pass is now in the app", HTML: mustRead(appLaunch, "app-launch/email.html"), Text: mustRead(appLaunch, "app-launch/email.txt"), Until: time.Date(2026, 10, 10, 0, 0, 0, 0, ist), Files: mustSub(appLaunch, "app-launch")},
-}
-
-func mustRead(f fs.FS, name string) string {
-	b, err := fs.ReadFile(f, name)
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
-}
-
-func mustSub(f fs.FS, dir string) fs.FS {
-	sub, err := fs.Sub(f, dir)
-	if err != nil {
-		panic(err)
-	}
-	return sub
-}
-
 type attachment struct{ Name, Content, ContentType, ContentID string }
 
-// inlineImages returns the template's images referenced by cid: in its HTML.
-func (t emailTemplate) inlineImages() ([]attachment, error) {
-	if t.Files == nil {
-		return nil, nil
-	}
+func inlineImages(t campaigns.Template) ([]attachment, error) {
+	images, err := t.Images()
 	var list []attachment
-	err := fs.WalkDir(t.Files, ".", func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.Contains(t.HTML, "cid:"+name) {
-			return err
-		}
-		b, err := fs.ReadFile(t.Files, name)
-		if err != nil {
-			return err
-		}
-		list = append(list, attachment{name, base64.StdEncoding.EncodeToString(b), mime.TypeByExtension(filepath.Ext(name)), "cid:" + name})
-		return nil
-	})
+	for _, img := range images {
+		list = append(list, attachment{img.Name, base64.StdEncoding.EncodeToString(img.Data), img.ContentType, "cid:" + img.Name})
+	}
 	return list, err
 }
 
@@ -318,18 +263,12 @@ func contacts(path, sheet, emailColumn, nameColumn string) ([]contact, error) {
 	return result, nil
 }
 
-func render(t emailTemplate, c contact) (string, string) {
-	greeting := "Hello,"
-	if c.Name != "" {
-		greeting = "Hello " + c.Name + ","
-	}
+func render(t campaigns.Template, c contact) (string, string) {
 	email := c.Email
 	if email == "" {
 		email = "your registered email"
 	}
-	h := strings.NewReplacer("__GREETING__", html.EscapeString(greeting), "__EMAIL__", html.EscapeString(email)).Replace(t.HTML)
-	p := strings.NewReplacer("__GREETING__", greeting, "__EMAIL__", email).Replace(t.Text)
-	return h, p
+	return t.Render(c.Name, email)
 }
 
 type provider struct {
@@ -384,11 +323,11 @@ func run() error {
 	skipMX := flag.Bool("skip-mx-check", false, "skip DNS MX/A record validation of recipient domains")
 	templateName := flag.String("template", "invitation", "email to send: invitation or app-launch")
 	flag.Parse()
-	tmpl, ok := templates[*templateName]
+	tmpl, ok := campaigns.Get(*templateName)
 	if !ok {
 		return fmt.Errorf("unknown template %q", *templateName)
 	}
-	images, err := tmpl.inlineImages()
+	images, err := inlineImages(tmpl)
 	if err != nil {
 		return err
 	}
@@ -462,7 +401,7 @@ func run() error {
 		return nil
 	}
 	// Templates are deliberately dated; require a copy update once they go stale.
-	if !now().Before(tmpl.Until) {
+	if !tmpl.Open(now()) {
 		return fmt.Errorf("%s template expired on %s; update the copy and cutoff before sending", *templateName, tmpl.Until.Format("2 January 2006"))
 	}
 	token := os.Getenv("POSTMARK_SERVER_TOKEN")

@@ -126,6 +126,9 @@ func (a *App) recordWebhook(w http.ResponseWriter, r *http.Request, channel, pid
 	if e == nil {
 		_, e = tx.Exec(r.Context(), `UPDATE delivery_jobs SET status=CASE WHEN status='delivered' OR $3='delivered' THEN 'delivered' WHEN status='failed' OR $3='failed' THEN 'failed' ELSE $3 END,updated_at=now() WHERE channel=$1 AND provider_id=$2 AND status<>'cancelled'`, channel, pid, status)
 	}
+	if e == nil && channel == "email" {
+		_, e = tx.Exec(r.Context(), `UPDATE campaign_recipients SET status=CASE WHEN status='delivered' OR $2='delivered' THEN 'delivered' WHEN status='failed' OR $2='failed' THEN 'failed' ELSE $2 END,updated_at=now() WHERE provider_id=$1 AND status<>'cancelled'`, pid, status)
+	}
 	if e == nil {
 		e = tx.Commit(r.Context())
 	}

@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"bioconnect/registration/internal/campaigns"
+
 	"github.com/xuri/excelize/v2"
 )
 
@@ -73,7 +75,7 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestRenderingAndReport(t *testing.T) {
-	h, p := render(templates["invitation"], contact{Name: "<script>&"})
+	h, p := render(mustTemplate(t, "invitation"), contact{Name: "<script>&"})
 	if strings.Contains(h, "<script>") || !strings.Contains(h, "&lt;script&gt;&amp;") || !strings.Contains(p, "<script>&") {
 		t.Fatal("incorrect greeting escaping")
 	}
@@ -269,7 +271,7 @@ func TestCampaignStopsReportsAndResumesWithoutDuplicates(t *testing.T) {
 }
 
 func TestAppLaunchTemplate(t *testing.T) {
-	tmpl := templates["app-launch"]
+	tmpl := mustTemplate(t, "app-launch")
 	h, p := render(tmpl, contact{Email: "a&b@example.com", Name: "Asha"})
 	for _, body := range []string{h, p} {
 		if strings.Contains(body, "__") || !strings.Contains(body, "{{{ pm:unsubscribe }}}") || !strings.Contains(body, "id6817779744") || !strings.Contains(body, "in.gov.kerala.bioconnect") {
@@ -279,7 +281,7 @@ func TestAppLaunchTemplate(t *testing.T) {
 	if !strings.Contains(h, "a&amp;b@example.com") || !strings.Contains(p, "a&b@example.com") || !strings.Contains(h, "Hello Asha,") {
 		t.Fatal("recipient not personalised")
 	}
-	images, err := tmpl.inlineImages()
+	images, err := inlineImages(tmpl)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,4 +298,13 @@ func TestAppLaunchTemplate(t *testing.T) {
 			t.Fatalf("missing inline image %s", ref[1])
 		}
 	}
+}
+
+func mustTemplate(t *testing.T, id string) campaigns.Template {
+	t.Helper()
+	tmpl, ok := campaigns.Get(id)
+	if !ok {
+		t.Fatalf("missing template %s", id)
+	}
+	return tmpl
 }
