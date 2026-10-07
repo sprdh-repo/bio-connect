@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Bridge smoke test</title><body><p id="result">Waiting</p><script>
+window.responses = [];
+BioConnectKiosk.onmessage = function(event) {
+  const reply = JSON.parse(event.data);
+  responses.push(reply);
+  document.getElementById('result').textContent = JSON.stringify(reply);
+};
+function printBadge(id) {
+  const c = document.createElement('canvas'); c.width = 608; c.height = 406;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,608,406);
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,8,1);
+  BioConnectKiosk.postMessage(JSON.stringify({type:'print', jobId:id, png:c.toDataURL('image/png').split(',')[1], widthDots:608,heightDots:406}));
+}
+BioConnectKiosk.postMessage(JSON.stringify({type:'hello'}));
+</script>
