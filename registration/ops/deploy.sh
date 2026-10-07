@@ -53,8 +53,14 @@ done
 echo "== build $IMAGE (linux/amd64, single manifest) =="
 docker build --platform linux/amd64 --provenance=false --sbom=false -t "$IMAGE" "$ROOT"
 
-echo "== ship image (~$(docker image inspect "$IMAGE" --format '{{.Size}}' | numfmt --to=iec)) =="
-docker save "$IMAGE" | gzip | $SSH 'gunzip | docker load'
+# Skip the upload when the host already holds this tag, so a deploy whose image
+# was shipped separately (or by an earlier interrupted run) can resume.
+if $SSH "sudo docker image inspect $IMAGE >/dev/null 2>&1"; then
+  echo "== $IMAGE already on the host; skipping ship =="
+else
+  echo "== ship image (~$(docker image inspect "$IMAGE" --format '{{.Size}}' | numfmt --to=iec)) =="
+  docker save "$IMAGE" | gzip | $SSH 'gunzip | docker load'
+fi
 
 echo "== render + push /etc/bioconnect/*.env =="
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
