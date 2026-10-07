@@ -66,7 +66,7 @@
         </dl>
         <div class="actions">
           <button class="btn btn-primary" id="print-button" type="button"><span>Print my badge</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
-          <button class="btn btn-ghost" data-action="reset" type="button">This isn't me</button>
+          <button class="btn btn-ghost" data-action="reset" data-hold="1200" type="button">This isn't me</button>
         </div>
         <p class="fine">Printing your badge checks you in for <b data-field="day"></b>.</p>
       </div>
@@ -118,7 +118,7 @@
         <div class="actions">
           <button class="btn btn-primary" id="checkin-button" type="button"><span>Check me in</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           <button class="btn btn-primary" data-action="reset" id="welcome-done" type="button"><span>Done</span><span class="countdown" data-countdown></span></button>
-          <button class="btn btn-ghost" data-action="reset" id="welcome-cancel" type="button">This isn't me</button>
+          <button class="btn btn-ghost" data-action="reset" data-hold="1200" id="welcome-cancel" type="button">This isn't me</button>
         </div>
         <p class="fine" data-field="welcome-fine"></p>
       </div>
@@ -133,7 +133,7 @@
         <h1 id="problem-title" data-field="problem-title"></h1>
         <p class="lede" data-field="problem-copy"></p>
         <div class="actions">
-          <button class="btn btn-primary" data-action="reset" type="button"><span>Try again</span><span class="countdown" data-countdown></span></button>
+          <button class="btn btn-primary" data-action="reset" data-hold="0" type="button"><span>Try again</span><span class="countdown" data-countdown></span></button>
         </div>
       </div>
     </section>

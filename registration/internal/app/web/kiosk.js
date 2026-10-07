@@ -12,7 +12,7 @@ const LABEL_MM=Badge.LABEL_MM;
 const IDLE={confirm:45,welcome:30,collect:20,done:12,problem:12,staff:90};
 const HONORIFICS=/^(dr|prof|mr|mrs|ms|miss|shri|smt|sri|er|adv)\.?$/i;
 
-const state={kiosk:false,csrf:'',station:'',today:'',days:[],screen:'scan',busy:false,paused:false,current:null,badge:null,scanner:null,cameraRetry:null,lastCode:'',lastSeen:0,timer:null,ticker:null,deadline:0,staffPass:'',staffTimer:null,audio:null,wakeLock:null,pageRule:-1};
+const state={kiosk:false,csrf:'',station:'',today:'',days:[],screen:'scan',busy:false,paused:false,current:null,badge:null,scanner:null,cameraRetry:null,lastCode:'',holdUntil:0,timer:null,ticker:null,deadline:0,staffPass:'',staffTimer:null,audio:null,wakeLock:null,pageRule:-1};
 
 const store={
   get(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch{return fallback}},
@@ -64,10 +64,14 @@ function armIdle(seconds){
   tick();state.ticker=setInterval(tick,1000);
   state.timer=setTimeout(reset,seconds*1000);
 }
-function reset(){
+// holdMs: how long the code just handled is ignored once the scanner is back.
+// A finished flow holds it briefly so a phone still raised does not restart
+// it; "This isn't me" and "Try again" hold it for less, or not at all.
+const HOLD_MS=3000;
+function reset(holdMs=HOLD_MS){
   clearIdle();
   state.current=null;state.badge=null;state.busy=false;
-  state.lastSeen=Date.now();
+  state.holdUntil=Date.now()+(Number.isFinite(holdMs)?holdMs:HOLD_MS);
   $('#reprint-button').hidden=true;
   if(state.paused)return show('paused');
   show('scan');
@@ -109,9 +113,8 @@ function resume(){if(!state.paused)return;state.paused=false;reset()}
 async function onCode(raw){
   const code=String(raw||'').trim(),now=Date.now();
   if(!code||state.screen!=='scan'||state.busy||state.paused||$('#staff-dialog').open)return;
-  // A phone still held up after a finished flow keeps reporting its code; ignore it until it is lowered.
-  if(code===state.lastCode&&now-state.lastSeen<4000){state.lastSeen=now;return}
-  state.lastCode=code;state.lastSeen=now;state.busy=true;
+  if(code===state.lastCode&&now<state.holdUntil)return;
+  state.lastCode=code;state.busy=true;
   $('.scan-panel').classList.add('checking');
   feedback('tick');
   try{
@@ -124,7 +127,7 @@ async function onCode(raw){
       show('confirm',IDLE.confirm);
     }else showWelcome(x.status,x);
   }catch(err){if(err.status!==401)problem(err)}
-  finally{state.busy=false;state.lastSeen=Date.now();$('.scan-panel').classList.remove('checking')}
+  finally{state.busy=false;$('.scan-panel').classList.remove('checking')}
 }
 
 function showWelcome(kind,x){
@@ -181,8 +184,10 @@ async function startCamera(){
 const wedge={buffer:'',at:0};
 document.addEventListener('keydown',e=>{
   if($('#staff-dialog').open||e.ctrlKey||e.altKey||e.metaKey)return;
-  const now=Date.now();
-  if(now-wedge.at>120)wedge.buffer='';
+  // Measure gaps by when each key was typed, not when it was handled: a busy
+  // page delivers a fast scanner's keys late, and a code must not split in two.
+  const now=e.timeStamp;
+  if(now-wedge.at>300)wedge.buffer='';
   wedge.at=now;
   if(e.key==='Enter'){if(wedge.buffer.length>=6)void onCode(wedge.buffer);wedge.buffer='';e.preventDefault();return}
   if(e.key.length===1){wedge.buffer+=e.key;e.preventDefault()}
@@ -302,7 +307,7 @@ $('#staff-dialog').addEventListener('pointerdown',staffIdle);
 
 /* ---------- Wiring ---------- */
 
-$$('[data-action="reset"]').forEach(b=>b.addEventListener('click',reset));
+$$('[data-action="reset"]').forEach(b=>b.addEventListener('click',()=>reset(b.dataset.hold===undefined?HOLD_MS:Number(b.dataset.hold))));
 $('#print-button').addEventListener('click',()=>void printBadge(false));
 $('#reprint-button').addEventListener('click',()=>void printBadge(true));
 $('#checkin-button').addEventListener('click',()=>void checkIn());

@@ -193,11 +193,46 @@ dialog h2{font-size:clamp(30px,3vw,42px)}
   .badge-card{width:min(100%,460px)}
   .settings{grid-template-columns:1fr}
 }
-/* Short landscape screens (phones used for testing). */
+/* Landscape tablets. Most 8-11" tabs are 500-800 CSS px tall, less with
+   the browser bar showing, so type and spacing follow the height as well. */
+@media (max-height:900px) and (min-aspect-ratio:1/1){
+  :root{--pad:clamp(16px,2.8vw,44px)}
+  h1{font-size:clamp(32px,min(5.4vw,8.6vh),80px)}
+  .k-top{padding-top:clamp(8px,1.8vh,20px)}
+  .k-brand img{width:clamp(100px,10vw,150px)}
+  .k-foot{padding-bottom:clamp(6px,1.2vh,12px);font-size:12px}
+  .screen{padding-top:clamp(8px,1.8vh,20px);padding-bottom:clamp(12px,2.4vh,22px);gap:clamp(20px,3.4vw,56px)}
+  .eyebrow{margin-bottom:clamp(8px,1.6vh,16px)}
+  .lede{margin-top:clamp(8px,1.8vh,18px);font-size:clamp(16px,min(1.5vw,3vh),22px)}
+  .fine{margin-top:clamp(8px,1.4vh,14px);font-size:clamp(13px,2.2vh,16px)}
+  .actions{margin-top:clamp(12px,2.8vh,28px);gap:10px}
+  .btn{min-height:clamp(52px,10vh,80px);padding:0 clamp(20px,2.4vw,36px);font-size:clamp(16px,min(1.6vw,3.2vh),23px)}
+  .btn svg{width:24px;height:24px}
+  .who{margin-top:clamp(10px,2.4vh,26px);gap:clamp(6px,1.3vh,14px)}
+  .who>div{padding-top:clamp(6px,1.2vh,12px)}
+  .who dt{font-size:11px}
+  .who dd{margin-top:3px;font-size:clamp(15px,min(1.6vw,3.3vh),25px);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .chip{padding:5px 12px}
+  .badge-stage{padding:clamp(14px,2.4vw,36px);gap:14px;border-radius:28px}
+  .badge-card{width:min(100%,62vh,520px)}
+  .howto{margin-top:clamp(12px,2.6vh,28px);gap:clamp(6px,1.2vh,12px)}
+  .howto li{gap:14px;padding:clamp(8px,1.5vh,16px) clamp(12px,1.4vw,20px);border-radius:16px;font-size:clamp(15px,min(1.5vw,3vh),22px)}
+  .howto b{width:clamp(30px,5.6vh,42px);height:clamp(30px,5.6vh,42px);font-size:clamp(14px,2.6vh,18px)}
+  .tick{width:26px;height:26px}
+}
 @media (max-height:620px) and (min-aspect-ratio:1/1){
   .steps,.camera-tip,.k-foot>span:first-child{display:none}
-  .lede{font-size:17px}
+  /* The name already heads the screen and fills the badge preview. */
+  .who>div:first-child{display:none}
+  .screen-confirm .fine{display:none}
 }
+/* "Badge didn't print?" sits beside Done as a quieter action. */
+#reprint-button{min-height:auto;padding:10px 6px;border:0;background:none;box-shadow:none;font-size:clamp(14px,min(1.3vw,2.6vh),18px);text-decoration:underline;text-underline-offset:4px}
+.screen-collect .actions{flex-wrap:nowrap;align-items:center}
+/* Last resort for anything still taller than the screen: scroll inside it, never under the footer. */
+.k-stage{overflow:hidden}
+.screen{overflow-y:auto;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.sweep{display:none}}
 
 /* Printing through the browser dialog: only the rendered badge image. */
