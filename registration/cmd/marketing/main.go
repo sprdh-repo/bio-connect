@@ -1,11 +1,12 @@
-// Command marketing previews and sends the Bio Connect registration invitation.
+// Command marketing previews and sends Bio Connect broadcast emails.
 package main
 
 import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	_ "embed"
+	"embed"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/fs"
+	"mime"
 	"net"
 	"net/http"
 	"net/mail"
@@ -39,7 +42,66 @@ var invitation string
 //go:embed invitation.txt
 var plain string
 
-const subject = "Bio Connect 4.0: register now for Kerala's life sciences summit"
+//go:embed app-launch
+var appLaunch embed.FS
+
+// Overridable in tests so dated templates can be exercised after they expire.
+var now = time.Now
+
+var ist = time.FixedZone("IST", 19800)
+
+// emailTemplate is one broadcast. Images in Files are attached inline and
+// referenced from the HTML as cid:<name>, so nothing needs to be deployed.
+// __GREETING__ and __EMAIL__ are replaced per recipient.
+type emailTemplate struct {
+	Subject, HTML, Text string
+	// Dated copy refuses live sends from this instant.
+	Until time.Time
+	Files fs.FS
+}
+
+var templates = map[string]emailTemplate{
+	"invitation": {Subject: "Bio Connect 4.0: register now for Kerala's life sciences summit", HTML: invitation, Text: plain, Until: time.Date(2026, 10, 1, 0, 0, 0, 0, ist)},
+	"app-launch": {Subject: "Your Bio Connect 4.0 pass is now in the app", HTML: mustRead(appLaunch, "app-launch/email.html"), Text: mustRead(appLaunch, "app-launch/email.txt"), Until: time.Date(2026, 10, 10, 0, 0, 0, 0, ist), Files: mustSub(appLaunch, "app-launch")},
+}
+
+func mustRead(f fs.FS, name string) string {
+	b, err := fs.ReadFile(f, name)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+func mustSub(f fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(f, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
+}
+
+type attachment struct{ Name, Content, ContentType, ContentID string }
+
+// inlineImages returns the template's images referenced by cid: in its HTML.
+func (t emailTemplate) inlineImages() ([]attachment, error) {
+	if t.Files == nil {
+		return nil, nil
+	}
+	var list []attachment
+	err := fs.WalkDir(t.Files, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.Contains(t.HTML, "cid:"+name) {
+			return err
+		}
+		b, err := fs.ReadFile(t.Files, name)
+		if err != nil {
+			return err
+		}
+		list = append(list, attachment{name, base64.StdEncoding.EncodeToString(b), mime.TypeByExtension(filepath.Ext(name)), "cid:" + name})
+		return nil
+	})
+	return list, err
+}
 
 type contact struct{ Email, Name string }
 type entry struct {
@@ -256,12 +318,18 @@ func contacts(path, sheet, emailColumn, nameColumn string) ([]contact, error) {
 	return result, nil
 }
 
-func render(c contact) (string, string) {
+func render(t emailTemplate, c contact) (string, string) {
 	greeting := "Hello,"
 	if c.Name != "" {
 		greeting = "Hello " + c.Name + ","
 	}
-	return strings.ReplaceAll(invitation, "__GREETING__", html.EscapeString(greeting)), strings.ReplaceAll(plain, "__GREETING__", greeting)
+	email := c.Email
+	if email == "" {
+		email = "your registered email"
+	}
+	h := strings.NewReplacer("__GREETING__", html.EscapeString(greeting), "__EMAIL__", html.EscapeString(email)).Replace(t.HTML)
+	p := strings.NewReplacer("__GREETING__", greeting, "__EMAIL__", email).Replace(t.Text)
+	return h, p
 }
 
 type provider struct {
@@ -314,7 +382,16 @@ func run() error {
 	state := flag.String("state", "var/marketing", "private send-log and preview directory")
 	stream := flag.String("stream", "broadcast", "Postmark broadcast stream with Postmark-managed unsubscribes")
 	skipMX := flag.Bool("skip-mx-check", false, "skip DNS MX/A record validation of recipient domains")
+	templateName := flag.String("template", "invitation", "email to send: invitation or app-launch")
 	flag.Parse()
+	tmpl, ok := templates[*templateName]
+	if !ok {
+		return fmt.Errorf("unknown template %q", *templateName)
+	}
+	images, err := tmpl.inlineImages()
+	if err != nil {
+		return err
+	}
 	if flag.NArg() > 0 {
 		return errors.New("unexpected positional arguments")
 	}
@@ -328,7 +405,6 @@ func run() error {
 		return errors.New("campaign must not be empty")
 	}
 	list := []contact{{Name: "Shiyaf"}}
-	var err error
 	if *file != "" {
 		list, err = contacts(*file, *sheet, *emailCol, *nameCol)
 		if err != nil {
@@ -345,7 +421,15 @@ func run() error {
 	if err := os.MkdirAll(*state, 0700); err != nil {
 		return err
 	}
-	h, t := render(list[0])
+	h, t := render(tmpl, list[0])
+	// Browsers cannot resolve cid: URLs, so the preview points at copies of the images.
+	h = strings.ReplaceAll(h, `src="cid:`, `src="preview-`)
+	for _, img := range images {
+		b, _ := base64.StdEncoding.DecodeString(img.Content)
+		if err := os.WriteFile(filepath.Join(*state, "preview-"+img.Name), b, 0600); err != nil {
+			return err
+		}
+	}
 	for ext, content := range map[string]string{"html": h, "txt": t} {
 		if err := os.WriteFile(filepath.Join(*state, "preview."+ext), []byte(content), 0600); err != nil {
 			return err
@@ -377,10 +461,9 @@ func run() error {
 		fmt.Printf("Dry run: %d unique contacts; no emails sent.\n", len(list))
 		return nil
 	}
-	// This invitation is deliberately dated; require a copy update after the offer ends.
-	loc := time.FixedZone("IST", 19800)
-	if !time.Now().Before(time.Date(2026, 10, 1, 0, 0, 0, 0, loc)) {
-		return errors.New("early-bird invitation expired; update the copy and cutoff before sending")
+	// Templates are deliberately dated; require a copy update once they go stale.
+	if !now().Before(tmpl.Until) {
+		return fmt.Errorf("%s template expired on %s; update the copy and cutoff before sending", *templateName, tmpl.Until.Format("2 January 2006"))
 	}
 	token := os.Getenv("POSTMARK_SERVER_TOKEN")
 	from, err := address(os.Getenv("POSTMARK_FROM_ADDRESS"))
@@ -459,12 +542,15 @@ func run() error {
 			fmt.Printf("Skipped previously attempted contact: %s\n", c.Email)
 			continue
 		}
-		h, t := render(c)
-		sub := subject
+		h, t := render(tmpl, c)
+		sub := tmpl.Subject
 		if *test != "" {
 			sub = "[TEST] " + sub
 		}
 		payload := map[string]any{"From": (&mail.Address{Name: name, Address: from}).String(), "To": c.Email, "ReplyTo": "bioconnect@bio360.in", "Subject": sub, "HtmlBody": h, "TextBody": t, "MessageStream": *stream, "TrackOpens": false, "TrackLinks": "None", "Metadata": map[string]string{"campaign": *campaign, "application": "bioconnect-marketing"}}
+		if len(images) > 0 {
+			payload["Attachments"] = images
+		}
 		// Persist before the request. An interrupted/ambiguous attempt is never retried automatically.
 		report[i].Status = "attempted"
 		report[i].Time = time.Now().UTC()

@@ -120,6 +120,35 @@ Each contact receives an individual message; recipient addresses are never share
 The sender uses the existing configured identity and replies go to `bioconnect@bio360.in`.
 No registration application deployment is required.
 
+## Mobile app announcement
+
+`--template app-launch` sends the app announcement in `app-launch/` to registered participants.
+Its images are attached inline (`cid:`), so no static deployment is needed; `preview.html` uses local copies.
+The copy names each recipient's email address because My passes verifies against the attendee email.
+It refuses live sends from 10 October 2026 in India time.
+
+Export attendees on approved registrations who hold an active pass, on the production host:
+
+```sh
+docker compose -f compose.production.yaml exec -T db psql -U bioconnect -d bioconnect --csv -c \
+  "SELECT DISTINCT ON (lower(a.email)) lower(a.email) AS email, a.name AS name
+     FROM attendees a JOIN registrations r ON r.id=a.registration_id
+     JOIN passes p ON p.attendee_id=a.id AND p.revoked_at IS NULL
+    WHERE r.status='approved' AND a.removed_at IS NULL
+    ORDER BY lower(a.email), a.position" > approved-attendees.csv
+```
+
+Then preview, test and send with a dedicated state directory:
+
+```sh
+go run ./cmd/marketing --template app-launch --campaign app-launch-october-2026 --state var/marketing/app-launch \
+  --contacts approved-attendees.csv --email-column email --name-column name
+go run ./cmd/marketing --template app-launch --campaign app-launch-october-2026 --state var/marketing/app-launch \
+  --test-to shiyaf@sprdh.com
+go run ./cmd/marketing --template app-launch --campaign app-launch-october-2026 --state var/marketing/app-launch \
+  --contacts approved-attendees.csv --email-column email --name-column name --send
+```
+
 ## Logs and reports
 
 All files are private by default under the git-ignored `registration/var/marketing/` directory.

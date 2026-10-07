@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +73,7 @@ func TestContactImports(t *testing.T) {
 }
 
 func TestRenderingAndReport(t *testing.T) {
-	h, p := render(contact{Name: "<script>&"})
+	h, p := render(templates["invitation"], contact{Name: "<script>&"})
 	if strings.Contains(h, "<script>") || !strings.Contains(h, "&lt;script&gt;&amp;") || !strings.Contains(p, "<script>&") {
 		t.Fatal("incorrect greeting escaping")
 	}
@@ -194,9 +195,9 @@ func TestProviderRequest(t *testing.T) {
 }
 
 func TestCampaignStopsReportsAndResumesWithoutDuplicates(t *testing.T) {
-	if time.Now().After(time.Date(2026, 9, 30, 18, 30, 0, 0, time.UTC)) {
-		t.Skip("dated invitation has expired")
-	}
+	originalNow := now
+	now = func() time.Time { return time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC) }
+	defer func() { now = originalNow }()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "contacts.csv")
 	if err := os.WriteFile(path, []byte("Email\na@example.com\nb@example.com\nc@example.com\n"), 0600); err != nil {
@@ -215,11 +216,14 @@ func TestCampaignStopsReportsAndResumesWithoutDuplicates(t *testing.T) {
 	http.DefaultTransport = roundTrip(func(r *http.Request) (*http.Response, error) {
 		body := `{"MessageStreamType":"Broadcasts","SubscriptionManagementConfiguration":{"UnsubscribeHandlingType":"Postmark"}}`
 		if r.Method == "POST" {
-			var payload struct{ To, HtmlBody, TextBody, MessageStream string }
+			var payload struct {
+				To, HtmlBody, TextBody, MessageStream string
+				Attachments                           []attachment
+			}
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				t.Fatal(err)
 			}
-			if payload.MessageStream != "broadcast" || !strings.Contains(payload.HtmlBody, "pm:unsubscribe") || payload.TextBody == "" {
+			if payload.MessageStream != "broadcast" || !strings.Contains(payload.HtmlBody, "pm:unsubscribe") || payload.TextBody == "" || len(payload.Attachments) != 0 {
 				t.Fatal("incomplete marketing payload")
 			}
 			sends[payload.To]++
@@ -260,6 +264,36 @@ func TestCampaignStopsReportsAndResumesWithoutDuplicates(t *testing.T) {
 	for _, email := range []string{"a@example.com", "b@example.com", "c@example.com"} {
 		if sends[email] != 1 {
 			t.Fatalf("%s sent %d times", email, sends[email])
+		}
+	}
+}
+
+func TestAppLaunchTemplate(t *testing.T) {
+	tmpl := templates["app-launch"]
+	h, p := render(tmpl, contact{Email: "a&b@example.com", Name: "Asha"})
+	for _, body := range []string{h, p} {
+		if strings.Contains(body, "__") || !strings.Contains(body, "{{{ pm:unsubscribe }}}") || !strings.Contains(body, "id6817779744") || !strings.Contains(body, "in.gov.kerala.bioconnect") {
+			t.Fatal("incomplete app-launch body")
+		}
+	}
+	if !strings.Contains(h, "a&amp;b@example.com") || !strings.Contains(p, "a&b@example.com") || !strings.Contains(h, "Hello Asha,") {
+		t.Fatal("recipient not personalised")
+	}
+	images, err := tmpl.inlineImages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	attached := map[string]bool{}
+	for _, img := range images {
+		if !strings.HasPrefix(img.ContentType, "image/") || img.ContentID != "cid:"+img.Name || img.Content == "" {
+			t.Fatalf("bad inline image %#v", img.Name)
+		}
+		attached[img.Name] = true
+	}
+	// Every cid: reference must be attached, or the client shows a broken image.
+	for _, ref := range regexp.MustCompile(`cid:([^"]+)`).FindAllStringSubmatch(h, -1) {
+		if !attached[ref[1]] {
+			t.Fatalf("missing inline image %s", ref[1])
 		}
 	}
 }
