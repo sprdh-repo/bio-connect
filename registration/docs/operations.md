@@ -80,36 +80,41 @@ An attendee scans the QR on their pass, confirms their name against a preview of
 - On day two, an attendee who already has a badge is checked in without printing.
 - The event day comes from the server clock, not the tablet.
 - Prints and check-ins appear in the activity audit under the kiosk's station name with the detail "Self-service kiosk", and opening or closing a kiosk is audited as well.
-- Hold the Bio Connect logo for two seconds and enter the ops passcode for the staff menu: printer, resolution, label orientation, camera, a test print, and **Exit kiosk mode**.
+- Hold the Bio Connect logo for two seconds and enter the ops passcode for the staff menu: printer status, camera, a test print, and **Exit kiosk mode**.
   The menu closes itself after 90 seconds. Settings are stored on the tablet.
 
-Printing goes through [RawBT](https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter) so no Android print dialog appears.
-The kiosk draws the 76.2 × 50.8 mm badge as a PNG at the printer's resolution, with whole printer dots per QR module, and hands it to RawBT through an Android intent after the server has recorded the print.
+The front camera is the default, since it faces the attendee; the preview is mirrored so it behaves like a mirror.
+A USB or Bluetooth scanner in keyboard mode also works with no field focused.
+
+#### Setting up a kiosk tablet
+
+Kiosk tablets run the **Bio Connect Kiosk** Android app (`kiosk-android/`; its README covers building, installing and device-owner provisioning).
+The app shows this same page full screen, locks the tablet to it, and prints straight to the Zebra, so RawBT is not needed.
 Set up each tablet before doors open:
 
-1. Install RawBT, pair the badge printer, choose its driver, set the paper to the 76.2 mm label width, and print RawBT's own test page.
-2. In Chrome, open `/kiosk` once and allow the camera. Optionally use **Add to Home screen**: the kiosk opens full screen from there.
-3. Keep the tablet on a kiosk launcher that allows RawBT to open, or simply in the full-screen kiosk app.
-   Do not use Android screen pinning: it blocks Chrome from opening RawBT, so nothing prints.
-4. From the staff menu, run **Print a test badge** and check the margins, orientation (switch to "Rotated 90°" if the printer feeds labels portrait) and that a phone can scan the QR.
-5. Run one real pass through scan, print, gate entry and checkout.
+1. Install the app, allow the camera, and set the 6-digit tablet admin PIN (separate from the ops passcode).
+2. In the app's tablet setup, choose the Zebra's connection (Bluetooth, USB or network), detect its resolution (203 or 300 dpi), print the app's test label, and calibrate the 76 x 51 mm gap labels.
+3. Open staff web setup in the app, sign in at `/ops` with a station name such as `Kiosk 1`, open **Kiosk**, and choose **Start kiosk on this device**.
+   The Kiosk tab confirms when it is running inside the app.
+4. Tap **Start kiosk** in the app's tablet setup to lock the tablet.
+   To get back to setup, tap the top-left corner five times and enter the tablet PIN.
+5. From the kiosk's staff menu, run **Print a test badge**: it should fill exactly one label and a phone should scan its QR.
+6. Run one real pass through scan, print, gate entry and checkout.
+   Then open the printer cover and scan another pass: the kiosk should say the printer isn't ready without using up that attendee's print.
 
-The front camera is the default, since it faces the attendee; the preview is mirrored so it behaves like a mirror.
+Inside the app, the page finds the app's `BioConnectKiosk` channel (a web message channel locked to this site's origin) and then:
 
-#### Bio Connect Kiosk Android app
-
-The Android app (`kiosk-android/`) shows this same page full screen and prints straight to the Zebra, with no RawBT.
-The page finds the app's `BioConnectKiosk` channel (a web message channel locked to this site's origin) and then:
-
-- draws the badge at the dpi the printer reports (608 or 609 x 406 dots at 203 dpi, 900 x 600 at 300 dpi);
+- draws the badge at the dpi the printer reports (609 x 406 dots at 203 dpi, 900 x 600 at 300 dpi);
 - asks the printer for its status before recording a print, so a printer that is out of labels or not connected never uses up an attendee's print;
 - records the print and check-in, sends the badge as `{type:"print", jobId, png, widthDots, heightDots}`, and waits for the app's `printed` reply;
 - on a failed or uncertain print, offers "Try printing again", which uses the same-kiosk reprint window;
-- shows the app's printer status in the staff menu instead of the RawBT, resolution and orientation options, and sends the test badge through the app;
+- shows the app's printer status in the staff menu and sends the test badge through the app;
 - shows a printer problem in the footer, so staff notice it before an attendee does.
 
-Outside the app the page behaves as before (RawBT or the browser print dialog).
-A USB or Bluetooth scanner in keyboard mode also works with no field focused.
+#### Fallback without the app
+
+In an ordinary browser the kiosk still works, printing through [RawBT](https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter) on Android or the browser print dialog elsewhere; choose which in the staff menu, along with the printer resolution and label orientation.
+For RawBT, set the printer's label width and length (608 x 406 dots at 203 dpi), set "Count of lines scrolling" to 0 and copies to 1 so each badge uses one label, and do not use Android screen pinning, which stops Chrome from opening RawBT.
 
 ### Rollback
 
