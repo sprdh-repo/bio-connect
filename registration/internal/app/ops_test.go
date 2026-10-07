@@ -291,6 +291,15 @@ func TestOpsPaidSpotRegistrationVerifiesAndDeduplicatesReference(t *testing.T) {
 	if person["checkedIn"] != true {
 		t.Fatalf("spot registration was not checked in: %s", created.Body.String())
 	}
+	// Consent is given in person at the desk, so the pass goes out on both channels.
+	for channel, to := range map[string]string{"email": "maya.spot@example.com", "whatsapp": "+919876543210"} {
+		if n := count(t, a, "SELECT count(*) FROM delivery_jobs WHERE purpose='pass' AND channel=$1 AND recipient=$2", channel, to); n != 1 {
+			t.Fatalf("spot %s deliveries = %d", channel, n)
+		}
+	}
+	if n := count(t, a, "SELECT count(*) FROM attendees WHERE email='maya.spot@example.com' AND whatsapp_consent AND consent_text<>''"); n != 1 {
+		t.Fatalf("spot attendee WhatsApp consent not recorded")
+	}
 	body["email"] = "another.spot@example.com"
 	body["name"] = "Another Person"
 	duplicate := c.request(http.MethodPost, "/api/v1/ops/spot-register", body)

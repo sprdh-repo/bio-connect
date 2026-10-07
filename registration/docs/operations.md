@@ -56,6 +56,7 @@ The session lasts 12 hours and all writes carry CSRF protection.
   Every ops scanner (check-in, checkout, undo, gates) accepts the profile URL, the bare QR identifier on PDF passes and in the app, or a typed pass number.
 - Checkout requires a check-in for the selected day. Both check-in and checkout can be undone with a required reason.
 - Spot registration uses the same server-side category fee and verified bank-reference checks as the staff console, then checks in and prints immediately.
+  The pass is also sent at once by email and WhatsApp, since the attendee agrees to delivery in person at the desk; a guest pass is only downloaded.
 - Access gates can enforce or only log category, day, prior check-in, capacity and single-entry rules. An attendee already recorded inside is always permitted to exit even if gate rules subsequently change.
 - Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
 
