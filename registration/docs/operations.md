@@ -51,6 +51,7 @@ The session lasts 12 hours and all writes carry CSRF protection.
 
 - Select the event day before scanning. Attendance is unique per attendee per day, while repeated scans are retained in the activity audit.
 - A first check-in opens the browser print dialog for a landscape 76.2 × 50.8 mm thermal badge, with attendee details above the QR. Configure the printer driver for that exact label size, landscape orientation, 100% scale, zero margins and no browser headers or footers.
+  The desk and the self-service kiosk draw the badge with the same renderer (`web/badge.js`), as a 203 dpi image with whole printer dots per QR module, so a badge looks the same whichever station printed it.
 - The badge QR encodes the attendee's public profile URL (`BASE_URL/p/<qr_id>`), so a phone camera opens a Bio Connect page instead of a web search.
   The profile shows only what the badge prints (name, designation, institution, category), is marked `noindex`, and returns 404 once the pass is revoked.
   Every ops scanner (check-in, checkout, undo, gates) accepts the profile URL, the bare QR identifier on PDF passes and in the app, or a typed pass number.

@@ -335,8 +335,7 @@ func TestOpsBadgeIsHiddenOnScreenAndPrintsLandscapeStacked(t *testing.T) {
 		".badge-print{display:none}",
 		"size:7.62cm 5.08cm",
 		"width:7.62cm;height:5.08cm",
-		".badge-print .badge-inner{display:flex;flex-direction:column",
-		"text-align:center;text-transform:uppercase",
+		".badge-print img{display:block;width:7.62cm;height:5.08cm}",
 	} {
 		if !strings.Contains(styles, want) {
 			t.Errorf("badge stylesheet does not contain %q", want)
@@ -348,6 +347,28 @@ func TestOpsBadgeIsHiddenOnScreenAndPrintsLandscapeStacked(t *testing.T) {
 	}
 	if strings.Contains(string(javascript), `<p class="category">`) {
 		t.Error("printed badge still includes the attendee category")
+	}
+	// The desk prints the kiosk's renderer, so both stations' badges match.
+	if !strings.Contains(string(javascript), "Badge.png(p,qrUrl)") {
+		t.Error("desk badge is not drawn by the shared badge renderer")
+	}
+	for _, page := range []string{"web/ops.html", "web/kiosk.html"} {
+		html, err := resources.ReadFile(page)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(html), `<script src="/static/badge.js" defer></script>`) {
+			t.Errorf("%s does not load the shared badge renderer", page)
+		}
+	}
+	renderer, err := resources.ReadFile("web/badge.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"LABEL_MM={w:76.2,h:50.8}", "toUpperCase()", "g.textAlign='center'"} {
+		if !strings.Contains(string(renderer), want) {
+			t.Errorf("badge renderer does not contain %q", want)
+		}
 	}
 }
 

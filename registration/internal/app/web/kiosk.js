@@ -5,9 +5,9 @@
 const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelectorAll(s)];
 
 const isAndroid=/Android/i.test(navigator.userAgent);
-const DEFAULTS={printer:isAndroid?'rawbt':'browser',dpi:203,rotate:0,camera:'user'};
+const DEFAULTS={printer:isAndroid?'rawbt':'browser',dpi:Badge.DEFAULT_DPI,rotate:0,camera:'user'};
 const RAWBT_PACKAGE='ru.a402d.rawbtprinter';
-const LABEL_MM={w:76.2,h:50.8};
+const LABEL_MM=Badge.LABEL_MM;
 // Seconds before an unattended screen returns to the scanner.
 const IDLE={confirm:45,welcome:30,collect:20,done:12,problem:12,staff:90};
 const HONORIFICS=/^(dr|prof|mr|mrs|ms|miss|shri|smt|sri|er|adv)\.?$/i;
@@ -188,102 +188,12 @@ document.addEventListener('keydown',e=>{
   if(e.key.length===1){wedge.buffer+=e.key;e.preventDefault()}
 });
 
-/* ---------- Badge rendering ---------- */
-
-function loadImage(src){return new Promise((ok,no)=>{const img=new Image();img.onload=()=>ok(img);img.onerror=no;img.src=src})}
-
-// Finds the QR's module grid in the server PNG so it can be redrawn with whole
-// printer dots per module: a thermal head cannot print a fraction of a dot.
-function qrGrid(img){
-  const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
-  const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);
-  const {data,width,height}=g.getImageData(0,0,c.width,c.height);
-  const dark=(x,y)=>data[(y*width+x)*4]<128;
-  let left=width,top=height,right=-1,bottom=-1;
-  for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(dark(x,y)){if(x<left)left=x;if(x>right)right=x;if(y<top)top=y;if(y>bottom)bottom=y}
-  if(right<0)throw new Error('empty QR');
-  let run=0;while(left+run<=right&&dark(left+run,top))run++;
-  const pixel=run/7,size=right-left+1;
-  return {img,left,top,size,modules:Math.round(size/pixel)};
-}
-
-function wrapText(g,text,width,maxLines){
-  const words=String(text||'').split(/\s+/).filter(Boolean),lines=[];let line='';
-  for(const word of words){
-    const next=line?line+' '+word:word;
-    if(g.measureText(next).width<=width){line=next;continue}
-    if(line)lines.push(line);
-    line=word;
-  }
-  if(line)lines.push(line);
-  const fits=lines.length<=maxLines&&lines.every(l=>g.measureText(l).width<=width);
-  return {lines,fits};
-}
-function clampLines(g,lines,width,maxLines){
-  const out=lines.slice(0,maxLines);
-  if(lines.length>maxLines||out.some(l=>g.measureText(l).width>width)){
-    let last=out[out.length-1]+(lines.length>maxLines?'…':'');
-    while(last.length>1&&g.measureText(last).width>width)last=last.slice(0,-2)+'…';
-    out[out.length-1]=last;
-  }
-  return out;
-}
-
-// Draws the 76.2 × 50.8 mm badge at the printer's resolution: name, role and
-// organisation above the QR, pass number below, matching the staffed desk badge.
-function renderBadge(person,grid,dpi,rotate){
-  const px=mm=>mm/25.4*dpi,pt=v=>v/72*dpi;
-  const W=Math.round(px(LABEL_MM.w)),H=Math.round(px(LABEL_MM.h));
-  const c=document.createElement('canvas');c.width=W;c.height=H;
-  const g=c.getContext('2d');
-  g.fillStyle='#fff';g.fillRect(0,0,W,H);g.fillStyle='#000';g.textAlign='center';g.textBaseline='alphabetic';
-  const padX=px(3.8),padY=px(2.8),maxW=W-padX*2;
-  const refSize=pt(8),refGap=px(.9);
-  // QR: the largest whole-dot module size up to the desk badge's 19.5 mm.
-  const modules=grid?grid.modules:33;
-  let dot=Math.max(2,Math.floor(px(19.5)/modules));
-  const textMin=pt(11)*1.9+pt(8);
-  while(dot>2&&H-padY*2-refSize-refGap-modules*dot-px(1.4)<textMin)dot--;
-  const qrSize=modules*dot,qrTop=H-padY-refSize-refGap-qrSize;
-  const textBottom=qrTop-px(1.4);
-
-  const name=String(person.name||'').toUpperCase(),designation=String(person.designation||person.category||'Delegate').toUpperCase(),institution=String(person.institution||'').toUpperCase();
-  const fontName=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontRole=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontOrg=s=>`500 ${s}px "DM Sans", Arial, sans-serif`;
-  let layout=null;
-  for(let scale=1;scale>=.55;scale-=.05){
-    const nameSize=pt(18)*scale,roleSize=pt(9)*Math.max(scale,.8),orgSize=pt(8)*Math.max(scale,.8);
-    g.font=fontName(nameSize);const n=wrapText(g,name,maxW,2);
-    if(!n.fits&&scale>.56)continue;
-    g.font=fontRole(roleSize);const role=clampLines(g,[designation],maxW,1);
-    g.font=fontOrg(orgSize);const org=institution?clampLines(g,wrapText(g,institution,maxW,2).lines,maxW,2):[];
-    g.font=fontName(nameSize);const nameLines=clampLines(g,n.lines,maxW,2);
-    const height=nameLines.length*nameSize*.98+px(1.1)+roleSize*1.1+(org.length?px(.7)+org.length*orgSize*1.12:0);
-    layout={nameSize,roleSize,orgSize,nameLines,role,org};
-    if(padY+height<=textBottom)break;
-  }
-  let y=padY;
-  g.font=fontName(layout.nameSize);
-  for(const line of layout.nameLines){y+=layout.nameSize*.92;g.fillText(line,W/2,y);y+=layout.nameSize*.06}
-  y+=px(1.1)+layout.roleSize*.9;g.font=fontRole(layout.roleSize);g.fillText(layout.role[0],W/2,y);
-  if(layout.org.length){y+=px(.7);g.font=fontOrg(layout.orgSize);for(const line of layout.org){y+=layout.orgSize*1.02;g.fillText(line,W/2,y)}}
-
-  const qrLeft=Math.round((W-qrSize)/2),qrY=Math.round(qrTop);
-  if(grid){g.imageSmoothingEnabled=false;g.drawImage(grid.img,grid.left,grid.top,grid.size,grid.size,qrLeft,qrY,qrSize,qrSize)}
-  else{g.lineWidth=Math.max(2,dot);g.setLineDash([dot*3,dot*2]);g.strokeRect(qrLeft,qrY,qrSize,qrSize);g.setLineDash([]);g.font=`800 ${pt(10)}px Manrope, Arial, sans-serif`;g.fillText('TEST',W/2,qrY+qrSize/2+pt(4))}
-  g.font=`700 ${refSize}px ui-monospace, "Roboto Mono", monospace`;g.fillText(person.reference||'',W/2,H-padY);
-
-  if(!rotate)return c;
-  const r=document.createElement('canvas');r.width=H;r.height=W;
-  const rg=r.getContext('2d');rg.translate(H,0);rg.rotate(Math.PI/2);rg.drawImage(c,0,0);
-  return r;
-}
-
 async function prepareBadge(person,qrUrl){
-  const grid=qrUrl?qrGrid(await loadImage(qrUrl)):null;
-  const preview=renderBadge(person,grid,300,false),canvas=$('#badge-preview');
+  const grid=qrUrl?Badge.qrGrid(await Badge.loadImage(qrUrl)):null;
+  const preview=Badge.render(person,grid,300,false),canvas=$('#badge-preview');
   canvas.width=preview.width;canvas.height=preview.height;canvas.getContext('2d').drawImage(preview,0,0);
   const rotate=Number(settings.rotate)===90;
-  state.badge={dataUrl:renderBadge(person,grid,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate};
+  state.badge={dataUrl:Badge.render(person,grid,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate};
 }
 
 /* ---------- Printing ---------- */
@@ -377,7 +287,7 @@ $('#test-print').addEventListener('click',async()=>{
     await document.fonts.ready;
     const sample={name:'Dr. Lakshmi Narayanan Pillai',designation:'Principal Scientist',institution:'Rajiv Gandhi Centre for Biotechnology',reference:'BC4-TEST-0000'};
     const rotate=Number(settings.rotate)===90;
-    dispatchPrint({dataUrl:renderBadge(sample,null,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate});
+    dispatchPrint({dataUrl:Badge.render(sample,null,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate});
   }catch{$('#unlock-error').textContent='Test badge could not be drawn.'}
 });
 $('#exit-kiosk').addEventListener('click',async e=>{
@@ -442,7 +352,7 @@ async function heartbeat(){
 function dayLabel(){const i=state.days.findIndex(d=>d.ID===state.today),d=state.days[i];$('#day-label').textContent=d?`Day ${i+1} · ${d.Label.split('·')[1]?.trim()||d.Label}`:''}
 
 async function boot(){
-  try{await Promise.all([document.fonts.load('800 40px Manrope'),document.fonts.load('500 20px "DM Sans"')])}catch{}
+  await Badge.fontsReady();
   let me;
   try{me=await api('me')}catch(err){document.body.classList.remove('booting');if(err.status===0){setNet(false);pause('expired');setTimeout(boot,10000)}else pause('setup');return}
   Object.assign(state,{csrf:me.csrf,station:me.station,today:me.today,days:me.days});
