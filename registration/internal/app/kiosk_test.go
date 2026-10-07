@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -180,5 +181,27 @@ func TestKioskTreatsDeskPrintedBadgeAsPrinted(t *testing.T) {
 	}
 	if rr := kiosk.request(http.MethodPost, "/api/v1/ops/kiosk/print", map[string]any{"code": qr, "retry": true}); rr.Code != http.StatusConflict {
 		t.Fatalf("kiosk reprint of a desk badge = %d", rr.Code)
+	}
+}
+
+// The Android kiosk app talks to the page over an origin-locked web message
+// channel; these are the names and fields it depends on.
+func TestKioskPageKeepsTheAppBridgeContract(t *testing.T) {
+	script, err := resources.ReadFile("web/kiosk.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"window.BioConnectKiosk",
+		"type:info?'status':'hello'",
+		"send({type:'print',jobId,png:",
+		"widthDots:badge.width,heightDots:badge.height",
+		"crypto.randomUUID()",
+		"m.type==='info'",
+		"m.type==='printed'",
+	} {
+		if !strings.Contains(string(script), want) {
+			t.Errorf("kiosk.js no longer contains %q", want)
+		}
 	}
 }

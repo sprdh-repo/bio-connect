@@ -133,7 +133,8 @@
         <h1 id="problem-title" data-field="problem-title"></h1>
         <p class="lede" data-field="problem-copy"></p>
         <div class="actions">
-          <button class="btn btn-primary" data-action="reset" data-hold="0" type="button"><span>Try again</span><span class="countdown" data-countdown></span></button>
+          <button class="btn btn-primary" id="problem-retry" type="button" hidden><span>Try printing again</span></button>
+          <button class="btn btn-primary" id="problem-reset" data-action="reset" data-hold="0" type="button"><span data-field="problem-reset">Try again</span><span class="countdown" data-countdown></span></button>
         </div>
       </div>
     </section>
@@ -155,6 +156,7 @@
 
   <footer class="k-foot">
     <span>Hyatt Regency Trivandrum · 08–09 October 2026</span>
+    <span class="k-net" id="printer-status" hidden><i></i><span id="printer-status-text"></span></span>
     <span class="k-net" id="net-status" hidden><i></i>Reconnecting…</span>
   </footer>
 </div>
@@ -170,16 +172,17 @@
   </form>
   <div id="staff-panel" class="staff-panel" hidden>
     <div class="staff-head"><div><p class="eyebrow">Staff only · <span id="staff-station"></span></p><h2>Kiosk settings</h2></div><p class="staff-count"><b id="staff-printed">0</b> badges printed on this device</p></div>
+    <p class="app-printer" id="app-printer" role="status" hidden></p>
     <form id="settings-form" class="settings">
-      <fieldset><legend>Printing</legend>
+      <fieldset data-browser-printing><legend>Printing</legend>
         <label class="opt"><input type="radio" name="printer" value="rawbt"><span><b>RawBT (silent)</b><small>Android print service app. No dialog.</small></span></label>
         <label class="opt"><input type="radio" name="printer" value="browser"><span><b>Browser print dialog</b><small>For testing on a laptop or desk printer.</small></span></label>
       </fieldset>
-      <fieldset><legend>Printer resolution</legend>
+      <fieldset data-browser-printing><legend>Printer resolution</legend>
         <label class="opt"><input type="radio" name="dpi" value="203"><span><b>203 dpi</b><small>Most thermal label printers.</small></span></label>
         <label class="opt"><input type="radio" name="dpi" value="300"><span><b>300 dpi</b></span></label>
       </fieldset>
-      <fieldset><legend>Badge orientation</legend>
+      <fieldset data-browser-printing><legend>Badge orientation</legend>
         <label class="opt"><input type="radio" name="rotate" value="0"><span><b>Landscape</b><small>76.2 × 50.8 mm as fed.</small></span></label>
         <label class="opt"><input type="radio" name="rotate" value="90"><span><b>Rotated 90°</b><small>For printers that feed the label portrait.</small></span></label>
       </fieldset>

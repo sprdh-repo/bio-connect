@@ -31,6 +31,8 @@ p{margin:0}
 .k-clock{font:700 clamp(18px,1.6vw,24px) var(--display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--forest)}
 .k-foot{display:flex;justify-content:space-between;align-items:center;padding:0 var(--pad) clamp(10px,1.4vw,18px);color:var(--muted);font-size:13px}
 .k-net{display:inline-flex;align-items:center;gap:8px;color:var(--red);font-weight:700}
+.app-printer{display:flex;align-items:center;gap:10px;margin:0 0 16px;padding:14px 16px;border-radius:14px;background:var(--lime-soft);color:var(--forest);font:700 16px/1.3 var(--display)}
+.app-printer.problem{background:#f7dfdb;color:var(--red)}
 .k-net i{width:9px;height:9px;border-radius:50%;background:currentColor;animation:blink 1s infinite}
 @keyframes blink{50%{opacity:.25}}
 
@@ -99,6 +101,8 @@ p{margin:0}
 .btn.loading::after{content:"";position:absolute;width:30px;height:30px;border-radius:50%;border:4px solid rgba(255,255,255,.3);border-top-color:var(--lime);animation:spin .8s linear infinite}
 .countdown{font-variant-numeric:tabular-nums;color:var(--lime);font-size:.85em}
 .countdown:empty{display:none}
+.btn-ghost .countdown{color:var(--muted)}
+.btn-ghost .countdown::before{color:var(--line)}
 .countdown::before{content:"· ";color:rgba(255,255,255,.5)}
 
 /* Idle timeout bar on screens that wait for a decision. */

@@ -7,9 +7,49 @@ const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelect
 const isAndroid=/Android/i.test(navigator.userAgent);
 const DEFAULTS={printer:isAndroid?'rawbt':'browser',dpi:Badge.DEFAULT_DPI,rotate:0,camera:'user'};
 const RAWBT_PACKAGE='ru.a402d.rawbtprinter';
+
+// The Bio Connect Kiosk Android app injects BioConnectKiosk (an origin-locked
+// web message channel) and prints straight to the Zebra. When it is present it
+// replaces RawBT and the browser dialog, and its printer's dpi wins.
+const appBridge=(()=>{
+  const port=window.BioConnectKiosk;
+  if(!port||typeof port.postMessage!=='function')return null;
+  const jobs=new Map(),waiting=[];let info=null;
+  port.onmessage=e=>{
+    let m;try{m=JSON.parse(e.data)}catch{return}
+    if(m.type==='info'){info=m;waiting.splice(0).forEach(done=>done(m));showPrinterStatus()}
+    else if(m.type==='printed'){const job=jobs.get(m.jobId);if(job){jobs.delete(m.jobId);clearTimeout(job.timer);job.done(m)}}
+  };
+  const send=m=>port.postMessage(JSON.stringify(m));
+  return {
+    get printer(){return info?.printer||null},
+    // Resolves with the freshest printer info, or the last known after a timeout.
+    status(timeout=4000){return new Promise(done=>{const t=setTimeout(()=>done(info),timeout);waiting.push(m=>{clearTimeout(t);done(m)});send({type:info?'status':'hello'})})},
+    print(badge,timeout=20000){
+      const jobId=crypto.randomUUID();
+      return new Promise(done=>{
+        const timer=setTimeout(()=>{jobs.delete(jobId);done({ok:false,message:'The printer did not respond'})},timeout);
+        jobs.set(jobId,{done,timer});
+        send({type:'print',jobId,png:badge.dataUrl.slice(badge.dataUrl.indexOf(',')+1),widthDots:badge.width,heightDots:badge.height});
+      });
+    }
+  };
+})();
+function printerMode(){return appBridge?'app':settings.printer}
+function badgeDpi(){const d=appBridge?.printer?.dpi;return d===203||d===300?d:Number(settings.dpi)||Badge.DEFAULT_DPI}
+function badgeRotated(){return !appBridge&&Number(settings.rotate)===90}
+function printerError(message,recorded){return Object.assign(new Error(String(message||'The badge did not print').replace(/\.$/,'')),{code:'printer',recorded})}
+// Staff need to see a printer problem before an attendee finds it.
+function showPrinterStatus(){
+  const p=appBridge?.printer,bad=!!p&&(!p.connected||!p.ready);
+  $('#printer-status').hidden=!bad;
+  if(bad){const why=p.problem||'not connected';$('#printer-status-text').textContent=/^printer\b/i.test(why)?why:'Printer: '+why}
+  const box=$('#app-printer');
+  if(box&&appBridge){box.hidden=false;box.classList.toggle('problem',!p||bad);box.textContent=!p?'Bio Connect app: checking the printer…':`${p.name||'Badge printer'} · ${p.connection||'connected'} · ${p.dpi||'?'} dpi · ${bad?(p.problem||'not connected'):'Ready'}`}
+}
 const LABEL_MM=Badge.LABEL_MM;
 // Seconds before an unattended screen returns to the scanner.
-const IDLE={confirm:45,welcome:30,collect:20,done:12,problem:12,staff:90};
+const IDLE={confirm:45,welcome:30,collect:20,done:12,problem:12,printer:40,staff:90};
 const HONORIFICS=/^(dr|prof|mr|mrs|ms|miss|shri|smt|sri|er|adv)\.?$/i;
 
 const state={kiosk:false,csrf:'',station:'',today:'',days:[],screen:'scan',busy:false,paused:false,current:null,badge:null,scanner:null,cameraRetry:null,lastCode:'',holdUntil:0,timer:null,ticker:null,deadline:0,staffPass:'',staffTimer:null,audio:null,wakeLock:null,pageRule:-1};
@@ -70,7 +110,7 @@ function armIdle(seconds){
 const HOLD_MS=3000;
 function reset(holdMs=HOLD_MS){
   clearIdle();
-  state.current=null;state.badge=null;state.busy=false;
+  state.current=null;state.badge=null;state.busy=false;state.printRecorded=false;
   state.holdUntil=Date.now()+(Number.isFinite(holdMs)?holdMs:HOLD_MS);
   $('#reprint-button').hidden=true;
   if(state.paused)return show('paused');
@@ -85,7 +125,8 @@ function problem(err){
     already_printed:['Badge already printed','Your badge was printed earlier.','For a replacement badge, please visit the registration desk. They will print one for you.','helpdesk'],
     offline:['Connection problem',"We couldn't reach the check-in server.",'Please try again in a moment. If it keeps happening, the registration desk will help.','helpdesk']
   }[code]||['Something went wrong','We could not finish that.','Please try again. If it keeps happening, the registration desk will help.','helpdesk'];
-  setField('problem-eyebrow',copy[0]);setField('problem-title',copy[1]);setField('problem-copy',copy[2]);
+  setField('problem-eyebrow',copy[0]);setField('problem-title',copy[1]);setField('problem-copy',copy[2]);setField('problem-reset','Try again');
+  $('#problem-retry').hidden=true;$('#problem-reset').classList.replace('btn-ghost','btn-primary');
   art.src=`/static/kiosk/${copy[3]}.webp`;
   // A connection problem is worth retrying with the same code straight away.
   if(code==='offline'||!code)state.lastCode='';
@@ -119,7 +160,7 @@ async function onCode(raw){
   feedback('tick');
   try{
     const x=await api('kiosk/scan',{code});
-    state.current=x;
+    state.current=x;state.printRecorded=false;
     fillPerson(x.person,x.dayLabel);
     if(x.status==='print'){
       await prepareBadge(x.person,x.qrUrl);
@@ -197,11 +238,12 @@ async function prepareBadge(person,qrUrl){
   const grid=qrUrl?Badge.qrGrid(await Badge.loadImage(qrUrl)):null;
   const preview=Badge.render(person,grid,300,false),canvas=$('#badge-preview');
   canvas.width=preview.width;canvas.height=preview.height;canvas.getContext('2d').drawImage(preview,0,0);
-  const rotate=Number(settings.rotate)===90;
-  state.badge={dataUrl:Badge.render(person,grid,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate};
+  state.badge=badgeImage(Badge.render(person,grid,badgeDpi(),badgeRotated()));
 }
 
 /* ---------- Printing ---------- */
+
+function badgeImage(canvas){return {dataUrl:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height,rotate:badgeRotated()}}
 
 // Hands the badge to the printer. Must run inside the tap that asked for it:
 // Android only opens another app's intent from a user gesture.
@@ -218,26 +260,46 @@ function dispatchPrint(badge){
   window.print();
 }
 
-async function printBadge(retry){
+// retry asks the server to print again a badge it already recorded, which it
+// allows from this kiosk for a few minutes.
+async function printBadge(retry,button){
   if(state.busy||!state.current||!state.badge)return;
-  const button=retry?$('#reprint-button'):$('#print-button');
+  const app=printerMode()==='app';
   state.busy=true;button.classList.add('loading');button.disabled=true;clearIdle();
   try{
+    // Check the printer first, so a printer that is down does not use up the attendee's print.
+    if(app){const p=(await appBridge.status())?.printer;if(!p?.connected||!p.ready)throw printerError(p?.problem||'The badge printer is not connected',state.printRecorded)}
     await api('kiosk/print',{code:state.current.person.qrId,retry});
-    dispatchPrint(state.badge);
+    state.printRecorded=true;
+    if(app){
+      show('printing');
+      const r=await appBridge.print(state.badge);
+      if(!r.ok)throw printerError(r.message,true);
+    }else{dispatchPrint(state.badge);show('printing')}
     store.set('bcKioskPrinted',{day:state.today,count:printedToday()+1});
-    show('printing');
     feedback('success');
     setTimeout(()=>{
       if(state.screen!=='printing')return;
       $('#reprint-button').hidden=true;
       show('collect',IDLE.collect);
       setTimeout(()=>{if(state.screen==='collect')$('#reprint-button').hidden=false},5000);
-    },retry?2500:4200);
+    },app?1200:retry?2500:4200);
   }catch(err){
     if(err.status===401)return;
+    if(err.code==='printer')return printerProblem(err.message,err.recorded);
     problem(err);
   }finally{state.busy=false;button.classList.remove('loading');button.disabled=false}
+}
+function printerProblem(message,recorded){
+  setField('problem-eyebrow',recorded?"You're checked in":'Printer problem');
+  setField('problem-title',recorded?"Your badge didn't print.":"The badge printer isn't ready.");
+  setField('problem-copy',`${message}. Try printing again, or the registration desk will print your badge for you.`);
+  setField('problem-reset',recorded?'Done':'Cancel');
+  $('#problem-art').src='/static/kiosk/helpdesk.webp';
+  $('#problem-retry').hidden=false;$('#problem-reset').classList.replace('btn-primary','btn-ghost');
+  feedback('reject');
+  show('problem',IDLE.printer);
+  void appBridge?.status();
 }
 function printedToday(){const p=store.get('bcKioskPrinted',{});return p.day===state.today?p.count||0:0}
 
@@ -262,6 +324,9 @@ function closeStaff(){clearTimeout(state.staffTimer);state.staffPass='';$('#unlo
 function fillSettings(){
   const f=$('#settings-form');
   for(const key of ['printer','dpi','rotate','camera'])for(const input of f.elements[key])input.checked=String(settings[key])===input.value;
+  // Inside the app, the app owns the printer; only the camera is set here.
+  $$('[data-browser-printing]').forEach(el=>el.hidden=!!appBridge);
+  if(appBridge){showPrinterStatus();void appBridge.status()}
   $('#staff-station').textContent=state.station;$('#staff-printed').textContent=printedToday();
 }
 
@@ -291,8 +356,11 @@ $('#test-print').addEventListener('click',async()=>{
   try{
     await document.fonts.ready;
     const sample={name:'Dr. Lakshmi Narayanan Pillai',designation:'Principal Scientist',institution:'Rajiv Gandhi Centre for Biotechnology',reference:'BC4-TEST-0000'};
-    const rotate=Number(settings.rotate)===90;
-    dispatchPrint({dataUrl:Badge.render(sample,null,Number(settings.dpi)||203,rotate).toDataURL('image/png'),rotate});
+    const badge=badgeImage(Badge.render(sample,null,badgeDpi(),badgeRotated()));
+    if(printerMode()!=='app')return dispatchPrint(badge);
+    const box=$('#app-printer');box.hidden=false;box.classList.remove('problem');box.textContent='Printing a test badge…';
+    const r=await appBridge.print(badge);
+    box.classList.toggle('problem',!r.ok);box.textContent=r.ok?'Test badge sent to the printer.':`Test badge failed: ${r.message||'unknown printer error'}`;
   }catch{$('#unlock-error').textContent='Test badge could not be drawn.'}
 });
 $('#exit-kiosk').addEventListener('click',async e=>{
@@ -308,8 +376,9 @@ $('#staff-dialog').addEventListener('pointerdown',staffIdle);
 /* ---------- Wiring ---------- */
 
 $$('[data-action="reset"]').forEach(b=>b.addEventListener('click',()=>reset(b.dataset.hold===undefined?HOLD_MS:Number(b.dataset.hold))));
-$('#print-button').addEventListener('click',()=>void printBadge(false));
-$('#reprint-button').addEventListener('click',()=>void printBadge(true));
+$('#print-button').addEventListener('click',e=>void printBadge(false,e.currentTarget));
+$('#reprint-button').addEventListener('click',e=>void printBadge(true,e.currentTarget));
+$('#problem-retry').addEventListener('click',e=>void printBadge(state.printRecorded,e.currentTarget));
 $('#checkin-button').addEventListener('click',()=>void checkIn());
 $('#start-button').addEventListener('click',async e=>{
   const button=e.currentTarget;button.disabled=true;
@@ -347,6 +416,7 @@ function clock(){$('#clock').textContent=new Intl.DateTimeFormat('en-IN',{hour:'
 
 async function heartbeat(){
   if(!state.kiosk)return;
+  void appBridge?.status();
   try{
     const me=await api('me');setNet(true);
     if(!me.kiosk){state.kiosk=false;return pause('staff')}
@@ -357,6 +427,7 @@ async function heartbeat(){
 function dayLabel(){const i=state.days.findIndex(d=>d.ID===state.today),d=state.days[i];$('#day-label').textContent=d?`Day ${i+1} · ${d.Label.split('·')[1]?.trim()||d.Label}`:''}
 
 async function boot(){
+  void appBridge?.status();
   await Badge.fontsReady();
   let me;
   try{me=await api('me')}catch(err){document.body.classList.remove('booting');if(err.status===0){setNet(false);pause('expired');setTimeout(boot,10000)}else pause('setup');return}

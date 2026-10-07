@@ -95,6 +95,20 @@ Set up each tablet before doors open:
 5. Run one real pass through scan, print, gate entry and checkout.
 
 The front camera is the default, since it faces the attendee; the preview is mirrored so it behaves like a mirror.
+
+#### Bio Connect Kiosk Android app
+
+The Android app (`kiosk-android/`) shows this same page full screen and prints straight to the Zebra, with no RawBT.
+The page finds the app's `BioConnectKiosk` channel (a web message channel locked to this site's origin) and then:
+
+- draws the badge at the dpi the printer reports (608 or 609 x 406 dots at 203 dpi, 900 x 600 at 300 dpi);
+- asks the printer for its status before recording a print, so a printer that is out of labels or not connected never uses up an attendee's print;
+- records the print and check-in, sends the badge as `{type:"print", jobId, png, widthDots, heightDots}`, and waits for the app's `printed` reply;
+- on a failed or uncertain print, offers "Try printing again", which uses the same-kiosk reprint window;
+- shows the app's printer status in the staff menu instead of the RawBT, resolution and orientation options, and sends the test badge through the app;
+- shows a printer problem in the footer, so staff notice it before an attendee does.
+
+Outside the app the page behaves as before (RawBT or the browser print dialog).
 A USB or Bluetooth scanner in keyboard mode also works with no field focused.
 
 ### Rollback
