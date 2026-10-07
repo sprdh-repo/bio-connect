@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -287,7 +288,7 @@ func TestCampaignLiveDeliveryPayloadRetryAndWebhook(t *testing.T) {
 		}
 	}
 	if n := count(t, c.a, "SELECT count(*) FROM campaign_recipients WHERE status='accepted' AND provider_id LIKE 'pm-%'"); n != 2 {
-		t.Fatalf("%d accepted, want 2", n)
+		t.Fatalf("%d accepted, want 2\n%s", n, dumpRecipients(t, c.a))
 	}
 	last := payloads[len(payloads)-1]
 	meta := last["Metadata"].(map[string]any)
@@ -368,4 +369,109 @@ func TestCampaignTemplateExpiryTestSendPreviewAndRole(t *testing.T) {
 	if rr := m.request("GET", "/api/v1/admin/campaigns", nil); rr.Code != 403 {
 		t.Fatalf("manager got %d, want 403", rr.Code)
 	}
+}
+
+func TestCampaignAttachesEachRecipientsOwnPass(t *testing.T) {
+	c := newCampaignHarness(t, "reviewer")
+	seedCampaignAudience(t, c.a)
+	ctx := context.Background()
+	var mu sync.Mutex
+	sent := map[string]map[string]any{}
+	postmark := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var p map[string]any
+		json.NewDecoder(r.Body).Decode(&p)
+		mu.Lock()
+		sent[p["To"].(string)] = p
+		mu.Unlock()
+		json.NewEncoder(w).Encode(map[string]any{"ErrorCode": 0, "MessageID": "pm-" + id()})
+	}))
+	defer postmark.Close()
+	c.a.Config.LiveDelivery, c.a.Config.PostmarkAPIBase = true, postmark.URL
+
+	reminder := func(extra map[string]any) map[string]any {
+		b := approvedAudience(extra)
+		b["template_id"] = "event-reminder"
+		return b
+	}
+	if rr := c.request("POST", "/api/v1/admin/campaigns/audience", reminder(map[string]any{"pass_holders": false})); rr.Code != 400 {
+		t.Fatalf("pass email without pass holders returned %d", rr.Code)
+	}
+
+	// Test sends carry a sample, never a real pass.
+	rr := c.request("POST", "/api/v1/admin/campaigns/test", map[string]any{"template_id": "event-reminder"})
+	if rr.Code != 200 {
+		t.Fatalf("test send returned %d: %s", rr.Code, rr.Body.String())
+	}
+	if !hasAttachment(sent["reviewer-campaigns@bioconnect.test"], "Bio-Connect-4.0-pass-TEST-0000.pdf") {
+		t.Fatal("test email missing the sample pass")
+	}
+
+	body := reminder(nil)
+	body["expected_count"] = 4
+	rr = c.request("POST", "/api/v1/admin/campaigns", body)
+	if rr.Code != 201 {
+		t.Fatalf("create returned %d: %s", rr.Code, rr.Body.String())
+	}
+	// A pass revoked after the snapshot is not sent.
+	if _, err := c.a.DB.Exec(ctx, "UPDATE passes SET revoked_at=now() WHERE attendee_id=(SELECT id FROM attendees WHERE email='rep1@example.com')"); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		worked, err := c.a.CampaignWorkOnce(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !worked {
+			break
+		}
+	}
+	for _, email := range []string{"asha@example.com", "bina@example.com", "rep0@example.com"} {
+		var number string
+		if err := c.a.DB.QueryRow(ctx, `SELECT p.number FROM passes p JOIN campaign_recipients cr ON cr.pass_id=p.id WHERE cr.email=$1`, email).Scan(&number); err != nil {
+			t.Fatal(err)
+		}
+		if !hasAttachment(sent[email], "Bio-Connect-4.0-pass-"+number+".pdf") {
+			t.Fatalf("%s did not receive their own pass %s: %v\n%s", email, number, attachmentNames(sent[email]), dumpRecipients(t, c.a))
+		}
+	}
+	if _, ok := sent["rep1@example.com"]; ok {
+		t.Fatal("revoked pass was sent")
+	}
+	if n := count(t, c.a, "SELECT count(*) FROM campaign_recipients WHERE email='rep1@example.com' AND status='cancelled' AND error_code='pass_revoked'"); n != 1 {
+		t.Fatal("revoked pass recipient not cancelled")
+	}
+}
+
+func hasAttachment(payload map[string]any, name string) bool {
+	list, _ := payload["Attachments"].([]any)
+	for _, a := range list {
+		if m, _ := a.(map[string]any); m["Name"] == name && m["ContentType"] == "application/pdf" && m["Content"] != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func attachmentNames(payload map[string]any) []any {
+	var out []any
+	list, _ := payload["Attachments"].([]any)
+	for _, a := range list {
+		m, _ := a.(map[string]any)
+		out = append(out, m["Name"])
+	}
+	return out
+}
+
+func dumpRecipients(t *testing.T, a *App) string {
+	rows, err := a.DB.Query(context.Background(), "SELECT email,status,attempts,error_code,available_at>now(),available_at,now() FROM campaign_recipients ORDER BY email")
+	if err != nil {
+		return err.Error()
+	}
+	defer rows.Close()
+	var b strings.Builder
+	for rows.Next() {
+		v, _ := rows.Values()
+		fmt.Fprintln(&b, v...)
+	}
+	return b.String()
 }

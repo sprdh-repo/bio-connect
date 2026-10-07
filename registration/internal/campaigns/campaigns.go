@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-//go:embed invitation app-launch
+//go:embed invitation app-launch event-reminder plain-reminder
 var files embed.FS
 
 var ist = time.FixedZone("IST", 19800)
@@ -26,6 +26,8 @@ type Template struct {
 	// Registrants marks templates written for registered participants; only
 	// these are offered in the admin console.
 	Registrants bool
+	// Attach each recipient's own PDF pass; only pass holders can receive it.
+	AttachPass bool
 	// Dated copy refuses sends from this instant.
 	Until      time.Time
 	html, text string
@@ -49,6 +51,21 @@ var registry = map[string]Template{
 		Subject:     "Your Bio Connect 4.0 pass is now in the app",
 		Registrants: true,
 		Until:       time.Date(2026, 10, 10, 0, 0, 0, 0, ist),
+	},
+	// The reminders say "tomorrow", so they stop at midnight before day one.
+	"event-reminder": {
+		ID: "event-reminder", Label: "Event reminder with pass",
+		Description: "Day-before reminder with each person's PDF pass attached, arrival steps, timings and app links.",
+		Subject:     "Bio Connect 4.0 starts tomorrow: your pass and arrival guide",
+		Registrants: true, AttachPass: true,
+		Until: time.Date(2026, 10, 8, 0, 0, 0, 0, ist),
+	},
+	"plain-reminder": {
+		ID: "plain-reminder", Label: "Plain reminder",
+		Description: "A short day-before reminder with the date, venue and start time.",
+		Subject:     "Reminder: Bio Connect 4.0 starts tomorrow",
+		Registrants: true,
+		Until:       time.Date(2026, 10, 8, 0, 0, 0, 0, ist),
 	},
 }
 

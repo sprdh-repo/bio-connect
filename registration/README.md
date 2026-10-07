@@ -127,6 +127,7 @@ Creating, cancelling and test-sending are recorded in the audit history.
 
 Templates are code, in `internal/campaigns/<id>/` (`email.html`, `email.txt` and inline `cid:` images), registered in `internal/campaigns/campaigns.go` with a subject and a send-by date.
 Only templates marked `Registrants` appear in the console; `cmd/marketing` sends the same templates to external contact lists.
+Templates marked `AttachPass` attach each recipient's own PDF pass, chosen when the audience is snapshotted; they only go to pass holders, a pass revoked before sending cancels that message, and test emails carry a labelled sample pass instead.
 
 ## Social posters
 

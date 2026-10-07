@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"bioconnect/registration/internal/app"
 	"bioconnect/registration/internal/campaigns"
 
 	"github.com/xuri/excelize/v2"
@@ -37,7 +38,10 @@ var (
 // Overridable in tests so dated templates can be exercised after they expire.
 var now = time.Now
 
-type attachment struct{ Name, Content, ContentType, ContentID string }
+type attachment struct {
+	Name, Content, ContentType string
+	ContentID                  string `json:",omitempty"`
+}
 
 func inlineImages(t campaigns.Template) ([]attachment, error) {
 	images, err := t.Images()
@@ -327,6 +331,10 @@ func run() error {
 	if !ok {
 		return fmt.Errorf("unknown template %q", *templateName)
 	}
+	// Contact lists are not registrants and hold no pass to attach.
+	if tmpl.AttachPass && *file != "" {
+		return fmt.Errorf("%s attaches each recipient's pass; send it from the admin console", *templateName)
+	}
 	images, err := inlineImages(tmpl)
 	if err != nil {
 		return err
@@ -487,8 +495,16 @@ func run() error {
 			sub = "[TEST] " + sub
 		}
 		payload := map[string]any{"From": (&mail.Address{Name: name, Address: from}).String(), "To": c.Email, "ReplyTo": "bioconnect@bio360.in", "Subject": sub, "HtmlBody": h, "TextBody": t, "MessageStream": *stream, "TrackOpens": false, "TrackLinks": "None", "Metadata": map[string]string{"campaign": *campaign, "application": "bioconnect-marketing"}}
-		if len(images) > 0 {
-			payload["Attachments"] = images
+		attachments := images
+		if tmpl.AttachPass {
+			pdf, err := app.SamplePassPDF()
+			if err != nil {
+				return err
+			}
+			attachments = append(attachments, attachment{Name: "Bio-Connect-4.0-pass-" + app.SamplePassNumber + ".pdf", Content: base64.StdEncoding.EncodeToString(pdf), ContentType: "application/pdf"})
+		}
+		if len(attachments) > 0 {
+			payload["Attachments"] = attachments
 		}
 		// Persist before the request. An interrupted/ambiguous attempt is never retried automatically.
 		report[i].Status = "attempted"

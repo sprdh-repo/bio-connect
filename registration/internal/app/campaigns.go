@@ -71,7 +71,8 @@ func (a *App) validAudience(ctx context.Context, in *audience) error {
 
 // audienceQuery returns one row (email, name) per distinct lower-cased email,
 // taking the earliest registration's attendee name for duplicates.
-const audienceQuery = `SELECT DISTINCT ON (lower(a.email)) lower(a.email),a.name
+const audienceQuery = `SELECT DISTINCT ON (lower(a.email)) lower(a.email),a.name,
+ COALESCE((SELECT p.id FROM passes p WHERE p.attendee_id=a.id AND p.revoked_at IS NULL ORDER BY p.version DESC LIMIT 1),'')
  FROM attendees a JOIN registrations r ON r.id=a.registration_id JOIN categories c ON c.id=r.category_id
  WHERE a.removed_at IS NULL AND a.email<>'' AND r.status=ANY($1)
  AND (cardinality($2::text[])=0 OR c.kind=ANY($2))
@@ -83,8 +84,9 @@ const audienceQuery = `SELECT DISTINCT ON (lower(a.email)) lower(a.email),a.name
  ORDER BY lower(a.email),r.created_at,a.position`
 
 type campaignRecipient struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Email  string `json:"email"`
+	Name   string `json:"name"`
+	PassID string `json:"-"`
 }
 
 func (a *App) resolveAudience(ctx context.Context, q interface {
@@ -98,12 +100,20 @@ func (a *App) resolveAudience(ctx context.Context, q interface {
 	out := []campaignRecipient{}
 	for rows.Next() {
 		var r campaignRecipient
-		if e = rows.Scan(&r.Email, &r.Name); e != nil {
+		if e = rows.Scan(&r.Email, &r.Name, &r.PassID); e != nil {
 			return nil, e
 		}
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// checkAudienceForTemplate enforces template-specific audience rules.
+func checkAudienceForTemplate(t campaigns.Template, in audience) error {
+	if t.AttachPass && !in.PassHolders {
+		return errors.New("this email attaches each person's pass, so it can only go to pass holders")
+	}
+	return nil
 }
 
 func (a *App) campaignTemplate(id string) (campaigns.Template, error) {
@@ -130,7 +140,11 @@ func (a *App) campaignsAPI(w http.ResponseWriter, r *http.Request, p principal, 
 		if !decode(w, r, &in) {
 			return
 		}
-		if _, e := a.campaignTemplate(in.TemplateID); e != nil {
+		t, e := a.campaignTemplate(in.TemplateID)
+		if e == nil {
+			e = checkAudienceForTemplate(t, in.Audience)
+		}
+		if e != nil {
 			fail(w, 400, e.Error())
 			return
 		}
@@ -171,7 +185,7 @@ func (a *App) listCampaigns(w http.ResponseWriter, r *http.Request) {
 	templates := []map[string]any{}
 	for _, t := range campaigns.All() {
 		if t.Registrants {
-			templates = append(templates, map[string]any{"id": t.ID, "label": t.Label, "description": t.Description, "subject": t.Subject, "send_by": t.Until, "open": t.Open(a.Now())})
+			templates = append(templates, map[string]any{"id": t.ID, "label": t.Label, "description": t.Description, "subject": t.Subject, "send_by": t.Until, "open": t.Open(a.Now()), "attach_pass": t.AttachPass})
 		}
 	}
 	items, e := a.queryMaps(r, `SELECT cp.id,cp.template_id,cp.subject,cp.audience,cp.created_at,cp.cancelled_at,s.email AS created_by,`+campaignCounts+`
@@ -208,6 +222,9 @@ func (a *App) createCampaign(w http.ResponseWriter, r *http.Request, p principal
 		return
 	}
 	t, e := a.campaignTemplate(in.TemplateID)
+	if e == nil {
+		e = checkAudienceForTemplate(t, in.Audience)
+	}
 	if e != nil {
 		fail(w, 400, e.Error())
 		return
@@ -249,9 +266,13 @@ func (a *App) createCampaign(w http.ResponseWriter, r *http.Request, p principal
 	}
 	rows := make([][]any, len(list))
 	for i, rcp := range list {
-		rows[i] = []any{id(), cid, rcp.Email, rcp.Name}
+		var pass any
+		if t.AttachPass && rcp.PassID != "" {
+			pass = rcp.PassID
+		}
+		rows[i] = []any{id(), cid, rcp.Email, rcp.Name, pass}
 	}
-	if _, e = tx.CopyFrom(r.Context(), pgx.Identifier{"campaign_recipients"}, []string{"id", "campaign_id", "email", "name"}, pgx.CopyFromRows(rows)); e != nil {
+	if _, e = tx.CopyFrom(r.Context(), pgx.Identifier{"campaign_recipients"}, []string{"id", "campaign_id", "email", "name", "pass_id"}, pgx.CopyFromRows(rows)); e != nil {
 		fail(w, 503, "could not create campaign")
 		return
 	}
@@ -368,7 +389,16 @@ func (a *App) sendCampaignTest(w http.ResponseWriter, r *http.Request, p princip
 		fail(w, 503, "test email unavailable")
 		return
 	}
-	result := a.sendCampaignEmail(r.Context(), t, "[TEST] ", email, "", map[string]string{"campaign_test": p.ID})
+	var attachments []map[string]string
+	if t.AttachPass {
+		b, e := SamplePassPDF()
+		if e != nil {
+			fail(w, 503, "test email unavailable")
+			return
+		}
+		attachments = append(attachments, passAttachment(SamplePassNumber, b))
+	}
+	result := a.sendCampaignEmail(r.Context(), t, "[TEST] ", email, "", attachments, map[string]string{"campaign_test": p.ID})
 	if _, e = a.DB.Exec(r.Context(), "INSERT INTO audit_events(staff_id,action,detail) VALUES($1,'campaign_test_sent',$2)", p.ID, t.ID+" status="+result.Status+" code="+result.Code+" provider_id="+result.ID); e != nil {
 		fail(w, 503, "test email unavailable")
 		return
@@ -409,7 +439,13 @@ func (a *App) previewCampaignTemplate(w http.ResponseWriter, r *http.Request, p 
 	w.Write([]byte(body))
 }
 
-func (a *App) sendCampaignEmail(ctx context.Context, t campaigns.Template, subjectPrefix, email, name string, metadata map[string]string) sendResult {
+const SamplePassNumber = "TEST-0000"
+
+func passAttachment(number string, pdf []byte) map[string]string {
+	return map[string]string{"Name": "Bio-Connect-4.0-pass-" + number + ".pdf", "Content": base64.StdEncoding.EncodeToString(pdf), "ContentType": "application/pdf"}
+}
+
+func (a *App) sendCampaignEmail(ctx context.Context, t campaigns.Template, subjectPrefix, email, name string, extra []map[string]string, metadata map[string]string) sendResult {
 	if !a.Config.LiveDelivery {
 		return sendResult{ID: "fake-campaign-" + id(), Status: "delivered", Code: "fake_provider"}
 	}
@@ -417,10 +453,11 @@ func (a *App) sendCampaignEmail(ctx context.Context, t campaigns.Template, subje
 	if e != nil {
 		return sendResult{Status: "failed", Code: "template_images"}
 	}
-	attachments := make([]map[string]string, len(images))
+	attachments := make([]map[string]string, len(images), len(images)+len(extra))
 	for i, img := range images {
 		attachments[i] = map[string]string{"Name": img.Name, "Content": base64.StdEncoding.EncodeToString(img.Data), "ContentType": img.ContentType, "ContentID": "cid:" + img.Name}
 	}
+	attachments = append(attachments, extra...)
 	htmlBody, textBody := t.Render(name, email)
 	meta := map[string]string{"application": "bioconnect4", "template": t.ID}
 	for k, v := range metadata {
@@ -458,11 +495,11 @@ func (a *App) CampaignWorkOnce(ctx context.Context) (bool, error) {
 	if _, e := a.DB.Exec(ctx, "UPDATE campaign_recipients SET status='uncertain',error_code='worker_lease_expired',updated_at=now() WHERE status='sending' AND claimed_at<now()-interval '5 minutes'"); e != nil {
 		return false, e
 	}
-	var rid, cid, email, name, templateID string
+	var rid, cid, email, name, templateID, passID string
 	var attempts int
 	e := a.DB.QueryRow(ctx, `UPDATE campaign_recipients cr SET status='sending',attempts=attempts+1,claimed_at=now(),updated_at=now()
 		FROM campaigns cp WHERE cp.id=cr.campaign_id AND cr.id=(SELECT id FROM campaign_recipients WHERE status='queued' AND available_at<=now() ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1)
-		RETURNING cr.id,cr.campaign_id,cr.email,cr.name,cr.attempts,cp.template_id`).Scan(&rid, &cid, &email, &name, &attempts, &templateID)
+		RETURNING cr.id,cr.campaign_id,cr.email,cr.name,cr.attempts,cp.template_id,COALESCE(cr.pass_id,'')`).Scan(&rid, &cid, &email, &name, &attempts, &templateID, &passID)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -473,11 +510,21 @@ func (a *App) CampaignWorkOnce(ctx context.Context) (bool, error) {
 	t, ok := campaigns.Get(templateID)
 	switch {
 	case !ok:
-		result = sendResult{Status: "failed", Code: "template_missing"}
+		// An older build still draining the queue during a deploy may not know a
+		// new template; back off so the current build sends it.
+		result = sendResult{Status: "failed", Code: "template_missing", Retry: true}
 	case !t.Open(a.Now()):
 		result = sendResult{Status: "cancelled", Code: "template_expired"}
+	case t.AttachPass && passID == "":
+		result = sendResult{Status: "failed", Code: "pass_missing"}
 	default:
-		result = a.sendCampaignEmail(ctx, t, "", email, name, map[string]string{"campaign_id": cid, "campaign_recipient_id": rid})
+		var extra []map[string]string
+		if t.AttachPass {
+			extra, result = a.campaignPass(ctx, passID)
+		}
+		if result.Status == "" {
+			result = a.sendCampaignEmail(ctx, t, "", email, name, extra, map[string]string{"campaign_id": cid, "campaign_recipient_id": rid})
+		}
 	}
 	backoff := 0
 	if result.Retry && attempts < 5 {
@@ -496,4 +543,30 @@ func (a *App) CampaignWorkOnce(ctx context.Context) (bool, error) {
 		slog.Error("campaign message needs review", "campaign_id", cid, "recipient_id", rid, "status", result.Status, "code", result.Code)
 	}
 	return true, nil
+}
+
+// campaignPass returns the recipient's current pass as an attachment. A pass
+// revoked, or a registration no longer approved, since the snapshot cancels the
+// message rather than sending a pass that will not admit them.
+func (a *App) campaignPass(ctx context.Context, passID string) ([]map[string]string, sendResult) {
+	var number string
+	var valid bool
+	e := a.DB.QueryRow(ctx, "SELECT p.number,p.revoked_at IS NULL AND r.status='approved' FROM passes p JOIN registrations r ON r.id=p.registration_id WHERE p.id=$1", passID).Scan(&number, &valid)
+	if e != nil {
+		return nil, sendResult{Status: "failed", Code: "pass_unavailable", Retry: true}
+	}
+	if !valid {
+		return nil, sendResult{Status: "cancelled", Code: "pass_revoked"}
+	}
+	b, e := a.passPDF(ctx, passID)
+	if e != nil {
+		return nil, sendResult{Status: "failed", Code: "pdf_unavailable", Retry: true}
+	}
+	return []map[string]string{passAttachment(number, b)}, sendResult{}
+}
+
+// SamplePassPDF renders the pass attached to test emails: never someone's real
+// pass, and its QR matches no pass at the venue.
+func SamplePassPDF() ([]byte, error) {
+	return renderPass("SAMPLE - NOT VALID", "Bio Connect test email", "Sample attendee", "industry", "Industry", "TEST-0000", "sample-not-valid")
 }
