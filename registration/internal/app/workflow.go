@@ -592,10 +592,21 @@ func (a *App) queue(ctx context.Context, tx pgx.Tx, rid, pid, purpose, channel, 
 	return e
 }
 
+// errDownloadOnly refuses to send a guest's pass (see downloadOnly).
+var errDownloadOnly = errors.New("guest passes are download only: download the pass and hand it over")
+
 // queuePass queues one pass to its holder. The dedupe key is shared with
 // queuePasses, so a pass queued here under "initial" is not sent twice by a
-// later "send".
+// later "send". Every pass delivery comes through here, so a download-only
+// registration is refused in this one place.
 func (a *App) queuePass(ctx context.Context, tx pgx.Tx, rid, pid, email, phone string, consent bool, channel, key string) error {
+	var cat string
+	if e := tx.QueryRow(ctx, "SELECT category_id FROM registrations WHERE id=$1", rid).Scan(&cat); e != nil {
+		return e
+	}
+	if downloadOnly(cat) {
+		return errDownloadOnly
+	}
 	// An attendee without an email (a government official reached by phone)
 	// is sent their pass by WhatsApp alone.
 	if email != "" && (channel == "" || channel == "email") {

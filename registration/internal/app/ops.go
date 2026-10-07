@@ -204,6 +204,8 @@ func (a *App) opsAPI(w http.ResponseWriter, r *http.Request) {
 		a.opsQR(w, r, strings.TrimPrefix(path, "qr/"))
 	case path == "spot-register" && r.Method == http.MethodPost:
 		a.opsSpotRegister(w, r, p)
+	case strings.HasPrefix(path, "passes/") && r.Method == http.MethodGet:
+		a.opsPassDownload(w, r, p, strings.TrimPrefix(path, "passes/"))
 	case path == "points" || strings.HasPrefix(path, "points/"):
 		a.opsPoints(w, r, p, strings.TrimPrefix(path, "points"))
 	case path == "reports" && r.Method == http.MethodGet:
@@ -505,7 +507,42 @@ func (a *App) opsSpotRegister(w http.ResponseWriter, r *http.Request, principal 
 	}
 	a.opsLog(r.Context(), p.AttendeeID, day, "spot_registration", principal.Station, in.Payment)
 	p, _ = a.opsFind(r.Context(), qrID, day)
-	respond(w, 201, map[string]any{"person": p.json(), "qrUrl": "/api/v1/ops/qr/" + qrID})
+	out := map[string]any{"person": p.json(), "qrUrl": "/api/v1/ops/qr/" + qrID}
+	if downloadOnly(p.CategoryID) {
+		out["passUrl"] = "/api/v1/ops/passes/" + qrID + ".pdf"
+	}
+	respond(w, 201, out)
+}
+
+// opsPassDownload hands the spot desk a guest's PDF pass, the only way a guest
+// pass reaches its holder (downloadOnly). Other passes are sent to their
+// holders, so the desk prints their badge instead.
+func (a *App) opsPassDownload(w http.ResponseWriter, r *http.Request, principal opsPrincipal, file string) {
+	qrID, isPDF := strings.CutSuffix(file, ".pdf")
+	var pid, rid, number, cat string
+	err := a.DB.QueryRow(r.Context(), `SELECT p.id,r.id,p.number,r.category_id FROM passes p JOIN registrations r ON r.id=p.registration_id WHERE p.qr_id=$1 AND p.revoked_at IS NULL AND r.status='approved'`, qrID).Scan(&pid, &rid, &number, &cat)
+	if !isPDF || err != nil || !downloadOnly(cat) {
+		fail(w, 404, "guest pass not found or revoked")
+		return
+	}
+	tx, err := a.DB.Begin(r.Context())
+	if err == nil {
+		defer tx.Rollback(r.Context())
+		if err = audit(r.Context(), tx, "", rid, "pass_downloaded", number+" at "+principal.Station); err == nil {
+			err = tx.Commit(r.Context())
+		}
+	}
+	var b []byte
+	if err == nil {
+		b, err = a.passPDF(r.Context(), pid)
+	}
+	if err != nil {
+		fail(w, 503, "pass is being prepared; retry shortly")
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", `attachment; filename="Bio-Connect-4.0-pass-`+number+`.pdf"`)
+	w.Write(b)
 }
 
 type accessPoint struct {

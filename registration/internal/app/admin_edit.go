@@ -33,7 +33,11 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 		return e
 	}
 	// Only staff correct attendees, so the phone is optional here.
-	if !attendeeOK(&p, true, emailOptional(categoryID)) {
+	if downloadOnly(categoryID) {
+		if !guestAttendeeOK(&p) {
+			return errGuestAttendee
+		}
+	} else if !attendeeOK(&p, true, emailOptional(categoryID)) {
 		return attendeeError(true, emailOptional(categoryID))
 	}
 	if status == "cancelled" {

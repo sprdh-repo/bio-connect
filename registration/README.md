@@ -23,6 +23,9 @@ Delivery uses the existing Zinvos Postmark sender and the existing Zinvos WhatsA
 - Self-service kiosk at `/kiosk` for Android tablets: attendees scan their pass QR, confirm, and print their own badge through RawBT, which checks them in. A kiosk runs on a locked-down ops session that only scans, prints and checks in (see [operations](docs/operations.md#self-service-kiosk)).
 - Reviewers can record and approve a payment found directly in SBI when the registrant did not submit payment evidence; the verified payment and staff action are retained in the payment history and audit trail.
 - Reviewers can register any delegate or exhibitor directly from the console in one form, confirmed on save as paid (against a verified bank payment) or complimentary, with optional phones and logo, and choose to confirm only or confirm and send the passes.
+- Guests (`BC4-GU-…`) are a staff-only complimentary category, registered from the console's New registration or the `/ops` spot desk with only a name; institution, designation, email and phone are optional.
+A guest pass is download only: it downloads when staff confirm (and from the attendee row, or the spot desk's result), and every send path refuses it, so nothing is emailed or sent by WhatsApp.
+Guests count in the console summary, exports and the ops reports like every other category.
 - Approval atomically creates one pass per attendee plus the delivery jobs. Concurrent approvals and repeated clicks never create extra passes.
 - Staff can correct a registration after the fact: approve a rejected one, move an exhibitor to another stall type, give a stall extra passes beyond what its type includes, and edit or remove attendees (a removed attendee's pass is revoked).
 Console changes never deliver anything on their own: staff send each pass from the attendee list, or all of them with Send passes. Only the normal review buttons (Approve and send) send on approval.
@@ -95,7 +98,7 @@ To eyeball a rendered pass:
 DUMP_PASS_DIR=/tmp go test -run TestDumpSamplePasses ./internal/app/
 ```
 
-This generates Exhibitor, Faculty, Industry, Startup, Student, Govt. Official, Organiser, Sponsor, and Volunteer samples on the same A5 grid, including a long attendee name.
+This generates Exhibitor, Faculty, Industry, Startup, Student, Govt. Official, Organiser, Sponsor, Volunteer and Guest (including a name-only Guest) samples on the same A5 grid, including a long attendee name.
 The Industry sample keeps the pre-shortening 32-character pass number, so the footer can be checked against passes issued before short numbers.
 The pass uses "Bio Connect 4.0 · Kerala's international life sciences summit" and "Building Kerala's / Global Life Sciences Hub".
 Booth allocation is handled separately, so exhibitor passes show the representative's role.

@@ -247,7 +247,7 @@ function renderBadge(person,grid,dpi,rotate){
   const qrSize=modules*dot,qrTop=H-padY-refSize-refGap-qrSize;
   const textBottom=qrTop-px(1.4);
 
-  const name=String(person.name||'').toUpperCase(),designation=String(person.designation||'Delegate').toUpperCase(),institution=String(person.institution||'').toUpperCase();
+  const name=String(person.name||'').toUpperCase(),designation=String(person.designation||person.category||'Delegate').toUpperCase(),institution=String(person.institution||'').toUpperCase();
   const fontName=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontRole=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontOrg=s=>`500 ${s}px "DM Sans", Arial, sans-serif`;
   let layout=null;
   for(let scale=1;scale>=.55;scale-=.05){

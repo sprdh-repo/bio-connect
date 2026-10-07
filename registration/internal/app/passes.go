@@ -40,7 +40,8 @@ func passStyleFor(catID string) passStyle {
 	forest, deep, lime, gold := [3]int{11, 51, 41}, [3]int{5, 28, 23}, [3]int{185, 220, 114}, [3]int{228, 173, 84}
 	teal, aqua := [3]int{15, 96, 118}, [3]int{190, 227, 236}
 	brick, navy, plum, paper := [3]int{140, 45, 32}, [3]int{23, 43, 77}, [3]int{86, 52, 120}, [3]int{247, 245, 239}
-	ember := [3]int{176, 74, 28} // warm orange no other category uses
+	ember := [3]int{176, 74, 28}    // warm orange no other category uses
+	silver := [3]int{198, 202, 204} // light grey no other category uses
 	switch catID {
 	case "student":
 		return passStyle{lime, forest, "STUDENT", "Student", false}
@@ -60,6 +61,8 @@ func passStyleFor(catID string) passStyle {
 		return passStyle{plum, lime, "VOLUNTEER", "Volunteer", false}
 	case "speaker":
 		return passStyle{ember, paper, "SPEAKER", "Speaker", false}
+	case "guest":
+		return passStyle{silver, forest, "GUEST", "Guest", false}
 	default: // premium / standard / table
 		return passStyle{forest, lime, "EXHIBITOR", "Exhibitor", true}
 	}
@@ -173,14 +176,21 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	textColor(forest)
 	drawPassText(p, name, "D", left, nameBaseline, contentW, 123, 25)
 	orgLabel, roleLabel := "INSTITUTION", "DESIGNATION"
-	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" {
+	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" || catID == "guest" {
 		orgLabel = "ORGANISATION"
 	}
 	if st.exhibitor {
 		roleLabel = "REPRESENTATIVE"
 	}
-	label(orgLabel, left, 128)
-	drawPassText(p, institution, "D", left, orgBaseline, contentW, footerY-4, 21)
+	// A guest may have no organisation or designation (downloadOnly): leave
+	// the organisation out, and show the category in the role panel.
+	if institution != "" {
+		label(orgLabel, left, 128)
+		drawPassText(p, institution, "D", left, orgBaseline, contentW, footerY-4, 21)
+	}
+	if designation == "" {
+		designation = st.badge
+	}
 
 	// The role panel and number share the left footer column. No invented
 	// booth allocation: the application currently stores the representative role.
