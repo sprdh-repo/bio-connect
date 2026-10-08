@@ -230,7 +230,7 @@ func (a *App) opsConfig(w http.ResponseWriter, r *http.Request, p opsPrincipal) 
 		fail(w, 503, "configuration unavailable")
 		return
 	}
-	respond(w, 200, map[string]any{"station": p.Station, "today": opsToday(a.Now()), "days": opsDays, "categories": cats, "badge": map[string]float64{"widthCm": 7.62, "heightCm": 5.08}})
+	respond(w, 200, map[string]any{"station": p.Station, "today": opsToday(a.Now()), "days": opsDays, "categories": cats, "coupons": couponList(), "badge": map[string]float64{"widthCm": 7.62, "heightCm": 5.08}})
 }
 
 const opsPersonSQL = `SELECT a.id,r.id,p.number,p.qr_id,a.name,a.email,a.phone,a.designation,r.institution,r.category_id,c.label,
@@ -555,8 +555,8 @@ func (a *App) opsQR(w http.ResponseWriter, r *http.Request, qrID string) {
 
 func (a *App) opsSpotRegister(w http.ResponseWriter, r *http.Request, principal opsPrincipal) {
 	var in struct {
-		Day, CategoryID, Name, Email, Phone, Designation, Institution, Payment, PaymentReference, PaymentDate string
-		AmountPaise                                                                                           int64
+		Day, CategoryID, Name, Email, Phone, Designation, Institution, Payment, PaymentReference, PaymentDate, CouponCode string
+		AmountPaise                                                                                                       int64
 	}
 	if !decode(w, r, &in) {
 		return
@@ -570,7 +570,7 @@ func (a *App) opsSpotRegister(w http.ResponseWriter, r *http.Request, principal 
 	// pass is sent at once by email and WhatsApp. A guest pass is never sent
 	// (downloadOnly); the desk hands over the PDF instead.
 	send := !downloadOnly(in.CategoryID)
-	input := StaffRegistrationInput{RegistrationInput: RegistrationInput{CategoryID: in.CategoryID, Institution: in.Institution, ContactName: in.Name, Email: in.Email, Phone: in.Phone, Attendees: []Attendee{{Name: in.Name, Email: in.Email, Phone: in.Phone, Designation: in.Designation, WhatsAppConsent: send && strings.TrimSpace(in.Phone) != ""}}}, Payment: in.Payment, VerifiedReference: in.PaymentReference, VerifiedDate: in.PaymentDate, VerifiedAmountPaise: in.AmountPaise, Send: send, Spot: true, Note: "Spot registration at " + principal.Station}
+	input := StaffRegistrationInput{RegistrationInput: RegistrationInput{CategoryID: in.CategoryID, CouponCode: in.CouponCode, Institution: in.Institution, ContactName: in.Name, Email: in.Email, Phone: in.Phone, Attendees: []Attendee{{Name: in.Name, Email: in.Email, Phone: in.Phone, Designation: in.Designation, WhatsAppConsent: send && strings.TrimSpace(in.Phone) != ""}}}, Payment: in.Payment, VerifiedReference: in.PaymentReference, VerifiedDate: in.PaymentDate, VerifiedAmountPaise: in.AmountPaise, Send: send, Spot: true, Note: "Spot registration at " + principal.Station}
 	rid, err := a.StaffCreate(r.Context(), input, randomToken(), nil, "ops-system")
 	if err != nil {
 		fail(w, 400, publicError(err))

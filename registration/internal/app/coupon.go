@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"sort"
 	"strings"
 	"time"
 )
@@ -54,6 +55,28 @@ func lookupCoupon(code, catID string) (Coupon, error) {
 		return Coupon{}, errCoupon
 	}
 	return c, nil
+}
+
+// opsCoupon is a coupon as the spot desk sees it, so the desk can show the
+// discounted fee before submitting; the server still validates the code.
+type opsCoupon struct {
+	Code       string   `json:"code"`
+	PercentOff int      `json:"percentOff"`
+	Excluded   []string `json:"excluded"`
+}
+
+func couponList() []opsCoupon {
+	out := []opsCoupon{}
+	for _, c := range coupons {
+		ex := []string{}
+		for id := range c.Excluded {
+			ex = append(ex, id)
+		}
+		sort.Strings(ex)
+		out = append(out, opsCoupon{c.Code, c.PercentOff, ex})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
+	return out
 }
 
 func couponEligible(catID string) bool {

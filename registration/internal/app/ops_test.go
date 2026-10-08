@@ -594,3 +594,45 @@ func TestOpsCameraScannerUsesEmbeddedCrossBrowserFallback(t *testing.T) {
 		t.Errorf("embedded camera scanner license: %v", err)
 	}
 }
+
+// The spot desk applies a coupon like the console: the discounted fee is the
+// amount to verify, the code is recorded, and a code the category excludes
+// or the full fee with a coupon is refused.
+func TestOpsSpotRegistrationAppliesCoupon(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Spot desk", "venue-passcode")
+	cfg := c.request(http.MethodGet, "/api/v1/ops/config", nil)
+	if !strings.Contains(cfg.Body.String(), `"code":"KMTC25"`) {
+		t.Fatalf("ops config lacks coupons: %s", cfg.Body.String())
+	}
+	categories, err := a.categories(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fees := map[string]int64{}
+	for _, category := range categories {
+		fees[category.ID] = category.PayablePaise
+	}
+	body := func(cat, ref string, amount int64) map[string]any {
+		return map[string]any{
+			"day": opsDays[0].ID, "categoryId": cat, "name": "Coupon Walk-in " + ref,
+			"institution": "Bio Lab", "payment": "paid", "paymentReference": ref,
+			"paymentDate": today(a), "amountPaise": amount, "couponCode": " kmtc25 ",
+		}
+	}
+	if full := c.request(http.MethodPost, "/api/v1/ops/spot-register", body("industry", "UPI-1", fees["industry"])); full.Code != http.StatusBadRequest {
+		t.Fatalf("full fee with a coupon: %d %s", full.Code, full.Body.String())
+	}
+	created := c.request(http.MethodPost, "/api/v1/ops/spot-register", body("industry", "UPI-2", discounted(fees["industry"], 25)))
+	if created.Code != http.StatusCreated {
+		t.Fatalf("discounted spot registration: %d %s", created.Code, created.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM registrations WHERE coupon_code='KMTC25' AND discount_percent=25 AND quoted_paise=$1", discounted(fees["industry"], 25)); n != 1 {
+		t.Fatalf("coupon registrations = %d", n)
+	}
+	if excluded := c.request(http.MethodPost, "/api/v1/ops/spot-register", body("student", "UPI-3", discounted(fees["student"], 25))); excluded.Code != http.StatusBadRequest {
+		t.Fatalf("coupon on an excluded category: %d %s", excluded.Code, excluded.Body.String())
+	}
+}
