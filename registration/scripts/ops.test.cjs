@@ -6,7 +6,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../internal/ap
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 function client(){
   const elements=new Map(),requests=[],intervals=[];let prints=0,uuid=0;
-  function element(selector){if(!elements.has(selector))elements.set(selector,{value:'',dataset:{},textContent:'',innerHTML:'',hidden:false,disabled:false,listeners:{},classList:{add(){},remove(){},toggle(){}},addEventListener(n,f){this.listeners[n]=f},focus(){document.activeElement=this},blur(){},showModal(){this.open=true},close(){this.open=false},setAttribute(){},append(){},before(){},remove(){},decode:async()=>{}});return elements.get(selector)}
+  function element(selector){if(!elements.has(selector))elements.set(selector,{value:'',dataset:{},textContent:'',innerHTML:'',hidden:false,disabled:false,listeners:{},classList:{add(){},remove(){},toggle(){}},addEventListener(n,f){this.listeners[n]=f},focus(){document.activeElement=this},blur(){},showModal(){this.open=true},close(){this.open=false},setAttribute(){},append(){},before(){},scrollIntoView(){},remove(){},decode:async()=>{}});return elements.get(selector)}
   const document={querySelector:element,querySelectorAll:s=>s==='#scan-form input, #scan-form button'?[element('#scan-code'),element('#camera-open'),element('submit')]:[],createElement:()=>element('badge'),body:element('body'),activeElement:null};
   const context=vm.createContext({document,window:{addEventListener(){},print(){prints++}},navigator:{},location:{hash:''},history:{replaceState(){}},sessionStorage:{},innerWidth:1000,Intl,Date,Image:function(){return element('image')},Badge:{png:async()=> 'png'},crypto:{randomUUID:()=>`id-${++uuid}`},setTimeout:()=>0,clearTimeout(){},setInterval:f=>intervals.push(f),confirm:()=>true,prompt:()=> 'reason',fetch:(url,options)=>{const d=deferred();requests.push({url,options,...d});return d.promise}});
   vm.runInContext(source,context);
@@ -15,6 +15,18 @@ function client(){
   return {run,element,requests,respond,intervals,prints:()=>prints,context};
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+test('gate creation displays all registration types and submits the selected filter',async()=>{
+  const c=client();c.context.FormData=class{get(name){return {name:'Restricted gate',mode:'enforce',direction:'entry',capacity:''}[name]}getAll(name){return name==='registrationType'?['complimentary','free_link']:['student']}has(){return true}};
+  c.run("state.view='gates';showGateForm()");
+  const html=c.element('#gate-create').innerHTML;
+  assert.match(html,/Allowed registration types/);
+  for(const type of ['paid','complimentary','free_link'])assert.ok(html.includes(`name="registrationType" value="${type}" checked`));
+  const saving=c.element('#gate-form').listeners.submit({preventDefault(){},target:{},submitter:c.element('create')});
+  const body=JSON.parse(c.requests[0].options.body);
+  assert.deepEqual(body.allowedRegistrationTypes,['complimentary','free_link']);
+  assert.deepEqual(body.allowedCategories,['student']);
+  c.respond(0,{point:{}});await tick();c.respond(1,{points:[]});await saving;
+});
 test('print preparation cannot overlap and audit keeps its captured day',async()=>{
   const c=client(),png=deferred();c.context.Badge.png=()=>png.promise;
   const first=c.run("printBadge({qrId:'a',name:'A'},'qr')");

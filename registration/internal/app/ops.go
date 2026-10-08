@@ -762,6 +762,7 @@ func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal o
 	var in struct {
 		Name, Mode, Direction                string
 		AllowedCategories, AllowedDays       []string
+		AllowedRegistrationTypes             []string
 		Capacity                             *int
 		RequireCheckIn, AllowMultipleEntries bool
 	}
@@ -785,12 +786,25 @@ func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal o
 	if in.AllowedCategories == nil {
 		in.AllowedCategories = []string{}
 	}
-	p := accessPoint{ID: id(), Name: in.Name, Mode: in.Mode, Direction: in.Direction, AllowedCategories: in.AllowedCategories, AllowedDays: in.AllowedDays, Capacity: in.Capacity, RequireCheckIn: in.RequireCheckIn, AllowMultipleEntries: in.AllowMultipleEntries, Active: true}
+	if in.AllowedRegistrationTypes == nil {
+		in.AllowedRegistrationTypes = []string{}
+	}
+	for _, kind := range in.AllowedRegistrationTypes {
+		if kind != "paid" && kind != "complimentary" && kind != "free_link" {
+			fail(w, 400, "invalid registration type")
+			return
+		}
+	}
+	p := accessPoint{ID: id(), Name: in.Name, Mode: in.Mode, Direction: in.Direction, AllowedCategories: in.AllowedCategories, AllowedDays: in.AllowedDays, AllowedRegistrationTypes: in.AllowedRegistrationTypes, Capacity: in.Capacity, RequireCheckIn: in.RequireCheckIn, AllowMultipleEntries: in.AllowMultipleEntries, Active: true}
 	err := pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries); err != nil {
+		if _, err := tx.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries,allowed_registration_types) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9,$10)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries, p.AllowedRegistrationTypes); err != nil {
 			return err
 		}
-		return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_created", principal.Station, p.ID+" | "+p.Name)
+		types := strings.Join(p.AllowedRegistrationTypes, ",")
+		if types == "" {
+			types = "all"
+		}
+		return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_created", principal.Station, p.ID+" | "+p.Name+" | registration types: "+types)
 	})
 	if err != nil {
 		fail(w, 503, "gate could not be created or recorded; check for a duplicate name")

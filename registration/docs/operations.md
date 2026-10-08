@@ -62,6 +62,7 @@ The session lasts 12 hours and all writes carry CSRF protection.
 - Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
 
 Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
+In **Create access gate**, choose **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types** to set the entry filter when creating the gate.
 In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.
 Existing gates allow every registration type; leaving all types unchecked also allows every type, like the category filter.
 The gate scan result labels the attendee's registration type, whether entry is granted or denied.

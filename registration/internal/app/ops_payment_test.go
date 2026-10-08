@@ -2,6 +2,53 @@ package app
 
 import "testing"
 
+func TestOpsCreateGateRegistrationTypes(t *testing.T) {
+	a := mustApp(t)
+	c := opsReliabilityDesk(t, a, "Create gate")
+	qr := seedOpsPass(t, a, "create-gate@example.com")
+	for _, tc := range []struct {
+		name    string
+		types   []string
+		allowed bool
+		status  int
+	}{
+		{"paid only", []string{"paid"}, false, 201},
+		{"free registrations", []string{"complimentary", "free_link"}, true, 201},
+		{"empty", []string{}, true, 201},
+		{"omitted", nil, true, 201},
+		{"invalid", []string{"free"}, false, 400},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := map[string]any{"name": tc.name, "mode": "enforce", "direction": "entry", "allowMultipleEntries": true}
+			if tc.types != nil {
+				in["allowedRegistrationTypes"] = tc.types
+			}
+			rr := c.request("POST", "/api/v1/ops/points", in)
+			if rr.Code != tc.status {
+				t.Fatalf("create: %d %s, want %d", rr.Code, rr.Body.String(), tc.status)
+			}
+			if rr.Code != 201 {
+				return
+			}
+			p := decodeOpsResponse(t, rr)["point"].(map[string]any)
+			types, ok := p["allowedRegistrationTypes"].([]any)
+			if !ok || len(types) != len(tc.types) {
+				t.Fatalf("creation response lost filter: %v", p)
+			}
+			for i, kind := range tc.types {
+				if types[i] != kind {
+					t.Fatalf("creation filter: %v", types)
+				}
+			}
+			gate := p["id"].(string)
+			scan := c.request("POST", "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": qr, "day": opsDays[0].ID})
+			if scan.Code != 200 || decodeOpsResponse(t, scan)["allowed"] != tc.allowed {
+				t.Fatalf("new gate ignored filter: %d %s", scan.Code, scan.Body.String())
+			}
+		})
+	}
+}
+
 func TestOpsGateRegistrationTypes(t *testing.T) {
 	a := mustApp(t)
 	c := opsReliabilityDesk(t, a, "Payment gate")
