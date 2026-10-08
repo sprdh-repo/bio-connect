@@ -311,10 +311,10 @@ func TestOpsPaidSpotRegistrationVerifiesAndDeduplicatesReference(t *testing.T) {
 	}
 }
 
-// A walk-in of any category needs only a name and an email or a phone; the
-// designation and institution are optional, and the pass goes to whichever
-// contact they give.
-func TestOpsSpotRegistrationNeedsOnlyNameAndOneContact(t *testing.T) {
+// A walk-in of any category needs only a name; contact, designation and
+// institution are optional. The pass goes to whichever contact they give, and
+// with none nothing is sent: the desk hands over the printed badge.
+func TestOpsSpotRegistrationNeedsOnlyName(t *testing.T) {
 	a := mustApp(t)
 	a.Config.OpsKey = "venue-passcode"
 	c := &opsTestClient{t: t, h: a.Handler()}
@@ -342,8 +342,17 @@ func TestOpsSpotRegistrationNeedsOnlyNameAndOneContact(t *testing.T) {
 			t.Fatalf("%s: no %s delivery to %s", tc.name, tc.channel, tc.to)
 		}
 	}
+	noContact := register("No Contact", "", "")
+	if noContact.Code != http.StatusCreated {
+		t.Fatalf("no contact: %d %s", noContact.Code, noContact.Body.String())
+	}
+	if person := decodeOpsResponse(t, noContact)["person"].(map[string]any); person["checkedIn"] != true {
+		t.Fatalf("no-contact walk-in was not checked in: %s", noContact.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM delivery_jobs d JOIN attendees a ON a.registration_id=d.registration_id WHERE a.name='No Contact'"); n != 0 {
+		t.Fatalf("no-contact walk-in queued %d deliveries", n)
+	}
 	for _, tc := range []struct{ name, email, phone string }{
-		{"No Contact", "", ""},
 		{"Bad Email", "not-an-email", ""},
 		{"Bad Phone", "", "98765"},
 	} {

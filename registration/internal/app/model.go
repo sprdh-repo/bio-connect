@@ -178,19 +178,20 @@ func guestAttendeeOK(p *Attendee) bool {
 var errGuestAttendee = errors.New("a guest pass needs the guest's name; an email or phone, if given, must be valid (phone with +country code)")
 
 // spotAttendeeOK normalises a walk-in attendee registered at the spot desk:
-// a name and at least one of email or phone are required, and a designation,
-// email or phone, when given, must be valid. WhatsApp delivery needs a phone.
+// only a name is required, and a designation, email or phone, when given,
+// must be valid. With neither email nor phone nothing is sent; the desk
+// prints the badge. WhatsApp delivery needs a phone.
 func spotAttendeeOK(p *Attendee) bool {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Designation = strings.TrimSpace(p.Designation)
 	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Phone = strings.TrimSpace(p.Phone)
 	return validText(p.Name, 120) && (p.Designation == "" || validText(p.Designation, 180)) &&
-		(p.Email != "" || p.Phone != "") && (p.Email == "" || validEmail(p.Email)) &&
+		(p.Email == "" || validEmail(p.Email)) &&
 		validPhone(p.Phone, true) && (p.Phone != "" || !p.WhatsAppConsent)
 }
 
-var errSpotAttendee = errors.New("a spot registration needs the attendee's name and a valid email or international phone (+country code)")
+var errSpotAttendee = errors.New("a spot registration needs the attendee's name; an email or phone, if given, must be valid (phone with +country code)")
 
 // attendeeOK normalises one attendee and reports whether their details are
 // complete. Staff entry may leave the phone out, but WhatsApp delivery still
@@ -238,7 +239,7 @@ const (
 	// be saved with fewer attendees than its passes, leaving the rest for later.
 	entryStaff
 	// entrySpot is the walk-in desk: staff rules, but a delegate needs only a
-	// name and an email or phone; designation and institution are optional.
+	// name; contact, designation and institution are optional.
 	entrySpot
 )
 
@@ -284,19 +285,18 @@ func validateInput(in *RegistrationInput, c Category, by entry) error {
 			}
 			continue
 		}
-		// Staff may issue a speaker a pass with no contact at all, to download
-		// and hand over in person; nothing can be sent to such a holder.
-		if staff && c.ID == "speaker" && strings.TrimSpace(p.Email) == "" && strings.TrimSpace(p.Phone) == "" && !p.WhatsAppConsent {
+		if spot {
+			if !spotAttendeeOK(p) {
+				return errSpotAttendee
+			}
+		} else if staff && c.ID == "speaker" && strings.TrimSpace(p.Email) == "" && strings.TrimSpace(p.Phone) == "" && !p.WhatsAppConsent {
+			// Staff may issue a speaker a pass with no contact at all, to download
+			// and hand over in person; nothing can be sent to such a holder.
 			p.Name, p.Designation, p.Email, p.Phone = strings.TrimSpace(p.Name), strings.TrimSpace(p.Designation), "", ""
 			if !validText(p.Name, 120) || !validText(p.Designation, 180) {
 				return errors.New("a speaker pass needs the speaker's name and role")
 			}
 			continue
-		}
-		if spot {
-			if !spotAttendeeOK(p) {
-				return errSpotAttendee
-			}
 		} else if !attendeeOK(p, staff, noEmail, foodOnly(c.ID)) {
 			return attendeeError(staff, noEmail, foodOnly(c.ID))
 		}
