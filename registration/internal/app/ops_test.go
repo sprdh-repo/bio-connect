@@ -260,6 +260,25 @@ func TestOpsGateAllowsExitAfterRulesChange(t *testing.T) {
 	if n := count(t, a, "SELECT count(*) FROM access_scans WHERE access_point_id=$1", pointID); n != 3 {
 		t.Fatalf("retained access decisions = %d", n)
 	}
+	reports := c.request(http.MethodGet, "/api/v1/ops/reports", nil)
+	if reports.Code != http.StatusOK {
+		t.Fatalf("reports: %d %s", reports.Code, reports.Body.String())
+	}
+	want := map[string][4]float64{opsDays[0].ID: {1, 1, 1, 0}, opsDays[1].ID: {1, 1, 0, 1}}
+	for _, raw := range decodeOpsResponse(t, reports)["gates"].([]any) {
+		g := raw.(map[string]any)
+		if g["pointId"] != pointID {
+			continue
+		}
+		w := want[g["day"].(string)]
+		if got := [4]float64{g["entries"].(float64), g["uniquePeople"].(float64), g["exits"].(float64), g["inside"].(float64)}; got != w {
+			t.Errorf("gate totals for %s = %v, want %v", g["day"], got, w)
+		}
+		delete(want, g["day"].(string))
+	}
+	if len(want) != 0 {
+		t.Errorf("missing gate totals for %v", want)
+	}
 }
 
 func TestOpsPaidSpotRegistrationVerifiesAndDeduplicatesReference(t *testing.T) {
@@ -467,6 +486,8 @@ func TestOpsReportsExposeFilterableActivityAudit(t *testing.T) {
 		"['all','success','repeat','rejected']",
 		"data-audit-filter",
 		"await loadAudit();if(current(c))renderReports()",
+		"Gate traffic",
+		"state.reports?.gates",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("operations audit UI does not contain %q", want)

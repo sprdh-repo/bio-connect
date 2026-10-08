@@ -1022,9 +1022,52 @@ func (a *App) opsReports(w http.ResponseWriter, r *http.Request) {
 			items = append(items, map[string]any{"day": day, "categoryId": timeID, "category": label, "registered": registered, "checkedIn": ins, "checkedOut": outs})
 		}
 	}
+	gates, err := a.opsGateTotals(r.Context())
+	if err != nil {
+		fail(w, 503, "reports unavailable")
+		return
+	}
 	var registered, unique, daily, outs int
 	_ = a.DB.QueryRow(r.Context(), `SELECT (SELECT count(*) FROM attendees a JOIN registrations r ON r.id=a.registration_id JOIN passes p ON p.attendee_id=a.id AND p.revoked_at IS NULL WHERE r.status='approved' AND a.removed_at IS NULL),(SELECT count(DISTINCT attendee_id) FROM ops_attendance),(SELECT count(*) FROM ops_attendance),(SELECT count(*) FROM ops_attendance WHERE checked_out_at IS NOT NULL)`).Scan(&registered, &unique, &daily, &outs)
-	respond(w, 200, map[string]any{"summary": map[string]int{"registered": registered, "uniqueCheckedIn": unique, "dailyCheckIns": daily, "checkouts": outs, "notYetCheckedIn": registered - unique}, "rows": items})
+	respond(w, 200, map[string]any{"summary": map[string]int{"registered": registered, "uniqueCheckedIn": unique, "dailyCheckIns": daily, "checkouts": outs, "notYetCheckedIn": registered - unique}, "rows": items, "gates": gates})
+}
+
+// opsGateTotals counts non-voided scans per gate and event day. "inside" uses
+// the same rule as opsOccupancy: the attendee's latest allowed scan is an entry.
+func (a *App) opsGateTotals(ctx context.Context) ([]map[string]any, error) {
+	days := make([]string, len(opsDays))
+	for i, d := range opsDays {
+		days[i] = d.ID
+	}
+	rows, err := a.DB.Query(ctx, `WITH s AS (SELECT * FROM access_scans WHERE voided_at IS NULL),
+	 totals AS (SELECT access_point_id,event_day,
+	  count(*) FILTER(WHERE decision='allow' AND direction='entry') entries,
+	  count(DISTINCT attendee_id) FILTER(WHERE decision='allow' AND direction='entry') people,
+	  count(*) FILTER(WHERE decision='allow' AND direction='exit') exits,
+	  count(*) FILTER(WHERE decision='deny') denied
+	  FROM s GROUP BY access_point_id,event_day),
+	 latest AS (SELECT DISTINCT ON(access_point_id,event_day,attendee_id) access_point_id,event_day,direction FROM s WHERE decision='allow' AND attendee_id IS NOT NULL ORDER BY access_point_id,event_day,attendee_id,created_at DESC,id DESC),
+	 inside AS (SELECT access_point_id,event_day,count(*) n FROM latest WHERE direction='entry' GROUP BY access_point_id,event_day)
+	 SELECT d.day::text,p.id,p.name,p.active,COALESCE(t.entries,0),COALESCE(t.people,0),COALESCE(t.exits,0),COALESCE(t.denied,0),COALESCE(i.n,0)
+	 FROM unnest($1::date[]) d(day) CROSS JOIN access_points p
+	 LEFT JOIN totals t ON t.access_point_id=p.id AND t.event_day=d.day
+	 LEFT JOIN inside i ON i.access_point_id=p.id AND i.event_day=d.day
+	 ORDER BY d.day,p.name`, days)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var day, id, name string
+		var active bool
+		var entries, people, exits, denied, inside int
+		if err := rows.Scan(&day, &id, &name, &active, &entries, &people, &exits, &denied, &inside); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{"day": day, "pointId": id, "gate": name, "active": active, "entries": entries, "uniquePeople": people, "exits": exits, "denied": denied, "inside": inside})
+	}
+	return out, rows.Err()
 }
 
 type opsActivityRow struct {
