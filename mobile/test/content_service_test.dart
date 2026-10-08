@@ -155,7 +155,10 @@ void main() {
           as Map<String, dynamic>,
     );
     expect(bundled.sponsors, hasLength(10));
-    expect(bundled.sponsors.every((s) => s.category.isNotEmpty), isTrue);
+    // Categories are optional in published content and hidden when blank.
+    final sponsorNames = bundled.sponsors.map((s) => s.name);
+    expect(sponsorNames, everyElement(isNotEmpty));
+    expect(sponsorNames, contains('Kerala Grameena Bank'));
     expect(bundled.leadership.committee.members, hasLength(14));
     expect(bundled.leadership.people.first.imageUrl, startsWith('https://'));
     expect(bundled.leadership.convenedBy?.name, isNotEmpty);
