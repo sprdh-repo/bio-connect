@@ -37,6 +37,10 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 		if !guestAttendeeOK(&p) {
 			return errGuestAttendee
 		}
+	} else if anyDetails(categoryID) {
+		if !spotAttendeeOK(&p) {
+			return errOtherAttendee
+		}
 	} else if !attendeeOK(&p, true, emailOptional(categoryID), foodOnly(categoryID)) {
 		return attendeeError(true, emailOptional(categoryID), foodOnly(categoryID))
 	}

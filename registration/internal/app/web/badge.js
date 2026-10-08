@@ -67,7 +67,7 @@ function renderBadge(person,grid,dpi,rotate){
 
   // A food pass (foodOnly in model.go) leads its role line with FOOD ONLY, so
   // volunteers can tell it apart at a glance.
-  const food=person.categoryId==='food',role=food?['FOOD ONLY',person.designation].filter(Boolean).join(' · '):person.designation||person.category||'Delegate';
+  const food=person.categoryId==='food',role=food?['FOOD ONLY',person.designation].filter(Boolean).join(' · '):person.designation||(person.categoryId==='other'?'':person.category)||'Delegate';
   const name=String(person.name||'').toUpperCase(),designation=String(role).toUpperCase(),institution=String(person.institution||'').toUpperCase();
   const fontName=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontRole=s=>`800 ${s}px Manrope, Arial, sans-serif`,fontOrg=s=>`500 ${s}px "DM Sans", Arial, sans-serif`;
   let layout=null;

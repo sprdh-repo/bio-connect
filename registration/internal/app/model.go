@@ -55,6 +55,8 @@ func categoryCode(catID string) string {
 		return "GU"
 	case "food":
 		return "FD"
+	case "other":
+		return "OT"
 	default:
 		return "EX"
 	}
@@ -80,6 +82,8 @@ type Category struct {
 	DownloadOnly bool `json:"download_only"`
 	// FoodOnly says the category's passes cover meals only (foodOnly).
 	FoodOnly bool `json:"food_only"`
+	// AnyDetails says staff need only the holder's name (anyDetails).
+	AnyDetails bool `json:"any_details"`
 }
 type Attendee struct {
 	ID              string `json:"id,omitempty"`
@@ -162,6 +166,12 @@ func foodOnly(categoryID string) bool { return categoryID == "food" }
 // but nothing is delivered to it (queuePass refuses).
 func downloadOnly(categoryID string) bool { return categoryID == "guest" }
 
+// anyDetails reports whether a category is the catch-all Other: staff enter
+// only the holder's name, and an organisation, designation, email or phone
+// when they have one. The pass is sent to any email or phone given; with
+// neither, staff download it or print the badge.
+func anyDetails(categoryID string) bool { return categoryID == "other" }
+
 // guestAttendeeOK normalises a download-only pass holder: a name is required,
 // and a designation, email or phone, when given, must still be valid. WhatsApp
 // consent is dropped because nothing is ever sent.
@@ -192,6 +202,8 @@ func spotAttendeeOK(p *Attendee) bool {
 }
 
 var errSpotAttendee = errors.New("a spot registration needs the attendee's name; an email or phone, if given, must be valid (phone with +country code)")
+
+var errOtherAttendee = errors.New("an Other pass needs the holder's name; an email or phone, if given, must be valid (phone with +country code)")
 
 // attendeeOK normalises one attendee and reports whether their details are
 // complete. Staff entry may leave the phone out, but WhatsApp delivery still
@@ -257,7 +269,7 @@ func validateInput(in *RegistrationInput, c Category, by entry) error {
 	noEmail := emailOptional(c.ID)
 	// A guest, food pass holder or walk-in may have no institution; staff
 	// enter only what they know.
-	institutionOK := validText(in.Institution, 180) || (spot || staff && (downloadOnly(c.ID) || foodOnly(c.ID))) && in.Institution == ""
+	institutionOK := validText(in.Institution, 180) || (spot || staff && (downloadOnly(c.ID) || foodOnly(c.ID) || anyDetails(c.ID))) && in.Institution == ""
 	// A delegate's contact is their one attendee, copied below once the
 	// attendee is checked, so only an exhibitor's contact is checked here.
 	if !institutionOK || c.Kind == "exhibitor" && (!validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff)) {
@@ -288,6 +300,10 @@ func validateInput(in *RegistrationInput, c Category, by entry) error {
 		if spot {
 			if !spotAttendeeOK(p) {
 				return errSpotAttendee
+			}
+		} else if staff && anyDetails(c.ID) {
+			if !spotAttendeeOK(p) {
+				return errOtherAttendee
 			}
 		} else if staff && c.ID == "speaker" && strings.TrimSpace(p.Email) == "" && strings.TrimSpace(p.Phone) == "" && !p.WhatsAppConsent {
 			// Staff may issue a speaker a pass with no contact at all, to download
@@ -373,7 +389,7 @@ func (a *App) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) categories(ctx context.Context) ([]Category, error) {
-	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 WHEN 'organiser' THEN 6 WHEN 'sponsor' THEN 7 WHEN 'volunteer' THEN 8 WHEN 'speaker' THEN 9 WHEN 'guest' THEN 10 WHEN 'food' THEN 11 ELSE 12 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
+	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 WHEN 'organiser' THEN 6 WHEN 'sponsor' THEN 7 WHEN 'volunteer' THEN 8 WHEN 'speaker' THEN 9 WHEN 'guest' THEN 10 WHEN 'food' THEN 11 WHEN 'other' THEN 12 ELSE 13 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
 	if e != nil {
 		return nil, e
 	}
@@ -388,6 +404,7 @@ func (a *App) categories(ctx context.Context) ([]Category, error) {
 		c.CouponEligible = couponEligible(c.ID)
 		c.DownloadOnly = downloadOnly(c.ID)
 		c.FoodOnly = foodOnly(c.ID)
+		c.AnyDetails = anyDetails(c.ID)
 		out = append(out, c)
 	}
 	return out, rows.Err()

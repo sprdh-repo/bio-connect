@@ -426,8 +426,8 @@ func TestDelegateCategoriesAreIndustryFirst(t *testing.T) {
 			got = append(got, c.ID)
 		}
 	}
-	if strings.Join(got, ",") != "industry,faculty,startup,student,official,organiser,sponsor,volunteer,speaker,guest,food" {
-		t.Fatalf("delegate category order = %v, want industry, faculty, startup, student, official, organiser, sponsor, volunteer, speaker, guest, food", got)
+	if strings.Join(got, ",") != "industry,faculty,startup,student,official,organiser,sponsor,volunteer,speaker,guest,food,other" {
+		t.Fatalf("delegate category order = %v, want industry, faculty, startup, student, official, organiser, sponsor, volunteer, speaker, guest, food, other", got)
 	}
 }
 

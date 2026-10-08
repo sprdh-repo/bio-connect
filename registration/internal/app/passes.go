@@ -43,6 +43,7 @@ func passStyleFor(catID string) passStyle {
 	ember := [3]int{176, 74, 28}    // warm orange no other category uses
 	silver := [3]int{198, 202, 204} // light grey no other category uses
 	rose := [3]int{168, 32, 88}     // deep rose no other category uses
+	slate := [3]int{74, 85, 104}    // blue-grey no other category uses
 	switch catID {
 	case "student":
 		return passStyle{lime, forest, "STUDENT", "Student", false}
@@ -66,6 +67,8 @@ func passStyleFor(catID string) passStyle {
 		return passStyle{silver, forest, "GUEST", "Guest", false}
 	case "food":
 		return passStyle{rose, paper, "FOOD ONLY", "Food only", false}
+	case "other":
+		return passStyle{slate, paper, "DELEGATE", "Delegate", false}
 	default: // premium / standard / table
 		return passStyle{forest, lime, "EXHIBITOR", "Exhibitor", true}
 	}
@@ -183,7 +186,7 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	textColor(forest)
 	drawPassText(p, name, "D", left, nameBaseline, contentW, 123, 25)
 	orgLabel, roleLabel := "INSTITUTION", "DESIGNATION"
-	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" || catID == "guest" || foodOnly(catID) {
+	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" || catID == "guest" || foodOnly(catID) || anyDetails(catID) {
 		orgLabel = "ORGANISATION"
 	}
 	if st.exhibitor {
