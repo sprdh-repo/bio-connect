@@ -40,7 +40,7 @@ func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo
 			return "", "", errors.New("a coupon cannot be combined with a free registration link")
 		}
 	}
-	if e = validateInput(&in, c, false); e != nil {
+	if e = validateInput(&in, c, entryPublic); e != nil {
 		return "", "", e
 	}
 	rh := requestHash(in)

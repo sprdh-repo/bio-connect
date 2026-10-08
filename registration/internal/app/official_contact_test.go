@@ -29,11 +29,11 @@ func TestOfficialNeedsEmailOrPhone(t *testing.T) {
 		{"bad email", "not-an-email", "+919876543210", true, false},
 		{"bad phone", "meera@kerala.gov.in", "98765", false, false},
 	} {
-		for _, staff := range []bool{false, true} {
+		for _, by := range []entry{entryPublic, entryStaff} {
 			in := officialInput(tc.email, tc.phone, tc.whatsapp)
-			err := validateInput(&in, official, staff)
+			err := validateInput(&in, official, by)
 			if (err == nil) != tc.ok {
-				t.Fatalf("%s (staff=%v): err=%v, want ok=%v", tc.name, staff, err, tc.ok)
+				t.Fatalf("%s (entry=%v): err=%v, want ok=%v", tc.name, by, err, tc.ok)
 			}
 			if err == nil && (in.Email != tc.email || in.Phone != tc.phone || in.ContactName != "Meera Das") {
 				t.Fatalf("%s: contact not copied from the attendee: %+v", tc.name, in)
@@ -46,12 +46,12 @@ func TestOtherDelegatesStillNeedEmail(t *testing.T) {
 	in := delegateInput("industry")
 	in.Attendees[0].Email, in.Email = "", ""
 	in.Attendees[0].WhatsAppConsent = true
-	if err := validateInput(&in, Category{ID: "industry", Kind: "delegate", RosterCount: 1}, false); err == nil {
+	if err := validateInput(&in, Category{ID: "industry", Kind: "delegate", RosterCount: 1}, entryPublic); err == nil {
 		t.Fatal("an industry delegate registered without an email")
 	}
 	in = delegateInput("industry")
 	in.Institution = ""
-	if err := validateInput(&in, Category{ID: "industry", Kind: "delegate", RosterCount: 1}, false); err == nil {
+	if err := validateInput(&in, Category{ID: "industry", Kind: "delegate", RosterCount: 1}, entryPublic); err == nil {
 		t.Fatal("a delegate registered without an institution")
 	}
 }

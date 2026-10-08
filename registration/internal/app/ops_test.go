@@ -311,6 +311,54 @@ func TestOpsPaidSpotRegistrationVerifiesAndDeduplicatesReference(t *testing.T) {
 	}
 }
 
+// A walk-in of any category needs only a name and an email or a phone; the
+// designation and institution are optional, and the pass goes to whichever
+// contact they give.
+func TestOpsSpotRegistrationNeedsOnlyNameAndOneContact(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Spot desk", "venue-passcode")
+	register := func(name, email, phone string) *httptest.ResponseRecorder {
+		return c.request(http.MethodPost, "/api/v1/ops/spot-register", map[string]any{
+			"day": opsDays[0].ID, "categoryId": "faculty", "name": name, "email": email, "phone": phone, "payment": "complimentary",
+		})
+	}
+	for _, tc := range []struct {
+		name, email, phone string
+		channel, to        string
+	}{
+		{"Email Only", "email.only@example.com", "", "email", "email.only@example.com"},
+		{"Phone Only", "", "+919876500001", "whatsapp", "+919876500001"},
+	} {
+		res := register(tc.name, tc.email, tc.phone)
+		if res.Code != http.StatusCreated {
+			t.Fatalf("%s: %d %s", tc.name, res.Code, res.Body.String())
+		}
+		if n := count(t, a, "SELECT count(*) FROM delivery_jobs d JOIN attendees a ON a.registration_id=d.registration_id WHERE a.name=$1 AND d.purpose='pass'", tc.name); n != 1 {
+			t.Fatalf("%s: pass deliveries = %d", tc.name, n)
+		}
+		if n := count(t, a, "SELECT count(*) FROM delivery_jobs d JOIN attendees a ON a.registration_id=d.registration_id WHERE a.name=$1 AND d.channel=$2 AND d.recipient=$3", tc.name, tc.channel, tc.to); n != 1 {
+			t.Fatalf("%s: no %s delivery to %s", tc.name, tc.channel, tc.to)
+		}
+	}
+	for _, tc := range []struct{ name, email, phone string }{
+		{"No Contact", "", ""},
+		{"Bad Email", "not-an-email", ""},
+		{"Bad Phone", "", "98765"},
+	} {
+		if res := register(tc.name, tc.email, tc.phone); res.Code != http.StatusBadRequest {
+			t.Fatalf("%s: %d %s", tc.name, res.Code, res.Body.String())
+		}
+	}
+	// The relaxed rules are the spot desk's alone.
+	in := delegateInput("faculty")
+	in.Institution, in.Attendees[0].Designation = "", ""
+	if err := validateInput(&in, Category{ID: "faculty", Kind: "delegate", RosterCount: 1}, entryStaff); err == nil {
+		t.Fatal("a console registration was saved without institution or designation")
+	}
+}
+
 func TestOpsCSVFormulaProtectionAndReferenceNormalisation(t *testing.T) {
 	if got := opsReference("https://example.test/passes/bc26-in-0042"); got != "BC26IN0042" {
 		t.Fatalf("normalised reference = %q", got)

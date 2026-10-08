@@ -177,6 +177,21 @@ func guestAttendeeOK(p *Attendee) bool {
 
 var errGuestAttendee = errors.New("a guest pass needs the guest's name; an email or phone, if given, must be valid (phone with +country code)")
 
+// spotAttendeeOK normalises a walk-in attendee registered at the spot desk:
+// a name and at least one of email or phone are required, and a designation,
+// email or phone, when given, must be valid. WhatsApp delivery needs a phone.
+func spotAttendeeOK(p *Attendee) bool {
+	p.Name = strings.TrimSpace(p.Name)
+	p.Designation = strings.TrimSpace(p.Designation)
+	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
+	p.Phone = strings.TrimSpace(p.Phone)
+	return validText(p.Name, 120) && (p.Designation == "" || validText(p.Designation, 180)) &&
+		(p.Email != "" || p.Phone != "") && (p.Email == "" || validEmail(p.Email)) &&
+		validPhone(p.Phone, true) && (p.Phone != "" || !p.WhatsAppConsent)
+}
+
+var errSpotAttendee = errors.New("a spot registration needs the attendee's name and a valid email or international phone (+country code)")
+
 // attendeeOK normalises one attendee and reports whether their details are
 // complete. Staff entry may leave the phone out, but WhatsApp delivery still
 // needs one. When the email is optional, one of email or phone is still
@@ -213,10 +228,24 @@ func attendeeError(phoneOptional, noEmail, roleOptional bool) error {
 	return errors.New("each attendee needs name, designation, valid email and international phone")
 }
 
-// validateInput checks a registration. staff marks one entered from the
-// console: the phones are optional, and an exhibitor may be saved with fewer
-// attendees than its passes, leaving the rest to be filled later.
-func validateInput(in *RegistrationInput, c Category, staff bool) error {
+// entry is where a registration is entered, which sets what it must include.
+type entry int
+
+const (
+	// entryPublic is the public form: complete details.
+	entryPublic entry = iota
+	// entryStaff is the console: the phones are optional, and an exhibitor may
+	// be saved with fewer attendees than its passes, leaving the rest for later.
+	entryStaff
+	// entrySpot is the walk-in desk: staff rules, but a delegate needs only a
+	// name and an email or phone; designation and institution are optional.
+	entrySpot
+)
+
+// validateInput checks a registration entered by the given route.
+func validateInput(in *RegistrationInput, c Category, by entry) error {
+	staff := by != entryPublic
+	spot := by == entrySpot && c.Kind != "exhibitor"
 	in.Institution = strings.TrimSpace(in.Institution)
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 	in.Phone = strings.TrimSpace(in.Phone)
@@ -225,9 +254,9 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 		return e
 	}
 	noEmail := emailOptional(c.ID)
-	// A guest or food pass holder may have no institution; staff enter only
-	// what they know.
-	institutionOK := validText(in.Institution, 180) || staff && (downloadOnly(c.ID) || foodOnly(c.ID)) && in.Institution == ""
+	// A guest, food pass holder or walk-in may have no institution; staff
+	// enter only what they know.
+	institutionOK := validText(in.Institution, 180) || (spot || staff && (downloadOnly(c.ID) || foodOnly(c.ID))) && in.Institution == ""
 	// A delegate's contact is their one attendee, copied below once the
 	// attendee is checked, so only an exhibitor's contact is checked here.
 	if !institutionOK || c.Kind == "exhibitor" && (!validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff)) {
@@ -264,7 +293,11 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 			}
 			continue
 		}
-		if !attendeeOK(p, staff, noEmail, foodOnly(c.ID)) {
+		if spot {
+			if !spotAttendeeOK(p) {
+				return errSpotAttendee
+			}
+		} else if !attendeeOK(p, staff, noEmail, foodOnly(c.ID)) {
 			return attendeeError(staff, noEmail, foodOnly(c.ID))
 		}
 		if p.Email == "" {

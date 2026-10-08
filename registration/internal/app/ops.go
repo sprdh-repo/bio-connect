@@ -570,7 +570,7 @@ func (a *App) opsSpotRegister(w http.ResponseWriter, r *http.Request, principal 
 	// pass is sent at once by email and WhatsApp. A guest pass is never sent
 	// (downloadOnly); the desk hands over the PDF instead.
 	send := !downloadOnly(in.CategoryID)
-	input := StaffRegistrationInput{RegistrationInput: RegistrationInput{CategoryID: in.CategoryID, Institution: in.Institution, ContactName: in.Name, Email: in.Email, Phone: in.Phone, Attendees: []Attendee{{Name: in.Name, Email: in.Email, Phone: in.Phone, Designation: in.Designation, WhatsAppConsent: send && strings.TrimSpace(in.Phone) != ""}}}, Payment: in.Payment, VerifiedReference: in.PaymentReference, VerifiedDate: in.PaymentDate, VerifiedAmountPaise: in.AmountPaise, Send: send, Note: "Spot registration at " + principal.Station}
+	input := StaffRegistrationInput{RegistrationInput: RegistrationInput{CategoryID: in.CategoryID, Institution: in.Institution, ContactName: in.Name, Email: in.Email, Phone: in.Phone, Attendees: []Attendee{{Name: in.Name, Email: in.Email, Phone: in.Phone, Designation: in.Designation, WhatsAppConsent: send && strings.TrimSpace(in.Phone) != ""}}}, Payment: in.Payment, VerifiedReference: in.PaymentReference, VerifiedDate: in.PaymentDate, VerifiedAmountPaise: in.AmountPaise, Send: send, Spot: true, Note: "Spot registration at " + principal.Station}
 	rid, err := a.StaffCreate(r.Context(), input, randomToken(), nil, "ops-system")
 	if err != nil {
 		fail(w, 400, publicError(err))

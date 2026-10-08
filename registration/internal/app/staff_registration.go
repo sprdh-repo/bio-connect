@@ -25,6 +25,9 @@ type StaffRegistrationInput struct {
 	// AcceptAmount accepts a verified amount different from the fee due, with
 	// the reason in Note, as in a review (checkPaidAmount).
 	AcceptAmount bool `json:"accept_amount"`
+	// Spot marks a walk-in registered at the ops desk, which needs less
+	// (entrySpot). Only the ops handler sets it.
+	Spot bool `json:"-"`
 }
 
 // StaffCreate saves and approves a registration entered by staff. Unlike the
@@ -70,7 +73,11 @@ func (a *App) staffCreate(ctx context.Context, tx pgx.Tx, in StaffRegistrationIn
 	if e != nil {
 		return "", errors.New("unknown category")
 	}
-	if e = validateInput(&in.RegistrationInput, c, true); e != nil {
+	by := entryStaff
+	if in.Spot {
+		by = entrySpot
+	}
+	if e = validateInput(&in.RegistrationInput, c, by); e != nil {
 		return "", e
 	}
 	if c.FreeOnly && in.Payment == "paid" {
