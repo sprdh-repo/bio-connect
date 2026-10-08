@@ -4,6 +4,7 @@ import 'package:bio_connect_app/services/moments_service.dart';
 import 'package:bio_connect_app/services/pass_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 const attendeePass = AdmissionPass(
   id: 'pass-1',
@@ -122,5 +123,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(MomentsAlbumScreen), findsOneWidget);
     expect(find.text('1 photo'), findsOneWidget);
+  });
+
+  testWidgets('uses the app-wide wallet so passes added elsewhere count', (
+    tester,
+  ) async {
+    final passWallet = wallet([]);
+    addTearDown(passWallet.dispose);
+    await passWallet.load();
+    await passWallet.add(savedAccess());
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: passWallet,
+        child: MaterialApp(
+          home: MomentsScreen(
+            service: _MomentsService(
+              const MomentsStatus(
+                albumReady: true,
+                selfieUploaded: true,
+                similarPhotosCount: 1,
+                photosReady: true,
+                processingStatus: 'completed',
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('DEBUG PREVIEW'), findsNothing);
+    expect(find.text('Your photos are ready'), findsOneWidget);
   });
 }

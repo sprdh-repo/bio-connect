@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
+import 'package:provider/provider.dart';
 
 import '../main.dart';
 import '../providers/pass_wallet.dart';
@@ -29,9 +30,9 @@ class MomentsScreen extends StatefulWidget {
 
 class _MomentsScreenState extends State<MomentsScreen>
     with WidgetsBindingObserver {
-  late final PassWallet _wallet = widget.wallet ?? PassWallet();
+  late final PassWallet _wallet;
+  PassWallet? _ownWallet;
   late final MomentsService _service = widget.service ?? MomentsService();
-  late final bool _ownsWallet = widget.wallet == null;
   MomentsCredential? _credential;
   MomentsStatus? _status;
   String? _error;
@@ -43,6 +44,10 @@ class _MomentsScreenState extends State<MomentsScreen>
   @override
   void initState() {
     super.initState();
+    _wallet =
+        widget.wallet ??
+        context.read<PassWallet?>() ??
+        (_ownWallet = PassWallet());
     WidgetsBinding.instance.addObserver(this);
     _load();
   }
@@ -273,7 +278,7 @@ class _MomentsScreenState extends State<MomentsScreen>
   void dispose() {
     _poll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    if (_ownsWallet) _wallet.dispose();
+    _ownWallet?.dispose();
     super.dispose();
   }
 

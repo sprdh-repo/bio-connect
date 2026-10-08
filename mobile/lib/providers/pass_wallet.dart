@@ -54,28 +54,35 @@ class PassWallet extends ChangeNotifier {
     return times.isEmpty ? null : times.last;
   }
 
-  Future<void> load() async {
-    if (busy) return;
+  Future<void>? _syncing;
+
+  /// Reads the passes saved on this phone, then checks them with the server.
+  /// Callers that arrive mid-load wait for the same run.
+  Future<void> load() {
+    if (_syncing case final running?) return running;
+    if (busy) return Future.value();
+    return _syncing = _sync().whenComplete(() => _syncing = null);
+  }
+
+  /// Checks saved passes with the server. Re-reads the saved copy first, so
+  /// passes saved since this wallet loaded are never overwritten.
+  Future<void> refresh() => loaded ? load() : Future.value();
+
+  Future<void> _sync() async {
     busy = true;
+    offline = false;
     error = null;
     notifyListeners();
     try {
       _access = await _store.read();
       loaded = true;
+      notifyListeners();
     } catch (_) {
       error = 'Saved passes could not be opened. Try again, or remove the saved passes from this phone.';
+      busy = false;
+      notifyListeners();
+      return;
     }
-    busy = false;
-    notifyListeners();
-    if (loaded) await refresh();
-  }
-
-  Future<void> refresh() async {
-    if (busy || !loaded) return;
-    busy = true;
-    offline = false;
-    error = null;
-    notifyListeners();
     final next = <PassAccess>[];
     try {
       for (final access in _access) {

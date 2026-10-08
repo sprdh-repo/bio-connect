@@ -45,10 +45,14 @@ class MyPassesScreen extends StatefulWidget {
 class _MyPassesScreenState extends State<MyPassesScreen>
     with WidgetsBindingObserver {
   late final PassWallet _wallet;
+  PassWallet? _ownWallet;
   @override
   void initState() {
     super.initState();
-    _wallet = widget.wallet ?? PassWallet();
+    _wallet =
+        widget.wallet ??
+        context.read<PassWallet?>() ??
+        (_ownWallet = PassWallet());
     WidgetsBinding.instance.addObserver(this);
     _wallet.addListener(_changed);
     _wallet.load();
@@ -67,7 +71,7 @@ class _MyPassesScreenState extends State<MyPassesScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _wallet.removeListener(_changed);
-    if (widget.wallet == null) _wallet.dispose();
+    _ownWallet?.dispose();
     super.dispose();
   }
 

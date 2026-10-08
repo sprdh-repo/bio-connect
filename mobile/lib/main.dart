@@ -19,6 +19,7 @@ import 'providers/agenda.dart';
 import 'providers/contact_book.dart';
 import 'providers/content_provider.dart';
 import 'providers/feedback_book.dart';
+import 'providers/pass_wallet.dart';
 import 'screens/agenda_screen.dart';
 import 'screens/contacts_screen.dart';
 import 'screens/delegate_registration_screen.dart';
@@ -128,6 +129,7 @@ class BioConnectApp extends StatelessWidget {
     this.agenda,
     this.contacts,
     this.feedback,
+    this.wallet,
   });
   final bool checkForUpdates;
 
@@ -139,6 +141,9 @@ class BioConnectApp extends StatelessWidget {
   final ContactBook? contacts;
   final FeedbackBook? feedback;
 
+  /// Saved passes, shared by every screen so none keeps a stale copy.
+  final PassWallet? wallet;
+
   @override
   Widget build(BuildContext context) => MultiProvider(
     providers: [
@@ -149,6 +154,7 @@ class BioConnectApp extends StatelessWidget {
       ChangeNotifierProvider(
         create: (_) => (feedback ?? FeedbackBook())..load(),
       ),
+      ChangeNotifierProvider(create: (_) => wallet ?? PassWallet()),
     ],
     child: _app(context),
   );

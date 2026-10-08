@@ -75,6 +75,16 @@ class DelayedPassStore extends MemoryPassStore {
   }
 }
 
+class GatedReadStore extends MemoryPassStore {
+  GatedReadStore(super.data);
+  final open = Completer<void>();
+  @override
+  Future<List<PassAccess>> read() async {
+    await open.future;
+    return super.read();
+  }
+}
+
 void main() {
   sharingTests();
   test(
@@ -100,6 +110,39 @@ void main() {
       expect(store.data.single.passes.single.id, 'p1');
     },
   );
+  test(
+    'refreshing a stale wallet keeps passes saved since it loaded',
+    () async {
+      final store = MemoryPassStore([]);
+      final service = FakePassService();
+      final stale = PassWallet(service: service, store: store, now: () => now);
+      final other = PassWallet(service: service, store: store, now: () => now);
+      await stale.load();
+      await other.load();
+      await other.add(access());
+      await stale.refresh();
+      expect(stale.momentsCredentials.single.pass.id, 'p1');
+      expect(store.data.single.passes.single.id, 'p1');
+    },
+  );
+  test('concurrent loads wait for the same saved passes', () async {
+    final store = GatedReadStore([access()]);
+    final wallet = PassWallet(
+      service: FakePassService(),
+      store: store,
+      now: () => now,
+    );
+    final first = wallet.load();
+    var secondDone = false;
+    final second = wallet.load().then((_) => secondDone = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(secondDone, isFalse);
+    store.open.complete();
+    await second;
+    expect(wallet.loaded, isTrue);
+    expect(wallet.passes.single.id, 'p1');
+    await first;
+  });
   test(
     'saved passes remain available offline; online revocation removes the QR',
     () async {
