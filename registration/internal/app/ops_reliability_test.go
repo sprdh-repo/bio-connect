@@ -85,6 +85,42 @@ func TestOpsConcurrentGateRules(t *testing.T) {
 			}
 		})
 	}
+	t.Run("linked-gates", func(t *testing.T) {
+		gates := make([]string, len(clients))
+		for i := range gates {
+			gates[i] = opsReliabilityGate(t, clients[0], fmt.Sprintf("linked-%d", i), "entry", nil, false)
+			if rr := clients[0].request("POST", "/api/v1/ops/points/"+gates[i], map[string]any{"entryGroup": "Concurrent lunch"}); rr.Code != 200 {
+				t.Fatal(rr.Body.String())
+			}
+		}
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		results := make(chan bool, len(clients))
+		for i := range clients {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				<-start
+				rr := clients[i].request("POST", "/api/v1/ops/points/"+gates[i]+"/scan", map[string]any{"code": qrs[0], "day": day})
+				if rr.Code != 200 {
+					t.Errorf("scan: %d %s", rr.Code, rr.Body.String())
+				}
+				results <- decodeOpsResponse(t, rr)["allowed"] == true
+			}(i)
+		}
+		close(start)
+		wg.Wait()
+		close(results)
+		allowed := 0
+		for yes := range results {
+			if yes {
+				allowed++
+			}
+		}
+		if allowed != 1 {
+			t.Errorf("allowed %d across linked gates, want exactly one", allowed)
+		}
+	})
 }
 
 func TestOpsGateRevocationAndRequestReplay(t *testing.T) {

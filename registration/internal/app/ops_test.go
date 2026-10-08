@@ -488,6 +488,8 @@ func TestOpsReportsExposeFilterableActivityAudit(t *testing.T) {
 		"await loadAudit();if(current(c))renderReports()",
 		"Gate traffic",
 		"state.reports?.gates",
+		"Shared entry group",
+		"entryGroup:f.get('entryGroup')",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("operations audit UI does not contain %q", want)
@@ -655,5 +657,71 @@ func TestOpsSpotRegistrationAppliesCoupon(t *testing.T) {
 	}
 	if excluded := c.request(http.MethodPost, "/api/v1/ops/spot-register", body("student", "UPI-3", discounted(fees["student"], 25))); excluded.Code != http.StatusBadRequest {
 		t.Fatalf("coupon on an excluded category: %d %s", excluded.Code, excluded.Body.String())
+	}
+}
+
+func TestOpsLinkedGatesShareOneEntry(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Lunch desk", "venue-passcode")
+	qr := seedOpsPass(t, a, "ops-linked@example.com")
+	for _, d := range opsDays {
+		if rr := c.request(http.MethodPost, "/api/v1/ops/check-in", map[string]any{"code": qr, "day": d.ID}); rr.Code != http.StatusOK {
+			t.Fatalf("check-in: %s", rr.Body.String())
+		}
+	}
+	gate := func(name, group string, multiple bool) (int, string) {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{
+			"name": name, "mode": "enforce", "direction": "entry", "requireCheckIn": true,
+			"allowMultipleEntries": multiple, "entryGroup": group,
+		})
+		if rr.Code != http.StatusCreated {
+			return rr.Code, ""
+		}
+		return rr.Code, decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	}
+	if code, _ := gate("Repeat counter", "Lunch", true); code != http.StatusBadRequest {
+		t.Fatalf("repeat-entry gate joined a group: %d", code)
+	}
+	_, counterA := gate("Counter A", " Lunch ", false)
+	_, counterB := gate("Counter B", "", false)
+	_, counterC := gate("Counter C", "", false)
+	link := c.request(http.MethodPost, "/api/v1/ops/points/"+counterB, map[string]any{"entryGroup": "Lunch"})
+	if link.Code != http.StatusOK || decodeOpsResponse(t, link)["point"].(map[string]any)["entryGroup"] != "Lunch" {
+		t.Fatalf("link existing gate: %d %s", link.Code, link.Body.String())
+	}
+	if rr := c.request(http.MethodPost, "/api/v1/ops/points/"+counterB, map[string]any{"allowMultipleEntries": true}); rr.Code != http.StatusBadRequest {
+		t.Fatalf("linked gate allowed repeat entry: %d %s", rr.Code, rr.Body.String())
+	}
+	scan := func(point, day string) map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+point+"/scan", map[string]any{"code": qr, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	if out := scan(counterA, opsDays[0].ID); out["allowed"] != true {
+		t.Fatalf("first linked entry: %v", out)
+	}
+	out := scan(counterB, opsDays[0].ID)
+	if out["allowed"] != false || !strings.Contains(out["reason"].(string), "Counter A") {
+		t.Fatalf("second linked entry: %v", out)
+	}
+	if out := scan(counterC, opsDays[0].ID); out["allowed"] != true {
+		t.Fatalf("unlinked gate shared the limit: %v", out)
+	}
+	if out := scan(counterB, opsDays[1].ID); out["allowed"] != true {
+		t.Fatalf("next day linked entry: %v", out)
+	}
+	if out := scan(counterA, opsDays[1].ID); out["allowed"] != false {
+		t.Fatalf("next day second linked entry: %v", out)
+	}
+	// Unlinking restores the gate's own one-entry rule.
+	if rr := c.request(http.MethodPost, "/api/v1/ops/points/"+counterB, map[string]any{"entryGroup": ""}); rr.Code != http.StatusOK {
+		t.Fatalf("unlink: %s", rr.Body.String())
+	}
+	if out := scan(counterB, opsDays[0].ID); out["allowed"] != true {
+		t.Fatalf("unlinked gate after unlink: %v", out)
 	}
 }

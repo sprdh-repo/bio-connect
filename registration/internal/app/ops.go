@@ -632,7 +632,7 @@ func (a *App) opsPassDownload(w http.ResponseWriter, r *http.Request, principal 
 }
 
 type accessPoint struct {
-	ID, Name, Mode, Direction                    string
+	ID, Name, Mode, Direction, EntryGroup        string
 	AllowedCategories, AllowedDays               []string
 	AllowedRegistrationTypes                     []string
 	Capacity                                     *int
@@ -640,16 +640,16 @@ type accessPoint struct {
 }
 
 func pointMap(p accessPoint) map[string]any {
-	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "allowedRegistrationTypes": p.AllowedRegistrationTypes, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "active": p.Active}
+	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "allowedRegistrationTypes": p.AllowedRegistrationTypes, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "entryGroup": p.EntryGroup, "active": p.Active}
 }
 
 func scanPoint(row pgx.Row) (accessPoint, error) {
 	var p accessPoint
-	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active, &p.AllowedRegistrationTypes)
+	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active, &p.AllowedRegistrationTypes, &p.EntryGroup)
 	return p, err
 }
 
-const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types FROM access_points`
+const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group FROM access_points`
 
 func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPrincipal, rest string) {
 	rest = strings.TrimPrefix(rest, "/")
@@ -686,12 +686,22 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 		var in struct {
 			Active                   *bool
 			AllowedRegistrationTypes *[]string
+			AllowMultipleEntries     *bool
+			EntryGroup               *string
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		if in.Active == nil && in.AllowedRegistrationTypes == nil {
+		if in.Active == nil && in.AllowedRegistrationTypes == nil && in.AllowMultipleEntries == nil && in.EntryGroup == nil {
 			fail(w, 400, "provide a gate change")
+			return
+		}
+		if in.EntryGroup != nil {
+			group := strings.TrimSpace(*in.EntryGroup)
+			in.EntryGroup = &group
+		}
+		if msg := entryLimitError(valueOr(in.AllowMultipleEntries, p.AllowMultipleEntries), valueOr(in.EntryGroup, p.EntryGroup)); msg != "" {
+			fail(w, 400, msg)
 			return
 		}
 		if in.AllowedRegistrationTypes != nil {
@@ -708,7 +718,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 				types = *in.AllowedRegistrationTypes
 			}
 			var err error
-			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types`, p.ID, in.Active, types))
+			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types),allow_multiple_entries=COALESCE($4,allow_multiple_entries),entry_group=COALESCE($5,entry_group) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group`, p.ID, in.Active, types, in.AllowMultipleEntries, in.EntryGroup))
 			if err != nil {
 				return err
 			}
@@ -722,7 +732,12 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 				}
 			}
 			if in.AllowedRegistrationTypes != nil {
-				return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | registration types: "+strings.Join(p.AllowedRegistrationTypes, ","))
+				if err := a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | registration types: "+strings.Join(p.AllowedRegistrationTypes, ",")); err != nil {
+					return err
+				}
+			}
+			if in.AllowMultipleEntries != nil || in.EntryGroup != nil {
+				return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | "+entryLimitSummary(p))
 			}
 			return nil
 		})
@@ -760,7 +775,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 
 func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal opsPrincipal) {
 	var in struct {
-		Name, Mode, Direction                string
+		Name, Mode, Direction, EntryGroup    string
 		AllowedCategories, AllowedDays       []string
 		AllowedRegistrationTypes             []string
 		Capacity                             *int
@@ -772,6 +787,11 @@ func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal o
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Name == "" || len(in.Name) > 80 || (in.Mode != "enforce" && in.Mode != "log") || (in.Direction != "entry" && in.Direction != "exit" && in.Direction != "auto") {
 		fail(w, 400, "provide a gate name, mode and direction")
+		return
+	}
+	in.EntryGroup = strings.TrimSpace(in.EntryGroup)
+	if msg := entryLimitError(in.AllowMultipleEntries, in.EntryGroup); msg != "" {
+		fail(w, 400, msg)
 		return
 	}
 	if len(in.AllowedDays) == 0 {
@@ -795,22 +815,52 @@ func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal o
 			return
 		}
 	}
-	p := accessPoint{ID: id(), Name: in.Name, Mode: in.Mode, Direction: in.Direction, AllowedCategories: in.AllowedCategories, AllowedDays: in.AllowedDays, AllowedRegistrationTypes: in.AllowedRegistrationTypes, Capacity: in.Capacity, RequireCheckIn: in.RequireCheckIn, AllowMultipleEntries: in.AllowMultipleEntries, Active: true}
+	p := accessPoint{ID: id(), Name: in.Name, Mode: in.Mode, Direction: in.Direction, AllowedCategories: in.AllowedCategories, AllowedDays: in.AllowedDays, AllowedRegistrationTypes: in.AllowedRegistrationTypes, Capacity: in.Capacity, RequireCheckIn: in.RequireCheckIn, AllowMultipleEntries: in.AllowMultipleEntries, EntryGroup: in.EntryGroup, Active: true}
 	err := pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries,allowed_registration_types) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9,$10)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries, p.AllowedRegistrationTypes); err != nil {
+		if _, err := tx.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries,allowed_registration_types,entry_group) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9,$10,$11)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries, p.AllowedRegistrationTypes, p.EntryGroup); err != nil {
 			return err
 		}
 		types := strings.Join(p.AllowedRegistrationTypes, ",")
 		if types == "" {
 			types = "all"
 		}
-		return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_created", principal.Station, p.ID+" | "+p.Name+" | registration types: "+types)
+		return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_created", principal.Station, p.ID+" | "+p.Name+" | registration types: "+types+" | "+entryLimitSummary(p))
 	})
 	if err != nil {
 		fail(w, 503, "gate could not be created or recorded; check for a duplicate name")
 		return
 	}
 	respond(w, 201, map[string]any{"point": pointMap(p)})
+}
+
+// entryLimitError validates a gate's final entry settings. A shared entry
+// group only means something when the gate itself allows one entry.
+func entryLimitError(multiple bool, group string) string {
+	if len(group) > 60 {
+		return "entry group name is too long"
+	}
+	if multiple && group != "" {
+		return "linked gates must allow one entry only"
+	}
+	return ""
+}
+
+func entryLimitSummary(p accessPoint) string {
+	switch {
+	case p.AllowMultipleEntries:
+		return "entry limit: repeat entry"
+	case p.EntryGroup != "":
+		return "entry limit: one entry shared with group " + p.EntryGroup
+	default:
+		return "entry limit: one entry"
+	}
+}
+
+func valueOr[T any](v *T, fallback T) T {
+	if v != nil {
+		return *v
+	}
+	return fallback
 }
 
 type opsQuerier interface {
@@ -896,10 +946,21 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 				return findErr
 			}
 		}
-		inside, entries := false, 0
+		inside, entries, enteredAt := false, 0, ""
 		if findErr == nil {
 			if err := tx.QueryRow(r.Context(), `SELECT COALESCE((array_agg(direction ORDER BY created_at DESC,id DESC))[1]='entry',false),count(*) FILTER(WHERE direction='entry') FROM access_scans WHERE access_point_id=$1 AND attendee_id=$2 AND event_day=$3 AND decision='allow' AND voided_at IS NULL`, point.ID, p.AttendeeID, day).Scan(&inside, &entries); err != nil {
 				return err
+			}
+			if !point.AllowMultipleEntries && point.EntryGroup != "" {
+				// The point lock only covers this gate; the group lock serialises
+				// scans across linked gates. Every path takes the row lock first,
+				// so the two cannot deadlock.
+				if _, err := tx.Exec(r.Context(), `SELECT pg_advisory_xact_lock(hashtext('bc-entry-group:'||$1))`, point.EntryGroup); err != nil {
+					return err
+				}
+				if err := tx.QueryRow(r.Context(), `SELECT count(*),COALESCE((array_agg(p.name ORDER BY s.created_at,s.id))[1],'') FROM access_scans s JOIN access_points p ON p.id=s.access_point_id WHERE p.entry_group=$1 AND s.attendee_id=$2 AND s.event_day=$3 AND s.direction='entry' AND s.decision='allow' AND s.voided_at IS NULL`, point.EntryGroup, p.AttendeeID, day).Scan(&entries, &enteredAt); err != nil {
+					return err
+				}
 			}
 		}
 		direction := point.Direction
@@ -924,6 +985,9 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 			reason = "Badge-desk check-in is required first."
 		} else if direction == "entry" && !point.AllowMultipleEntries && entries > 0 {
 			reason = "This gate allows one entry only."
+			if enteredAt != "" && enteredAt != point.Name {
+				reason = "Already entered at " + enteredAt + "; linked gates allow one entry only."
+			}
 		} else if direction == "entry" && point.Capacity != nil {
 			_, n, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
 			if err != nil {
