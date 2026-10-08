@@ -32,9 +32,11 @@ class QrScannerScreen extends StatefulWidget {
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _camera = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    // Android remembers duplicates before applying the scan-window filter.
+    // Allow another read when a badge moves from outside into the frame.
+    detectionSpeed: DetectionSpeed.normal,
     formats: const [BarcodeFormat.qrCode],
   );
   late final _sweep = AnimationController(
@@ -52,9 +54,42 @@ class _QrScannerScreenState extends State<QrScannerScreen>
   String? _error;
   Timer? _clearError;
   bool _done = false;
+  Future<void> _cameraOperations = Future.value();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Permission dialogs can interrupt the initial camera start.
+    // Let that start finish before attempting another camera operation.
+    if (_done || !_camera.value.isInitialized) {
+      return;
+    }
+    final resume = state == AppLifecycleState.resumed;
+    // On resume, also retry after granting permission in phone settings.
+    if (!resume && !_camera.value.hasCameraPermission) return;
+    // Serialize stop/start so a quick return cannot race camera shutdown.
+    _cameraOperations = _cameraOperations.then((_) async {
+      if (!mounted || _done) return;
+      try {
+        if (resume) {
+          await _camera.start();
+        } else {
+          await _camera.stop();
+        }
+      } on MobileScannerException catch (error) {
+        debugPrint('Scanner lifecycle update failed: $error');
+      }
+    });
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clearError?.cancel();
     _camera.dispose();
     _sweep.dispose();
