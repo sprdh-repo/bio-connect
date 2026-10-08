@@ -123,3 +123,12 @@ test('occupancy polling reflects policy changes from another gate station',async
   const c=await gateClient(),p=c.intervals[0]();c.respond(1,{insideCount:1,inside:[],point:{active:false,mode:'enforce',capacity:5}});await p;
   assert.equal(c.element('#gate-mode').textContent,'enforce mode · Closed');assert.equal(c.element('#gate-toggle').textContent,'Open gate');assert.match(c.element('#gate-count').textContent,/1 \/ 5/);
 });
+test('roster filters by category and matches category in text search',()=>{
+  const c=client();
+  c.run(`state.categories=[{id:'student',label:'Student'},{id:'faculty',label:'Faculty'}];state.roster=[{name:'Asha',category:'Student',reference:'S1',qrId:'s1'},{name:'Binu',category:'Faculty',reference:'F1',qrId:'f1'}];renderRoster()`);
+  assert.match(c.element('#workspace').innerHTML,/<option value="">All categories<\/option><option>Student<\/option><option>Faculty<\/option>/);
+  c.element('#roster-category').value='Faculty';c.element('#roster-category').listeners.change();
+  assert.match(c.element('#roster-body').innerHTML,/Binu/);assert.doesNotMatch(c.element('#roster-body').innerHTML,/Asha/);
+  c.element('#roster-category').value='';c.element('#roster-search').value='stud';c.element('#roster-search').listeners.input();
+  assert.match(c.element('#roster-body').innerHTML,/Asha/);assert.doesNotMatch(c.element('#roster-body').innerHTML,/Binu/);
+});
