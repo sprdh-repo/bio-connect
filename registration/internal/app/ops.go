@@ -30,6 +30,7 @@ type opsPrincipal struct {
 
 type opsPerson struct {
 	AttendeeID, RegistrationID, Reference, QRID, Name, Email, Phone, Designation, Institution, CategoryID, Category string
+	RegistrationType                                                                                                string
 	CheckedIn, CheckedOut                                                                                           bool
 	CheckedInAt, CheckedInBy, CheckedOutAt, CheckedOutBy                                                            any
 }
@@ -40,7 +41,8 @@ func (p opsPerson) json() map[string]any {
 		"qrId": p.QRID, "name": p.Name, "email": p.Email, "phone": p.Phone,
 		"designation": p.Designation, "institution": p.Institution, "categoryId": p.CategoryID,
 		"category": p.Category, "checkedIn": p.CheckedIn, "checkedOut": p.CheckedOut,
-		"checkedInAt": p.CheckedInAt, "checkedInBy": p.CheckedInBy,
+		"registrationType": p.RegistrationType,
+		"checkedInAt":      p.CheckedInAt, "checkedInBy": p.CheckedInBy,
 		"checkedOutAt": p.CheckedOutAt, "checkedOutBy": p.CheckedOutBy,
 	}
 }
@@ -232,6 +234,7 @@ func (a *App) opsConfig(w http.ResponseWriter, r *http.Request, p opsPrincipal) 
 }
 
 const opsPersonSQL = `SELECT a.id,r.id,p.number,p.qr_id,a.name,a.email,a.phone,a.designation,r.institution,r.category_id,c.label,
+	CASE WHEN r.free_link_id IS NOT NULL THEN 'free_link' WHEN r.complimentary THEN 'complimentary' ELSE 'paid' END,
  oa.attendee_id IS NOT NULL,oa.checked_out_at IS NOT NULL,oa.checked_in_at,oa.checked_in_by,oa.checked_out_at,oa.checked_out_by
  FROM attendees a JOIN registrations r ON r.id=a.registration_id JOIN categories c ON c.id=r.category_id
  JOIN passes p ON p.attendee_id=a.id AND p.revoked_at IS NULL
@@ -240,7 +243,7 @@ const opsPersonSQL = `SELECT a.id,r.id,p.number,p.qr_id,a.name,a.email,a.phone,a
 
 func scanOpsPerson(row pgx.Row) (opsPerson, error) {
 	var p opsPerson
-	err := row.Scan(&p.AttendeeID, &p.RegistrationID, &p.Reference, &p.QRID, &p.Name, &p.Email, &p.Phone, &p.Designation, &p.Institution, &p.CategoryID, &p.Category, &p.CheckedIn, &p.CheckedOut, &p.CheckedInAt, &p.CheckedInBy, &p.CheckedOutAt, &p.CheckedOutBy)
+	err := row.Scan(&p.AttendeeID, &p.RegistrationID, &p.Reference, &p.QRID, &p.Name, &p.Email, &p.Phone, &p.Designation, &p.Institution, &p.CategoryID, &p.Category, &p.RegistrationType, &p.CheckedIn, &p.CheckedOut, &p.CheckedInAt, &p.CheckedInBy, &p.CheckedOutAt, &p.CheckedOutBy)
 	return p, err
 }
 
@@ -631,21 +634,22 @@ func (a *App) opsPassDownload(w http.ResponseWriter, r *http.Request, principal 
 type accessPoint struct {
 	ID, Name, Mode, Direction                    string
 	AllowedCategories, AllowedDays               []string
+	AllowedRegistrationTypes                     []string
 	Capacity                                     *int
 	RequireCheckIn, AllowMultipleEntries, Active bool
 }
 
 func pointMap(p accessPoint) map[string]any {
-	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "active": p.Active}
+	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "allowedRegistrationTypes": p.AllowedRegistrationTypes, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "active": p.Active}
 }
 
 func scanPoint(row pgx.Row) (accessPoint, error) {
 	var p accessPoint
-	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active)
+	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active, &p.AllowedRegistrationTypes)
 	return p, err
 }
 
-const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active FROM access_points`
+const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types FROM access_points`
 
 func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPrincipal, rest string) {
 	rest = strings.TrimPrefix(rest, "/")
@@ -679,25 +683,53 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 		return
 	}
 	if len(parts) == 1 && r.Method == http.MethodPost {
-		var in struct{ Active bool }
+		var in struct {
+			Active                   *bool
+			AllowedRegistrationTypes *[]string
+		}
 		if !decode(w, r, &in) {
 			return
 		}
+		if in.Active == nil && in.AllowedRegistrationTypes == nil {
+			fail(w, 400, "provide a gate change")
+			return
+		}
+		if in.AllowedRegistrationTypes != nil {
+			for _, kind := range *in.AllowedRegistrationTypes {
+				if kind != "paid" && kind != "complimentary" && kind != "free_link" {
+					fail(w, 400, "invalid registration type")
+					return
+				}
+			}
+		}
 		err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
-			if _, err := tx.Exec(r.Context(), `UPDATE access_points SET active=$2 WHERE id=$1`, p.ID, in.Active); err != nil {
+			var types any
+			if in.AllowedRegistrationTypes != nil {
+				types = *in.AllowedRegistrationTypes
+			}
+			var err error
+			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types`, p.ID, in.Active, types))
+			if err != nil {
 				return err
 			}
-			kind := "gate_closed"
-			if in.Active {
-				kind = "gate_opened"
+			if in.Active != nil {
+				kind := "gate_closed"
+				if *in.Active {
+					kind = "gate_opened"
+				}
+				if err := a.opsLog(r.Context(), tx, "", opsToday(a.Now()), kind, principal.Station, p.ID+" | "+p.Name); err != nil {
+					return err
+				}
 			}
-			return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), kind, principal.Station, p.ID+" | "+p.Name)
+			if in.AllowedRegistrationTypes != nil {
+				return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | registration types: "+strings.Join(p.AllowedRegistrationTypes, ","))
+			}
+			return nil
 		})
 		if err != nil {
 			fail(w, 503, "gate update failed")
 			return
 		}
-		p.Active = in.Active
 		respond(w, 200, map[string]any{"point": pointMap(p)})
 		return
 	}
@@ -872,6 +904,8 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 			reason = "This gate is not open for the selected day."
 		} else if direction == "entry" && len(point.AllowedCategories) > 0 && !contains(point.AllowedCategories, p.CategoryID) {
 			reason = "This badge category is not allowed here."
+		} else if direction == "entry" && len(point.AllowedRegistrationTypes) > 0 && !contains(point.AllowedRegistrationTypes, p.RegistrationType) {
+			reason = "This registration type is not allowed here."
 		} else if direction == "entry" && point.RequireCheckIn && !p.CheckedIn {
 			reason = "Badge-desk check-in is required first."
 		} else if direction == "entry" && !point.AllowMultipleEntries && entries > 0 {

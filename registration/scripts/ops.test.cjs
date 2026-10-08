@@ -6,7 +6,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../internal/ap
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 function client(){
   const elements=new Map(),requests=[],intervals=[];let prints=0,uuid=0;
-  function element(selector){if(!elements.has(selector))elements.set(selector,{value:'',dataset:{},textContent:'',innerHTML:'',hidden:false,disabled:false,listeners:{},classList:{add(){},remove(){},toggle(){}},addEventListener(n,f){this.listeners[n]=f},focus(){document.activeElement=this},blur(){},showModal(){this.open=true},close(){this.open=false},setAttribute(){},append(){},remove(){},decode:async()=>{}});return elements.get(selector)}
+  function element(selector){if(!elements.has(selector))elements.set(selector,{value:'',dataset:{},textContent:'',innerHTML:'',hidden:false,disabled:false,listeners:{},classList:{add(){},remove(){},toggle(){}},addEventListener(n,f){this.listeners[n]=f},focus(){document.activeElement=this},blur(){},showModal(){this.open=true},close(){this.open=false},setAttribute(){},append(){},before(){},remove(){},decode:async()=>{}});return elements.get(selector)}
   const document={querySelector:element,querySelectorAll:s=>s==='#scan-form input, #scan-form button'?[element('#scan-code'),element('#camera-open'),element('submit')]:[],createElement:()=>element('badge'),body:element('body'),activeElement:null};
   const context=vm.createContext({document,window:{addEventListener(){},print(){prints++}},navigator:{},location:{hash:''},history:{replaceState(){}},sessionStorage:{},innerWidth:1000,Intl,Date,Image:function(){return element('image')},Badge:{png:async()=> 'png'},crypto:{randomUUID:()=>`id-${++uuid}`},setTimeout:()=>0,clearTimeout(){},setInterval:f=>intervals.push(f),confirm:()=>true,prompt:()=> 'reason',fetch:(url,options)=>{const d=deferred();requests.push({url,options,...d});return d.promise}});
   vm.runInContext(source,context);
@@ -34,6 +34,22 @@ test('desk scans serialize and stale responses do not print or change results',a
 });
 async function gateClient(){const c=client();c.run("state.view='gates'");const opening=c.run("operateGate({id:'g',name:'Gate',mode:'enforce',active:true,capacity:10})");c.respond(0,{insideCount:0,inside:[]});await opening;return c}
 function submit(c,code='a'){c.element('#scan-code').value=code;c.element('#scan-form').listeners.submit({preventDefault(){},submitter:c.element('submit')})}
+test('gate scan labels distinguish paid, complimentary and free link on grants and denials',async()=>{
+  for(const [type,label] of [['paid','Paid'],['complimentary','Complimentary'],['free_link','Free link']]){
+    for(const allowed of [true,false]){
+      const c=await gateClient();submit(c);c.respond(1,{allowed,insideCount:1,person:{name:'Attendee',registrationType:type}});await tick();
+      assert.ok(c.element('#scan-result').innerHTML.includes('Registration: '+label));
+      assert.ok(c.element('#scan-result').innerHTML.includes(allowed?'ACCESS GRANTED':'ACCESS DENIED'));
+    }
+  }
+});
+test('registration filter saves only selected types without toggling the gate',async()=>{
+  const c=await gateClient();c.context.FormData=class{getAll(name){assert.equal(name,'registrationType');return ['complimentary','free_link']}};
+  const saving=c.element('#gate-registration-form').listeners.submit({preventDefault(){},target:{},submitter:c.element('save')});
+  assert.deepEqual(JSON.parse(c.requests[1].options.body),{allowedRegistrationTypes:['complimentary','free_link']});
+  c.respond(1,{point:{allowedRegistrationTypes:['complimentary','free_link'],active:true}});await saving;
+  assert.equal(c.element('#gate-registration-summary').textContent,'Current: Complimentary · Free link');
+});
 test('gate transport retry uses one logical request ID and captured day',async()=>{
   const c=await gateClient();submit(c);submit(c,'b');assert.equal(c.requests.length,2);
   c.requests[1].reject(new TypeError('network'));await tick();assert.equal(c.requests.length,3);

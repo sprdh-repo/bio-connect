@@ -62,6 +62,11 @@ The session lasts 12 hours and all writes carry CSRF protection.
 - Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
 
 Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
+In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.
+Existing gates allow every registration type; leaving all types unchecked also allows every type, like the category filter.
+The gate scan result labels the attendee's registration type, whether entry is granted or denied.
+This classification comes from the registration's complimentary/free-link records, not the badge category or fee amount.
+Filter changes are audited and apply to entry only; log-only gates report excluded types without denying access.
 Revoking a pass does not remove its attendee from occupancy; the historical badge can still identify them for exit, but cannot admit them again at an enforcing gate.
 Attendance changes, gate decisions and gate creation/open/close changes commit with their activity audit, or fail without committing the change.
 Successful desk lookups, kiosk scans and invalid scan attempts are also audited.
