@@ -37,7 +37,7 @@ Then open <http://localhost:4173>.
   Only approved exhibitors are included; company names, descriptions and logos update without editing the site.
   Loading, empty, error/retry, search and logo fallback states are handled in `script.js`.
 - `sponsors.html` - equal-weight sponsor cards.
-  SBI, KMTC, the MEA States Division and KIMSHEALTH lead at the organisers' request; the rest (CSIR-NIIST, Federal Bank, Haier Biomedical & Helixpro, HLL Lifecare, Kerala Rubber) follow alphabetically.
+  SBI, KMTC, the MEA States Division and KIMSHEALTH lead at the organisers' request; the rest (CSIR-NIIST, Federal Bank, Haier Biomedical & Helixpro, HLL Lifecare, Kerala Grameena Bank, Kerala Rubber) follow alphabetically.
   Logos are the organisers' supplied files, trimmed into `assets/*-logo.png`; profile copy comes from each sponsor's official website.
 - `product-launch.html` - Kerala Startup Mission's Product Launch details, eligibility, focus areas and closed application deadline.
 - `404.html` - served by CloudFront for any unknown path.
