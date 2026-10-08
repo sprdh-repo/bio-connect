@@ -17,6 +17,22 @@ import (
 // it from the console (see the per-pass "send" and "resend" review actions),
 // so nobody receives a pass the team has not decided to send.
 
+// keepsBlanks reports whether every email, phone or designation p leaves blank
+// was already blank on the record. Such a correction need not supply them;
+// a value already on record still cannot be cleared, and a holder with no
+// email keeps WhatsApp consent if they had it, their only way to get the pass.
+func keepsBlanks(old, p Attendee) bool {
+	if strings.TrimSpace(p.Email) == "" && old.WhatsAppConsent && !p.WhatsAppConsent {
+		return false
+	}
+	for _, f := range [][2]string{{old.Email, p.Email}, {old.Phone, p.Phone}, {old.Designation, p.Designation}} {
+		if strings.TrimSpace(f[1]) == "" && f[0] != "" {
+			return false
+		}
+	}
+	return true
+}
+
 // UpdateAttendee corrects one attendee's details. Their active pass, if any,
 // stays valid and keeps its number and QR; a changed name or designation is
 // rendered onto it the next time it is downloaded, and queued deliveries to a
@@ -32,6 +48,10 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 	if e = tx.QueryRow(ctx, `SELECT r.status,c.kind,c.id FROM registrations r JOIN categories c ON c.id=r.category_id WHERE r.id=$1 FOR UPDATE OF r`, rid).Scan(&status, &kind, &categoryID); e != nil {
 		return e
 	}
+	var old Attendee
+	if e = tx.QueryRow(ctx, "SELECT name,email,phone,designation,whatsapp_consent FROM attendees WHERE id=$1 AND registration_id=$2 AND removed_at IS NULL", aid, rid).Scan(&old.Name, &old.Email, &old.Phone, &old.Designation, &old.WhatsAppConsent); e != nil {
+		return errors.New("attendee not found on this registration")
+	}
 	// Only staff correct attendees, so the phone is optional here.
 	if downloadOnly(categoryID) {
 		if !guestAttendeeOK(&p) {
@@ -41,15 +61,14 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 		if !spotAttendeeOK(&p) {
 			return errOtherAttendee
 		}
+	} else if keepsBlanks(old, p) && spotAttendeeOK(&p) {
+		// A walk-in or staff entry recorded without an email, phone or
+		// designation can be corrected without inventing one.
 	} else if !attendeeOK(&p, true, emailOptional(categoryID), foodOnly(categoryID)) {
 		return attendeeError(true, emailOptional(categoryID), foodOnly(categoryID))
 	}
 	if status == "cancelled" {
 		return ErrConflict
-	}
-	var old Attendee
-	if e = tx.QueryRow(ctx, "SELECT name,email,phone,designation,whatsapp_consent FROM attendees WHERE id=$1 AND registration_id=$2 AND removed_at IS NULL", aid, rid).Scan(&old.Name, &old.Email, &old.Phone, &old.Designation, &old.WhatsAppConsent); e != nil {
-		return errors.New("attendee not found on this registration")
 	}
 	var dup bool
 	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM attendees WHERE registration_id=$1 AND id<>$2 AND removed_at IS NULL AND $3<>'' AND lower(email)=$3)", rid, aid, p.Email).Scan(&dup); e != nil {

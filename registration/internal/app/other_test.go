@@ -66,3 +66,35 @@ func TestOtherPassNeedsOnlyAName(t *testing.T) {
 		}
 	}
 }
+
+// A walk-in recorded with only a name can be corrected without inventing an
+// email, phone or designation; a value already on record cannot be cleared.
+func TestUpdateAttendeeKeepsBlanks(t *testing.T) {
+	a := mustApp(t)
+	ctx := context.Background()
+	sid, _ := addStaff(t, a, "desk@bioconnect.test", "reviewer")
+	in := staffInput(RegistrationInput{CategoryID: "official", Institution: "Dept", Attendees: []Attendee{{Name: "Walk In"}}}, "complimentary")
+	in.Spot = true
+	rid, err := a.StaffCreate(ctx, in, key(1), nil, sid)
+	if err != nil {
+		t.Fatalf("spot entry: %v", err)
+	}
+	r, _ := a.registration(ctx, rid)
+	aid := r.Attendees[0].ID
+	if err := a.UpdateAttendee(ctx, rid, aid, sid, Attendee{Name: "Walk In Corrected"}); err != nil {
+		t.Fatalf("correcting the name alone: %v", err)
+	}
+	if err := a.UpdateAttendee(ctx, rid, aid, sid, Attendee{Name: "Walk In Corrected", Email: "bad"}); err == nil {
+		t.Fatal("invalid email accepted")
+	}
+	if err := a.UpdateAttendee(ctx, rid, aid, sid, Attendee{Name: "Walk In Corrected", Phone: "+919876543210"}); err != nil {
+		t.Fatalf("adding a phone only: %v", err)
+	}
+	if err := a.UpdateAttendee(ctx, rid, aid, sid, Attendee{Name: "Walk In Corrected"}); err == nil {
+		t.Fatal("cleared a phone already on record")
+	}
+	r, _ = a.registration(ctx, rid)
+	if p := r.Attendees[0]; p.Name != "Walk In Corrected" || p.Phone != "+919876543210" || p.Email != "" {
+		t.Fatalf("attendee = %+v", p)
+	}
+}

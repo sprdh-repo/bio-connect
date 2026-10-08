@@ -302,12 +302,16 @@ func TestOpsPaidSpotRegistrationVerifiesAndDeduplicatesReference(t *testing.T) {
 	}
 	body["email"] = "another.spot@example.com"
 	body["name"] = "Another Person"
-	duplicate := c.request(http.MethodPost, "/api/v1/ops/spot-register", body)
-	if duplicate.Code != http.StatusBadRequest {
-		t.Fatalf("duplicate payment reference: %d %s", duplicate.Code, duplicate.Body.String())
+	// One payment may cover a group, so the reference can be shared.
+	shared := c.request(http.MethodPost, "/api/v1/ops/spot-register", body)
+	if shared.Code != http.StatusCreated {
+		t.Fatalf("shared payment reference: %d %s", shared.Code, shared.Body.String())
 	}
-	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE verified_reference=$1", "SBI-SPOT-0042"); n != 1 {
+	if n := count(t, a, "SELECT count(*) FROM payment_submissions WHERE verified_reference=$1", "SBI-SPOT-0042"); n != 2 {
 		t.Fatalf("verified payment rows = %d", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE action='reference_reused'"); n != 1 {
+		t.Fatalf("reuse audits = %d", n)
 	}
 }
 

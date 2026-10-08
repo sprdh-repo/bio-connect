@@ -21,8 +21,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // These tests need a throwaway PostgreSQL. Point TEST_DATABASE_URL at one; the
@@ -679,7 +677,7 @@ func TestCorrectionRequestedThenResubmit(t *testing.T) {
 	}
 }
 
-func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
+func TestBankReferenceMayBeShared(t *testing.T) {
 	a := mustApp(t)
 	ctx := context.Background()
 	sid, _ := addStaff(t, a, "reviewer@bioconnect.test", "reviewer")
@@ -688,39 +686,38 @@ func TestApprovedBankReferenceCannotBeReused(t *testing.T) {
 	if err := tryApprove(a, ridA, sid, "approve_send", "SBISHARED", dueNow(t, a, ridA)); err != nil {
 		t.Fatal(err)
 	}
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE action='reference_reused'"); n != 0 {
+		t.Fatalf("first use of a reference audited as reused: %d", n)
+	}
 	inB := delegateInput("industry")
 	inB.Attendees[0].Email = "second@example.com"
 	inB.Email = "second@example.com"
 	ridB, _, _ := a.Create(ctx, inB, key(2), nil)
 	payDelegate(t, a, ridB, dueNow(t, a, ridB))
-	err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", dueNow(t, a, ridB))
-	if err == nil {
-		t.Fatal("reused an already-approved bank transaction reference")
+	if err := tryApprove(a, ridB, sid, "approve_send", "SBISHARED", dueNow(t, a, ridB)); err != nil {
+		t.Fatalf("one payment covering two registrations was refused: %v", err)
 	}
-	// The reviewer must see which registration holds the reference, not the
-	// generic database-failure text publicError substitutes for SQL errors.
+	if status(t, a, ridB) != "approved" {
+		t.Fatalf("B = %s, want approved", status(t, a, ridB))
+	}
+	// The reuse is recorded against B, naming the registration that already
+	// holds the reference, so a reused receipt can still be traced.
 	regA, _ := a.registration(ctx, ridA)
-	if msg := publicError(err); !strings.Contains(msg, "SBISHARED") || !strings.Contains(msg, regA.Reference) {
-		t.Fatalf("message = %q, want the reference and %s", msg, regA.Reference)
-	}
-	if status(t, a, ridB) != "awaiting_review" {
-		t.Fatalf("B advanced despite duplicate reference: %s", status(t, a, ridB))
+	var detail string
+	if err := a.DB.QueryRow(ctx, "SELECT detail FROM audit_events WHERE action='reference_reused' AND registration_id=$1", ridB).Scan(&detail); err != nil || !strings.Contains(detail, "SBISHARED") || !strings.Contains(detail, regA.Reference) {
+		t.Fatalf("reuse audit = %q, %v", detail, err)
 	}
 
-	// Staff entry with a paid, already-approved reference gets the same message.
+	// Staff entry (console or spot desk) may share the reference too.
 	in := staffInput(delegateInput("industry"), "paid")
 	in.Attendees[0].Email, in.Email = "third@example.com", "third@example.com"
 	in.VerifiedReference, in.VerifiedDate, in.VerifiedAmountPaise = "SBISHARED", today(a), dueNow(t, a, ridB)
-	if _, err := a.StaffCreate(ctx, in, key(3), nil, sid); err == nil || !strings.Contains(publicError(err), regA.Reference) {
-		t.Fatalf("staff entry with a used reference: %v", err)
+	ridC, err := a.StaffCreate(ctx, in, key(3), nil, sid)
+	if err != nil {
+		t.Fatalf("staff entry with a shared reference: %v", err)
 	}
-}
-
-// A unique violation from a concurrent approval is reported in plain words.
-func TestPaymentVerifyErrorHidesDatabaseText(t *testing.T) {
-	got := paymentVerifyError(&pgconn.PgError{Code: "23505", ConstraintName: "approved_transaction"})
-	if msg := publicError(got); !strings.Contains(msg, "already approved") && !strings.Contains(msg, "just approved") {
-		t.Fatalf("message = %q", msg)
+	if n := count(t, a, "SELECT count(*) FROM audit_events WHERE action='reference_reused' AND registration_id=$1", ridC); n != 1 {
+		t.Fatalf("staff reuse audits = %d, want 1", n)
 	}
 }
 

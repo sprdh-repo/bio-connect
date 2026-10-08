@@ -135,15 +135,15 @@ func (a *App) staffCreate(ctx context.Context, tx pgx.Tx, in StaffRegistrationIn
 		return "", e
 	}
 	if in.Payment == "paid" {
-		if e = referenceFree(ctx, tx, ref); e != nil {
-			return "", e
-		}
 		_, e = tx.Exec(ctx, `INSERT INTO payment_submissions(
 			id,registration_id,bank_reference,payment_date,amount_paise,
 			verified_at,verified_by,verified_reference,verified_date,verified_amount_paise,beneficiary_confirmed
 		) VALUES($1,$2,$3,$4,$5,now(),$6,$3,$4,$5,true)`, id(), rid, ref, date, in.VerifiedAmountPaise, staff)
 		if e != nil {
-			return "", paymentVerifyError(e)
+			return "", e
+		}
+		if e = noteReusedReference(ctx, tx, staff, rid, ref); e != nil {
+			return "", e
 		}
 		if in.VerifiedAmountPaise != quoted {
 			if e = audit(ctx, tx, staff, rid, "amount_accepted", amountOverride(in.VerifiedAmountPaise, quoted, in.Note)); e != nil {

@@ -106,11 +106,11 @@ func TestStaffPaidExhibitorPartialRosterAndSend(t *testing.T) {
 		t.Fatalf("add attendee without phone: %v", err)
 	}
 
-	// The same bank reference cannot confirm a second registration.
+	// One payment may confirm a second registration (a group paying together).
 	again := in
 	again.Institution = "Another Lab"
-	if _, err := a.StaffCreate(ctx, again, key(3), nil, sid); err == nil {
-		t.Fatal("bank reference reused")
+	if _, err := a.StaffCreate(ctx, again, key(3), nil, sid); err != nil {
+		t.Fatalf("shared bank reference refused: %v", err)
 	}
 }
 
