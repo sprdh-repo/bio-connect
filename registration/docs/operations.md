@@ -68,6 +68,11 @@ Existing gates allow every registration type; leaving all types unchecked also a
 The gate scan result labels the attendee's registration type, whether entry is granted or denied.
 This classification comes from the registration's complimentary/free-link records, not the badge category or fee amount.
 Filter changes are audited and apply to entry only; log-only gates report excluded types without denying access.
+When an enforcing gate denies a known attendee, the scan result offers **Allow anyway**.
+It asks for a reason, then records a separate allowed scan linked to the denial, so occupancy, entry limits and gate totals count the attendee as entered; the denial stays in the denied count.
+Each denial can be overridden once, and only while it is that badge's latest scan at the gate.
+Overrides appear in the activity audit as **Gate manual override** with the station and reason.
+Unknown codes cannot be overridden; register the attendee at the spot desk instead.
 Revoking a pass does not remove its attendee from occupancy; the historical badge can still identify them for exit, but cannot admit them again at an enforcing gate.
 Attendance changes, gate decisions and gate creation/open/close changes commit with their activity audit, or fail without committing the change.
 Successful desk lookups, kiosk scans and invalid scan attempts are also audited.

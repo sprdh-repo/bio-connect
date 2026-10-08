@@ -725,3 +725,79 @@ func TestOpsLinkedGatesShareOneEntry(t *testing.T) {
 		t.Fatalf("unlinked gate after unlink: %v", out)
 	}
 }
+
+func TestOpsGateManualOverrideAdmitsDeniedAttendee(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Hall gate", "venue-passcode")
+	qr := seedOpsPass(t, a, "ops-override@example.com")
+	day := opsDays[0].ID
+	rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{"name": "Hall", "mode": "enforce", "direction": "auto", "requireCheckIn": true})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create gate: %s", rr.Body.String())
+	}
+	gate := decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	scan := func(code string) map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": code, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	override := func(scanID, reason string) *httptest.ResponseRecorder {
+		return c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/override", map[string]any{"scanId": scanID, "reason": reason})
+	}
+
+	denied := scan(qr)
+	if denied["allowed"] != false || !strings.Contains(denied["reason"].(string), "check-in") {
+		t.Fatalf("scan before check-in: %v", denied)
+	}
+	if rr := override(denied["scanId"].(string), " "); rr.Code != http.StatusBadRequest {
+		t.Fatalf("override without reason: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = override(denied["scanId"].(string), "VIP escorted by organiser")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("override: %d %s", rr.Code, rr.Body.String())
+	}
+	allowed := decodeOpsResponse(t, rr)
+	if allowed["allowed"] != true || allowed["override"] != true || allowed["direction"] != "entry" || allowed["insideCount"] != float64(1) {
+		t.Fatalf("override result: %v", allowed)
+	}
+	// A transport retry returns the recorded override instead of entering again.
+	retry := override(denied["scanId"].(string), "VIP escorted by organiser")
+	if retry.Code != http.StatusOK || decodeOpsResponse(t, retry)["scanId"] != allowed["scanId"] {
+		t.Fatalf("override retry: %d %s", retry.Code, retry.Body.String())
+	}
+	if n := count(t, a, "SELECT count(*) FROM access_scans WHERE access_point_id=$1 AND decision='allow'", gate); n != 1 {
+		t.Fatalf("allowed scans after retry = %d", n)
+	}
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='gate_override' AND detail LIKE '%VIP escorted%'"); n != 1 {
+		t.Fatalf("override audit rows = %d", n)
+	}
+	if rr := override(allowed["scanId"].(string), "again"); rr.Code != http.StatusConflict {
+		t.Fatalf("override of an allowed scan: %d %s", rr.Code, rr.Body.String())
+	}
+	// The overridden entry counts: the auto gate now lets the attendee out.
+	if out := scan(qr); out["allowed"] != true || out["direction"] != "exit" {
+		t.Fatalf("exit after override: %v", out)
+	}
+	if rr := override(denied["scanId"].(string)+"x", "unknown"); rr.Code != http.StatusNotFound {
+		t.Fatalf("override of unknown scan: %d %s", rr.Code, rr.Body.String())
+	}
+	stale := scan(qr)
+	if stale["allowed"] != false {
+		t.Fatalf("re-entry before check-in: %v", stale)
+	}
+	latest := scan(qr)
+	if rr := override(stale["scanId"].(string), "stale denial"); rr.Code != http.StatusConflict {
+		t.Fatalf("override of a superseded denial: %d %s", rr.Code, rr.Body.String())
+	}
+	if rr := override(latest["scanId"].(string), "re-entry approved"); rr.Code != http.StatusOK {
+		t.Fatalf("override of latest denial: %d %s", rr.Code, rr.Body.String())
+	}
+	unknown := scan("BC26NOPASS")
+	if rr := override(unknown["scanId"].(string), "no pass"); rr.Code != http.StatusConflict {
+		t.Fatalf("override without a pass: %d %s", rr.Code, rr.Body.String())
+	}
+}

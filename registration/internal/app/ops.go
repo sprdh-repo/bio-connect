@@ -241,6 +241,9 @@ const opsPersonSQL = `SELECT a.id,r.id,p.number,p.qr_id,a.name,a.email,a.phone,a
  LEFT JOIN ops_attendance oa ON oa.attendee_id=a.id AND oa.event_day=$1::date
  WHERE r.status='approved' AND a.removed_at IS NULL AND `
 
+// opsHistorySQL also matches revoked passes and removed attendees.
+var opsHistorySQL = strings.Replace(strings.Replace(opsPersonSQL, " AND p.revoked_at IS NULL", "", 1), "r.status='approved' AND a.removed_at IS NULL AND ", "", 1)
+
 func scanOpsPerson(row pgx.Row) (opsPerson, error) {
 	var p opsPerson
 	err := row.Scan(&p.AttendeeID, &p.RegistrationID, &p.Reference, &p.QRID, &p.Name, &p.Email, &p.Phone, &p.Designation, &p.Institution, &p.CategoryID, &p.Category, &p.RegistrationType, &p.CheckedIn, &p.CheckedOut, &p.CheckedInAt, &p.CheckedInBy, &p.CheckedOutAt, &p.CheckedOutBy)
@@ -766,6 +769,10 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 		a.opsGateScan(w, r, principal, p)
 		return
 	}
+	if len(parts) == 2 && parts[1] == "override" && r.Method == http.MethodPost {
+		a.opsGateOverride(w, r, principal, p)
+		return
+	}
 	if len(parts) == 2 && parts[1] == "entries" && r.Method == http.MethodGet {
 		a.opsGateEntries(w, r, p)
 		return
@@ -939,9 +946,7 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 		}
 		if !valid {
 			// Historical badges may identify an occupant for EXIT only.
-			historySQL := strings.Replace(opsPersonSQL, " AND p.revoked_at IS NULL", "", 1)
-			historySQL = strings.Replace(historySQL, "r.status='approved' AND a.removed_at IS NULL AND ", "", 1)
-			p, findErr = scanOpsPerson(tx.QueryRow(r.Context(), historySQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3) ORDER BY p.version DESC LIMIT 1`, day, opsScanCode(in.Code), opsReference(in.Code)))
+			p, findErr = scanOpsPerson(tx.QueryRow(r.Context(), opsHistorySQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3) ORDER BY p.version DESC LIMIT 1`, day, opsScanCode(in.Code), opsReference(in.Code)))
 			if findErr != nil && !errors.Is(findErr, pgx.ErrNoRows) {
 				return findErr
 			}
@@ -1052,6 +1057,99 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 }
 
 var errOpsRequestConflict = errors.New("request identifier already used")
+
+// opsGateOverride admits an attendee whose scan the gate denied. Staff give a
+// reason, and the admission is a separate allowed scan linked to the denial, so
+// reports, occupancy and later entry limits treat the attendee as entered.
+func (a *App) opsGateOverride(w http.ResponseWriter, r *http.Request, principal opsPrincipal, point accessPoint) {
+	var in struct{ ScanID, Reason string }
+	if !decode(w, r, &in) {
+		return
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if len([]rune(in.Reason)) < 3 || len(in.Reason) > 200 {
+		fail(w, 400, "give a reason of 3 to 200 characters")
+		return
+	}
+	var out map[string]any
+	status, message := 0, ""
+	err := pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		// Same lock as a scan, so the denial cannot be overtaken concurrently.
+		var err error
+		point, err = scanPoint(tx.QueryRow(r.Context(), pointSelect+` WHERE id=$1 FOR UPDATE`, point.ID))
+		if err != nil {
+			return err
+		}
+		var saved []byte
+		err = tx.QueryRow(r.Context(), `SELECT response FROM access_scans WHERE override_of=$1 AND access_point_id=$2`, in.ScanID, point.ID).Scan(&saved)
+		if err == nil {
+			// A retried request returns the override already recorded.
+			return json.Unmarshal(saved, &out)
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		var attendee, day, reference, direction, decision, denied string
+		var voided bool
+		var deniedAt time.Time
+		err = tx.QueryRow(r.Context(), `SELECT COALESCE(attendee_id,''),event_day::text,reference,direction,decision,reason,voided_at IS NOT NULL,created_at FROM access_scans WHERE id=$1 AND access_point_id=$2`, in.ScanID, point.ID).Scan(&attendee, &day, &reference, &direction, &decision, &denied, &voided, &deniedAt)
+		if errors.Is(err, pgx.ErrNoRows) {
+			status, message = 404, "scan not found at this gate"
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		switch {
+		case decision != "deny" || voided:
+			status, message = 409, "only a denied scan can be overridden"
+		case attendee == "":
+			status, message = 409, "no pass matches this scan; register the attendee at the spot desk first"
+		}
+		if status != 0 {
+			return nil
+		}
+		var later bool
+		if err := tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM access_scans WHERE access_point_id=$1 AND attendee_id=$2 AND event_day=$3 AND voided_at IS NULL AND id<>$4 AND (created_at,id)>($5,$4))`, point.ID, attendee, day, in.ScanID, deniedAt).Scan(&later); err != nil {
+			return err
+		}
+		if later {
+			status, message = 409, "this badge has been scanned again since; override the latest scan"
+			return nil
+		}
+		p, err := scanOpsPerson(tx.QueryRow(r.Context(), opsHistorySQL+`a.id=$2 ORDER BY p.version DESC LIMIT 1`, day, attendee))
+		if err != nil {
+			return err
+		}
+		scanID, reason := id(), "Manual override: "+in.Reason
+		if _, err := tx.Exec(r.Context(), `INSERT INTO access_scans(id,access_point_id,attendee_id,event_day,reference,direction,decision,reason,station,override_of,created_at) VALUES($1,$2,$3,$4,$5,$6,'allow',$7,$8,$9,clock_timestamp())`, scanID, point.ID, attendee, day, reference, direction, reason, principal.Station, in.ScanID); err != nil {
+			return err
+		}
+		if err := a.opsLog(r.Context(), tx, attendee, day, "gate_override", principal.Station, reference+" | "+point.Name+": denied for "+denied+" | "+reason); err != nil {
+			return err
+		}
+		_, count, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
+		if err != nil {
+			return err
+		}
+		out = map[string]any{"allowed": true, "override": true, "direction": direction, "reason": reason, "wouldDeny": "", "person": p.json(), "insideCount": count, "capacity": point.Capacity, "scanId": scanID}
+		response, err := json.Marshal(out)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(r.Context(), `UPDATE access_scans SET response=$2 WHERE id=$1`, scanID, response)
+		return err
+	})
+	if err != nil {
+		fail(w, 503, "gate override could not be recorded")
+		return
+	}
+	if status != 0 {
+		fail(w, status, message)
+		return
+	}
+	respond(w, 200, out)
+}
 
 func (a *App) opsGateEntries(w http.ResponseWriter, r *http.Request, p accessPoint) {
 	rows, err := a.DB.Query(r.Context(), `SELECT s.id,s.created_at,s.reference,COALESCE(a.name,''),s.direction,s.decision,s.reason,s.would_deny,s.station FROM access_scans s LEFT JOIN attendees a ON a.id=s.attendee_id WHERE s.access_point_id=$1 ORDER BY s.created_at DESC LIMIT 500`, p.ID)
