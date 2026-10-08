@@ -5,7 +5,7 @@
     "description": "Kerala's international life sciences conclave and expo. A platform for science, enterprise and policy to meet.",
     "end_date": "2026-10-09",
     "hero_title": "Where science\nmeets what’s next.",
-    "moments_album_id": "",
+    "moments_album_id": "12",
     "privacy_url": "https://bioconnect.kerala.gov.in/privacy-policy",
     "show_exhibitor_registration": false,
     "sponsorship_email": "bioconnect@bio360.in",
@@ -242,6 +242,13 @@
       "logo_url": "https://bioconnect.kerala.gov.in/assets/kerala-rubber-logo.png",
       "name": "Kerala Rubber Limited",
       "website_url": "https://keralarubber.com/"
+    },
+    {
+      "category": "",
+      "description": "Kerala’s own bank, owned by the Government of India, the Government of Kerala and Canara Bank. Formed in 2013 from the merger of the South and North Malabar Gramin Banks, it serves more than 90 lakh customers through over 630 branches.",
+      "logo_url": "https://bioconnect.kerala.gov.in/assets/kerala-grameena-bank-logo.png",
+      "name": "Kerala Grameena Bank",
+      "website_url": "https://kgb.bank.in/"
     }
   ],
   "sponsor": {
@@ -533,8 +540,8 @@
     {
       "id": "s-k-menon",
       "name": "Shashikumar Menon",
-      "role": "Former CEO",
-      "organization": "Muralya",
+      "role": "President, Q Life Consumer Products Pvt. Ltd.",
+      "organization": "NeST GROUP, Kochi",
       "image_url": "https://bioconnect.kerala.gov.in/assets/speakers/s-k-menon.webp",
       "linkedin": ""
     },
@@ -726,23 +733,8 @@
   "event_guide": {
     "activities": [],
     "faqs": [],
-    "revision": 3,
+    "revision": 9,
     "sessions": [
-      {
-        "description": "",
-        "ends_at": "2026-10-08T09:45:00+05:30",
-        "id": "d1-registration",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-08T08:00:00+05:30",
-        "title": "Registration",
-        "track": ""
-      },
       {
         "description": "",
         "ends_at": "2026-10-08T11:40:00+05:30",
@@ -946,21 +938,6 @@
       },
       {
         "description": "",
-        "ends_at": "2026-10-08T11:50:00+05:30",
-        "id": "d1-tea-1",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-08T11:40:00+05:30",
-        "title": "Tea Break",
-        "track": ""
-      },
-      {
-        "description": "",
         "ends_at": "2026-10-08T12:05:00+05:30",
         "id": "d1-keynote-ramasami",
         "kind": "talk",
@@ -1071,21 +1048,6 @@
         "speakers": "Shri. Snehil Kumar Singh IAS, Managing Director, KSIDC & KLIP; Director of Industries & Commerce and Managing Director, KSITIL, Government of Keralam",
         "starts_at": "2026-10-08T12:50:00+05:30",
         "title": "Shri. Snehil Kumar Singh IAS",
-        "track": ""
-      },
-      {
-        "description": "",
-        "ends_at": "2026-10-08T13:50:00+05:30",
-        "id": "d1-lunch",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-08T13:05:00+05:30",
-        "title": "Networking Lunch",
         "track": ""
       },
       {
@@ -1250,21 +1212,6 @@
         "speakers": "Dr. Jayakrishna Ambati, Founding Director, Centre for Advanced Vision Science (CAVS); University of Virginia School of Medicine, USA; President and CEO, Inflammasomes\nDr. C. N. Ramchand, CEO & Founder, MagGenome Technologies\nHost: Ms. Vachas",
         "starts_at": "2026-10-08T15:30:00+05:30",
         "title": "Beyond Generics: From Molecular Discovery to Global Innovation",
-        "track": ""
-      },
-      {
-        "description": "",
-        "ends_at": "2026-10-08T16:10:00+05:30",
-        "id": "d1-tea-2",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-08T15:55:00+05:30",
-        "title": "Tea Break",
         "track": ""
       },
       {
@@ -1652,21 +1599,6 @@
       },
       {
         "description": "",
-        "ends_at": "2026-10-09T11:10:00+05:30",
-        "id": "d2-tea-1",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-09T11:00:00+05:30",
-        "title": "Tea Break",
-        "track": ""
-      },
-      {
-        "description": "",
         "ends_at": "2026-10-09T12:00:00+05:30",
         "id": "panel-8",
         "kind": "panel",
@@ -1824,21 +1756,6 @@
       },
       {
         "description": "",
-        "ends_at": "2026-10-09T14:00:00+05:30",
-        "id": "d2-lunch",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-09T13:20:00+05:30",
-        "title": "Networking Lunch",
-        "track": ""
-      },
-      {
-        "description": "",
         "ends_at": "2026-10-09T14:15:00+05:30",
         "id": "d2-keynote-geyer",
         "kind": "talk",
@@ -1946,21 +1863,6 @@
         "speakers": "",
         "starts_at": "2026-10-09T15:25:00+05:30",
         "title": "Product Launch",
-        "track": ""
-      },
-      {
-        "description": "",
-        "ends_at": "2026-10-09T16:45:00+05:30",
-        "id": "d2-tea",
-        "kind": "break",
-        "label": "",
-        "location": "",
-        "people": [],
-        "segments": [],
-        "speaker_ids": [],
-        "speakers": "",
-        "starts_at": "2026-10-09T16:25:00+05:30",
-        "title": "Tea Break",
         "track": ""
       },
       {
@@ -2153,6 +2055,12 @@
         "url": ""
       },
       {
+        "key": "selfie_frame",
+        "subtitle": "Share that you are at Bio Connect",
+        "title": "Selfie frame",
+        "url": ""
+      },
+      {
         "key": "contacts",
         "subtitle": "People you met, with your notes",
         "title": "Contacts",
@@ -2222,12 +2130,6 @@
         "key": "moments",
         "subtitle": "Find and save your event photos",
         "title": "Moments album",
-        "url": ""
-      },
-      {
-        "key": "selfie_frame",
-        "subtitle": "Share that you are at Bio Connect",
-        "title": "Selfie frame",
         "url": ""
       }
     ],

@@ -181,7 +181,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sponsors'));
     await tester.pumpAndSettle();
-    expect(find.text('9 sponsors'), findsOneWidget);
+    expect(find.text('10 sponsors'), findsOneWidget);
     expect(find.text('State Bank of India'), findsOneWidget);
     expect(find.text('sbi.co.in'), findsOneWidget);
     await tester.pageBack();

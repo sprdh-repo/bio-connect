@@ -197,7 +197,10 @@ void main() {
     await tester.tap(find.text('Guide').last);
     await tester.pumpAndSettle();
     // Help contacts alone make the FAQ page worth offering.
+    await tester.scrollUntilVisible(find.text('FAQs'), 200);
     expect(find.text('FAQs'), findsOneWidget);
+    await tester.ensureVisible(find.text('Venue & directions'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Venue & directions'));
     await tester.pumpAndSettle();
     expect(find.text('Use gate 2.'), findsOneWidget);

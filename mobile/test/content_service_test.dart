@@ -154,7 +154,7 @@ void main() {
       jsonDecode(await File('assets/content/event.json').readAsString())
           as Map<String, dynamic>,
     );
-    expect(bundled.sponsors, hasLength(9));
+    expect(bundled.sponsors, hasLength(10));
     expect(bundled.sponsors.every((s) => s.category.isNotEmpty), isTrue);
     expect(bundled.leadership.committee.members, hasLength(14));
     expect(bundled.leadership.people.first.imageUrl, startsWith('https://'));
