@@ -37,8 +37,8 @@ func (a *App) UpdateAttendee(ctx context.Context, rid, aid, staff string, p Atte
 		if !guestAttendeeOK(&p) {
 			return errGuestAttendee
 		}
-	} else if !attendeeOK(&p, true, emailOptional(categoryID)) {
-		return attendeeError(true, emailOptional(categoryID))
+	} else if !attendeeOK(&p, true, emailOptional(categoryID), foodOnly(categoryID)) {
+		return attendeeError(true, emailOptional(categoryID), foodOnly(categoryID))
 	}
 	if status == "cancelled" {
 		return ErrConflict

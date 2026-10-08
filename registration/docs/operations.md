@@ -61,6 +61,16 @@ The session lasts 12 hours and all writes carry CSRF protection.
 - Access gates can enforce or only log category, day, prior check-in, capacity and single-entry rules. An attendee already recorded inside is always permitted to exit even if gate rules subsequently change.
 - Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
 
+Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
+Revoking a pass does not remove its attendee from occupancy; the historical badge can still identify them for exit, but cannot admit them again at an enforcing gate.
+Attendance changes, gate decisions and gate creation/open/close changes commit with their activity audit, or fail without committing the change.
+Successful desk lookups, kiosk scans and invalid scan attempts are also audited.
+If the audit cannot be stored, the portal reports an error rather than unaudited success.
+
+Roster and operated-gate occupancy refresh every 20 seconds across stations, preserving the current roster search.
+Desk scan and print preparation cannot overlap on the same screen, and late responses cannot overwrite a different day or screen.
+Gate transport retries reuse a request identifier and return the original decision instead of adding another entry or exit.
+
 Before doors open, run one real pass through check-in, print, gate entry, gate exit and checkout on each device and printer.
 Keep a USB scanner available because browser camera scanning depends on `BarcodeDetector` support and camera permission.
 
@@ -77,6 +87,8 @@ An attendee scans the QR on their pass, confirms their name against a preview of
 - A pass prints once at a kiosk.
   "Badge didn't print? Try again" reprints from the same kiosk for five minutes, at most three prints in all; later reprints are done at a desk.
   A badge printed earlier at a desk counts too.
+  If the server authorises printing but its response is lost, retry uses the same authorisation without consuming an additional print allowance.
+  Pending authorisation survives a reload in the same browser tab for five minutes; scan the same badge again to recover it.
 - On day two, an attendee who already has a badge is checked in without printing.
 - The event day comes from the server clock, not the tablet.
 - Prints and check-ins appear in the activity audit under the kiosk's station name with the detail "Self-service kiosk", and opening or closing a kiosk is audited as well.

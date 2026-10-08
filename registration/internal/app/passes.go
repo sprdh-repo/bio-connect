@@ -42,6 +42,7 @@ func passStyleFor(catID string) passStyle {
 	brick, navy, plum, paper := [3]int{140, 45, 32}, [3]int{23, 43, 77}, [3]int{86, 52, 120}, [3]int{247, 245, 239}
 	ember := [3]int{176, 74, 28}    // warm orange no other category uses
 	silver := [3]int{198, 202, 204} // light grey no other category uses
+	rose := [3]int{168, 32, 88}     // deep rose no other category uses
 	switch catID {
 	case "student":
 		return passStyle{lime, forest, "STUDENT", "Student", false}
@@ -63,6 +64,8 @@ func passStyleFor(catID string) passStyle {
 		return passStyle{ember, paper, "SPEAKER", "Speaker", false}
 	case "guest":
 		return passStyle{silver, forest, "GUEST", "Guest", false}
+	case "food":
+		return passStyle{rose, paper, "FOOD ONLY", "Food only", false}
 	default: // premium / standard / table
 		return passStyle{forest, lime, "EXHIBITOR", "Exhibitor", true}
 	}
@@ -104,7 +107,11 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	})
 	p.SetAutoPageBreak(false, 0)
 	p.SetCellMargin(0)
-	p.SetTitle("Bio Connect 4.0 - "+st.badge+" admission pass", false)
+	kind := "admission pass"
+	if foodOnly(catID) {
+		kind = "pass"
+	}
+	p.SetTitle("Bio Connect 4.0 - "+st.badge+" "+kind, false)
 	p.SetAuthor("Bio Connect 4.0", false)
 	p.AddUTF8FontFromBytes("D", "", fontDisplay)
 	p.AddUTF8FontFromBytes("B", "", fontBody)
@@ -176,14 +183,14 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	textColor(forest)
 	drawPassText(p, name, "D", left, nameBaseline, contentW, 123, 25)
 	orgLabel, roleLabel := "INSTITUTION", "DESIGNATION"
-	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" || catID == "guest" {
+	if st.exhibitor || catID == "industry" || catID == "startup" || catID == "official" || catID == "organiser" || catID == "sponsor" || catID == "speaker" || catID == "guest" || foodOnly(catID) {
 		orgLabel = "ORGANISATION"
 	}
 	if st.exhibitor {
 		roleLabel = "REPRESENTATIVE"
 	}
-	// A guest may have no organisation or designation (downloadOnly): leave
-	// the organisation out, and show the category in the role panel.
+	// A guest or food pass holder may have no organisation or designation:
+	// leave the organisation out, and show the category in the role panel.
 	if institution != "" {
 		label(orgLabel, left, 128)
 		drawPassText(p, institution, "D", left, orgBaseline, contentW, footerY-4, 21)
@@ -210,7 +217,12 @@ func renderPass(name, institution, designation, catID, catLabel, number, qr stri
 	p.SetDrawColor(168, 201, 91)
 	p.Line(left, footerY+38, left+footerW, footerY+38)
 	p.SetFont("M", "", 8.5)
-	p.Text(left, footerY+43, "ADMISSION PASS")
+	// A food pass says what it covers where every other pass says it admits.
+	footer := "ADMISSION PASS"
+	if foodOnly(catID) {
+		footer = "FOOD PASS - MEALS ONLY"
+	}
+	p.Text(left, footerY+43, footer)
 
 	// The encoded image includes its four-module quiet zone. Keep the complete
 	// image inside a white card so the decorative border cannot affect scanning.

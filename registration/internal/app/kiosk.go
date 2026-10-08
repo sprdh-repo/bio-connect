@@ -100,13 +100,16 @@ func (a *App) kioskStart(w http.ResponseWriter, r *http.Request, p opsPrincipal)
 	}
 	csrf, err := a.opsOpenSession(r.Context(), w, tx, p.Station, true)
 	if err == nil {
+		err = a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "kiosk_open", p.Station, "")
+	}
+	if err == nil {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {
+		w.Header().Del("Set-Cookie")
 		fail(w, 503, "kiosk could not start")
 		return
 	}
-	a.opsLog(r.Context(), "", opsToday(a.Now()), "kiosk_open", p.Station, "")
 	respond(w, 200, map[string]any{"station": p.Station, "csrf": csrf, "kiosk": true})
 }
 
@@ -136,13 +139,16 @@ func (a *App) kioskExit(w http.ResponseWriter, r *http.Request, p opsPrincipal) 
 	}
 	csrf, err := a.opsOpenSession(r.Context(), w, tx, p.Station, false)
 	if err == nil {
+		err = a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "kiosk_close", p.Station, "")
+	}
+	if err == nil {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {
+		w.Header().Del("Set-Cookie")
 		fail(w, 503, "kiosk could not close")
 		return
 	}
-	a.opsLog(r.Context(), "", opsToday(a.Now()), "kiosk_close", p.Station, "")
 	respond(w, 200, map[string]any{"station": p.Station, "csrf": csrf, "kiosk": false})
 }
 
@@ -153,12 +159,19 @@ func (a *App) kioskFind(w http.ResponseWriter, r *http.Request, p opsPrincipal, 
 	day := opsToday(a.Now())
 	token := opsScanCode(code)
 	if !admissionQRPattern.MatchString(token) {
+		if err := a.opsLog(r.Context(), a.DB, "", day, "check_in_denied", p.Station, token+" | "+kioskDetail+": scan the QR code on your pass."); err != nil {
+			fail(w, 503, "scan could not be recorded")
+			return opsPerson{}, "", false
+		}
 		respond(w, 422, map[string]string{"error": "scan the QR code on your pass", "code": "qr_required"})
 		return opsPerson{}, "", false
 	}
 	person, err := scanOpsPerson(a.DB.QueryRow(r.Context(), opsPersonSQL+`p.qr_id=$2`, day, token))
 	if err != nil {
-		a.opsLog(r.Context(), "", day, "check_in_denied", p.Station, token+" | "+kioskDetail+": no approved pass matches that code.")
+		if !errors.Is(err, pgx.ErrNoRows) || a.opsLog(r.Context(), a.DB, "", day, "check_in_denied", p.Station, token+" | "+kioskDetail+": no approved pass matches that code.") != nil {
+			fail(w, 503, "scan could not be recorded")
+			return opsPerson{}, "", false
+		}
 		respond(w, 404, map[string]string{"error": "no approved pass matches that code", "code": "not_found"})
 		return opsPerson{}, "", false
 	}
@@ -196,6 +209,10 @@ func (a *App) kioskScan(w http.ResponseWriter, r *http.Request, p opsPrincipal) 
 			status = "done"
 		}
 	}
+	if err := a.opsLog(r.Context(), a.DB, person.AttendeeID, day, "kiosk_scan", p.Station, kioskDetail+": "+status); err != nil {
+		fail(w, 503, "scan could not be recorded")
+		return
+	}
 	respond(w, 200, map[string]any{"status": status, "day": day, "dayLabel": opsDayLabel(day), "person": person.kioskJSON(), "qrUrl": "/api/v1/ops/qr/" + person.QRID})
 }
 
@@ -205,8 +222,8 @@ func (a *App) kioskScan(w http.ResponseWriter, r *http.Request, p opsPrincipal) 
 // a pass this kiosk printed moments ago.
 func (a *App) kioskPrint(w http.ResponseWriter, r *http.Request, p opsPrincipal) {
 	var in struct {
-		Code  string
-		Retry bool
+		Code, RequestID string
+		Retry           bool
 	}
 	if !decode(w, r, &in) {
 		return
@@ -215,8 +232,31 @@ func (a *App) kioskPrint(w http.ResponseWriter, r *http.Request, p opsPrincipal)
 	if !ok {
 		return
 	}
+	if len(in.RequestID) > 100 {
+		fail(w, 400, "invalid request identifier")
+		return
+	}
+	cookie, _ := r.Cookie("bc_ops")
+	sessionHash := hash(cookie.Value)
 	firstCheckIn := false
 	err := pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		if in.RequestID != "" {
+			if _, err := tx.Exec(r.Context(), `SELECT 1 FROM ops_sessions WHERE token_hash=$1 FOR UPDATE`, sessionHash); err != nil {
+				return err
+			}
+			var attendee, savedDay string
+			var retry, recent bool
+			err := tx.QueryRow(r.Context(), `SELECT attendee_id,event_day::text,retry,first_check_in,created_at>now()-$3::interval FROM kiosk_print_requests WHERE session_hash=$1 AND request_id=$2`, sessionHash, in.RequestID, kioskReprintWindow).Scan(&attendee, &savedDay, &retry, &firstCheckIn, &recent)
+			if err == nil {
+				if attendee != person.AttendeeID || savedDay != day || retry != in.Retry || !recent {
+					return errOpsRequestConflict
+				}
+				return nil
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+		}
 		// Serialise prints for one attendee so two kiosks cannot both print a first badge.
 		if _, err := tx.Exec(r.Context(), `SELECT 1 FROM attendees WHERE id=$1 FOR UPDATE`, person.AttendeeID); err != nil {
 			return err
@@ -242,9 +282,19 @@ func (a *App) kioskPrint(w http.ResponseWriter, r *http.Request, p opsPrincipal)
 				return err
 			}
 		}
-		_, err = tx.Exec(r.Context(), `INSERT INTO ops_activity(id,attendee_id,event_day,kind,station,detail) VALUES($1,$2,$3,'badge_print',$4,$5)`, id(), person.AttendeeID, day, p.Station, detail)
-		return err
+		if err := a.opsLog(r.Context(), tx, person.AttendeeID, day, "badge_print", p.Station, detail); err != nil {
+			return err
+		}
+		if in.RequestID != "" {
+			_, err = tx.Exec(r.Context(), `INSERT INTO kiosk_print_requests(session_hash,request_id,attendee_id,event_day,retry,first_check_in) VALUES($1,$2,$3,$4,$5,$6)`, sessionHash, in.RequestID, person.AttendeeID, day, in.Retry, firstCheckIn)
+			return err
+		}
+		return nil
 	})
+	if errors.Is(err, errOpsRequestConflict) {
+		respond(w, 409, map[string]string{"error": "print authorization has expired or was used for another request", "code": "authorization_conflict"})
+		return
+	}
 	if errors.Is(err, errKioskAlreadyPrinted) {
 		respond(w, 409, map[string]string{"error": "a badge has already been printed for this pass", "code": "already_printed"})
 		return
@@ -276,15 +326,22 @@ func (a *App) kioskCheckIn(w http.ResponseWriter, r *http.Request, p opsPrincipa
 		respond(w, 409, map[string]string{"error": "print the badge to check in", "code": "print_required"})
 		return
 	}
-	tag, err := a.DB.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, person.AttendeeID, day, p.Station)
+	repeat := false
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, person.AttendeeID, day, p.Station)
+		if err != nil {
+			return err
+		}
+		repeat = tag.RowsAffected() == 0
+		kind := "check_in"
+		if repeat {
+			kind = "repeat_check_in"
+		}
+		return a.opsLog(r.Context(), tx, person.AttendeeID, day, kind, p.Station, kioskDetail)
+	})
 	if err != nil {
 		fail(w, 503, "kiosk unavailable")
 		return
 	}
-	kind := "check_in"
-	if tag.RowsAffected() == 0 {
-		kind = "repeat_check_in"
-	}
-	a.opsLog(r.Context(), person.AttendeeID, day, kind, p.Station, kioskDetail)
-	respond(w, 200, map[string]any{"checkedIn": true, "repeat": kind != "check_in", "day": day, "dayLabel": opsDayLabel(day), "person": person.kioskJSON()})
+	respond(w, 200, map[string]any{"checkedIn": true, "repeat": repeat, "day": day, "dayLabel": opsDayLabel(day), "person": person.kioskJSON()})
 }

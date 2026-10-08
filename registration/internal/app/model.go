@@ -53,6 +53,8 @@ func categoryCode(catID string) string {
 		return "SK"
 	case "guest":
 		return "GU"
+	case "food":
+		return "FD"
 	default:
 		return "EX"
 	}
@@ -76,6 +78,8 @@ type Category struct {
 	CouponEligible bool `json:"coupon_eligible"`
 	// DownloadOnly says the category's passes are never sent (downloadOnly).
 	DownloadOnly bool `json:"download_only"`
+	// FoodOnly says the category's passes cover meals only (foodOnly).
+	FoodOnly bool `json:"food_only"`
 }
 type Attendee struct {
 	ID              string `json:"id,omitempty"`
@@ -143,9 +147,14 @@ func validPhone(s string, optional bool) bool {
 }
 
 // emailOptional reports whether a category accepts a person reached by phone
-// alone. Government officials often have no email they can share, so they
-// give an email, a phone, or both.
-func emailOptional(categoryID string) bool { return categoryID == "official" }
+// alone. Government officials and food pass holders often have no email they
+// can share, so they give an email, a phone, or both.
+func emailOptional(categoryID string) bool { return categoryID == "official" || foodOnly(categoryID) }
+
+// foodOnly reports whether a category's passes cover meals only. Staff issue
+// them to drivers and other support staff, often with no organisation or
+// designation of their own; the pass, the badge and the email say FOOD ONLY.
+func foodOnly(categoryID string) bool { return categoryID == "food" }
 
 // downloadOnly reports whether a category's passes are never sent. Staff
 // register a guest from the console or the spot desk with only a name, then
@@ -172,12 +181,16 @@ var errGuestAttendee = errors.New("a guest pass needs the guest's name; an email
 // complete. Staff entry may leave the phone out, but WhatsApp delivery still
 // needs one. When the email is optional, one of email or phone is still
 // required, and a person with no email must permit WhatsApp, the only way
-// their pass can reach them.
-func attendeeOK(p *Attendee, phoneOptional, noEmail bool) bool {
+// their pass can reach them. roleOptional lets the designation be blank.
+func attendeeOK(p *Attendee, phoneOptional, noEmail, roleOptional bool) bool {
 	p.Name = strings.TrimSpace(p.Name)
 	p.Email = strings.ToLower(strings.TrimSpace(p.Email))
 	p.Phone = strings.TrimSpace(p.Phone)
-	if !validText(p.Name, 120) || !validText(p.Designation, 180) || (p.Phone == "" && p.WhatsAppConsent) {
+	if roleOptional {
+		p.Designation = strings.TrimSpace(p.Designation)
+	}
+	roleOK := validText(p.Designation, 180) || roleOptional && p.Designation == ""
+	if !validText(p.Name, 120) || !roleOK || (p.Phone == "" && p.WhatsAppConsent) {
 		return false
 	}
 	if noEmail && p.Email == "" {
@@ -187,7 +200,10 @@ func attendeeOK(p *Attendee, phoneOptional, noEmail bool) bool {
 }
 
 // attendeeError describes what attendeeOK requires.
-func attendeeError(phoneOptional, noEmail bool) error {
+func attendeeError(phoneOptional, noEmail, roleOptional bool) error {
+	if noEmail && roleOptional {
+		return errors.New("a food pass needs the holder's name and a valid email or international phone (+country code); without an email, permit WhatsApp so the pass can be sent there")
+	}
 	if noEmail {
 		return errors.New("each attendee needs name, designation and a valid email or international phone (+country code); without an email, permit WhatsApp so the pass can be sent there")
 	}
@@ -209,8 +225,9 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 		return e
 	}
 	noEmail := emailOptional(c.ID)
-	// A guest may have no institution; staff enter only what they know.
-	institutionOK := validText(in.Institution, 180) || staff && downloadOnly(c.ID) && in.Institution == ""
+	// A guest or food pass holder may have no institution; staff enter only
+	// what they know.
+	institutionOK := validText(in.Institution, 180) || staff && (downloadOnly(c.ID) || foodOnly(c.ID)) && in.Institution == ""
 	// A delegate's contact is their one attendee, copied below once the
 	// attendee is checked, so only an exhibitor's contact is checked here.
 	if !institutionOK || c.Kind == "exhibitor" && (!validText(in.ContactName, 120) || !validEmail(in.Email) || !validPhone(in.Phone, staff)) {
@@ -247,8 +264,8 @@ func validateInput(in *RegistrationInput, c Category, staff bool) error {
 			}
 			continue
 		}
-		if !attendeeOK(p, staff, noEmail) {
-			return attendeeError(staff, noEmail)
+		if !attendeeOK(p, staff, noEmail, foodOnly(c.ID)) {
+			return attendeeError(staff, noEmail, foodOnly(c.ID))
 		}
 		if p.Email == "" {
 			continue
@@ -323,7 +340,7 @@ func (a *App) Migrate(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 func (a *App) categories(ctx context.Context) ([]Category, error) {
-	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 WHEN 'organiser' THEN 6 WHEN 'sponsor' THEN 7 WHEN 'volunteer' THEN 8 WHEN 'speaker' THEN 9 WHEN 'guest' THEN 10 ELSE 11 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
+	rows, e := a.DB.Query(ctx, "SELECT id,kind,label,early_paise,regular_paise,roster_count,open,free_only,free_open FROM categories ORDER BY kind,CASE id WHEN 'industry' THEN 1 WHEN 'faculty' THEN 2 WHEN 'startup' THEN 3 WHEN 'student' THEN 4 WHEN 'official' THEN 5 WHEN 'organiser' THEN 6 WHEN 'sponsor' THEN 7 WHEN 'volunteer' THEN 8 WHEN 'speaker' THEN 9 WHEN 'guest' THEN 10 WHEN 'food' THEN 11 ELSE 12 END,CASE WHEN kind='exhibitor' THEN early_paise END DESC")
 	if e != nil {
 		return nil, e
 	}
@@ -337,6 +354,7 @@ func (a *App) categories(ctx context.Context) ([]Category, error) {
 		c.PayablePaise = fee(c, a.Now())
 		c.CouponEligible = couponEligible(c.ID)
 		c.DownloadOnly = downloadOnly(c.ID)
+		c.FoodOnly = foodOnly(c.ID)
 		out = append(out, c)
 	}
 	return out, rows.Err()

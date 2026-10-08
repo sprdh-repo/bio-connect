@@ -405,7 +405,7 @@ func TestOpsReportsExposeFilterableActivityAudit(t *testing.T) {
 		"/api/v1/ops/activity/export\"",
 		"['all','success','repeat','rejected']",
 		"data-audit-filter",
-		"await loadAudit();renderReports()",
+		"await loadAudit();if(current(c))renderReports()",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("operations audit UI does not contain %q", want)

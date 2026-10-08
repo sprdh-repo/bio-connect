@@ -52,7 +52,19 @@ const LABEL_MM=Badge.LABEL_MM;
 const IDLE={confirm:45,welcome:30,collect:20,done:12,problem:12,printer:40,staff:90};
 const HONORIFICS=/^(dr|prof|mr|mrs|ms|miss|shri|smt|sri|er|adv)\.?$/i;
 
-const state={kiosk:false,csrf:'',station:'',today:'',days:[],screen:'scan',busy:false,paused:false,current:null,badge:null,scanner:null,cameraRetry:null,lastCode:'',holdUntil:0,timer:null,ticker:null,deadline:0,staffPass:'',staffTimer:null,audio:null,wakeLock:null,pageRule:-1};
+const state={kiosk:false,csrf:'',station:'',today:'',days:[],screen:'scan',busy:false,paused:false,current:null,badge:null,scanner:null,cameraRetry:null,lastCode:'',holdUntil:0,timer:null,ticker:null,deadline:0,staffPass:'',staffTimer:null,audio:null,wakeLock:null,pageRule:-1,flow:0};
+
+// Only unacknowledged server authorizations are retained. A retry uses the same
+// ID; an intentional physical reprint still requests a new authorization.
+let pendingPrints={};
+try{pendingPrints=JSON.parse(sessionStorage.getItem('bcKioskPendingPrints')||'{}')}catch{}
+function savePendingPrints(){try{sessionStorage.setItem('bcKioskPendingPrints',JSON.stringify(pendingPrints))}catch{}}
+function pendingPrint(qr){
+  const p=pendingPrints[qr];
+  if(p&&Date.now()-p.createdAt<5*60*1000)return p;
+  if(p){delete pendingPrints[qr];savePendingPrints()}
+  return null;
+}
 
 const store={
   get(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch{return fallback}},
@@ -66,7 +78,7 @@ async function api(path,body){
   let r;
   try{r=await fetch('/api/v1/ops/'+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'})}
   catch{const e=new Error('offline');e.status=0;e.code='offline';throw e}
-  let data={};try{data=await r.json()}catch{}
+  let data={};try{data=await r.json()}catch{const e=new Error('incomplete response');e.status=0;e.code='offline';throw e}
   if(!r.ok){const e=new Error(data.error||'Request failed');e.status=r.status;e.code=data.code||'';if(r.status===401&&path!=='kiosk/unlock'&&path!=='kiosk/exit')pause('expired');throw e}
   return data;
 }
@@ -109,7 +121,9 @@ function armIdle(seconds){
 // it; "This isn't me" and "Try again" hold it for less, or not at all.
 const HOLD_MS=3000;
 function reset(holdMs=HOLD_MS){
+  if(state.busy)return;
   clearIdle();
+  state.flow++;
   state.current=null;state.badge=null;state.busy=false;state.printRecorded=false;
   state.holdUntil=Date.now()+(Number.isFinite(holdMs)?holdMs:HOLD_MS);
   $('#reprint-button').hidden=true;
@@ -135,6 +149,7 @@ function problem(err){
 }
 
 function pause(reason){
+  state.flow++;
   state.paused=true;
   const staff=reason==='staff';
   const copy={
@@ -155,19 +170,22 @@ async function onCode(raw){
   const code=String(raw||'').trim(),now=Date.now();
   if(!code||state.screen!=='scan'||state.busy||state.paused||$('#staff-dialog').open)return;
   if(code===state.lastCode&&now<state.holdUntil)return;
+  const flow=state.flow;
   state.lastCode=code;state.busy=true;
   $('.scan-panel').classList.add('checking');
   feedback('tick');
   try{
     const x=await api('kiosk/scan',{code});
+    if(flow!==state.flow||state.paused)return;
     state.current=x;state.printRecorded=false;
     fillPerson(x.person,x.dayLabel);
-    if(x.status==='print'){
+    if(x.status==='print'||pendingPrint(x.person.qrId)){
       await prepareBadge(x.person,x.qrUrl);
+      if(flow!==state.flow||state.paused)return;
       feedback('success');
       show('confirm',IDLE.confirm);
     }else showWelcome(x.status,x);
-  }catch(err){if(err.status!==401)problem(err)}
+  }catch(err){if(flow===state.flow&&err.status!==401)problem(err)}
   finally{state.busy=false;$('.scan-panel').classList.remove('checking')}
 }
 
@@ -188,9 +206,9 @@ function showWelcome(kind,x){
 
 async function checkIn(){
   if(state.busy||!state.current)return;
-  const button=$('#checkin-button');state.busy=true;button.classList.add('loading');button.disabled=true;
-  try{const x=await api('kiosk/check-in',{code:state.current.person.qrId});showWelcome(x.repeat?'done':'checked',x)}
-  catch(err){if(err.status!==401)problem(err)}
+  const button=$('#checkin-button'),flow=state.flow,person=state.current.person;state.busy=true;clearIdle();button.classList.add('loading');button.disabled=true;
+  try{const x=await api('kiosk/check-in',{code:person.qrId});if(flow===state.flow&&!state.paused)showWelcome(x.repeat?'done':'checked',x)}
+  catch(err){if(flow===state.flow&&err.status!==401)problem(err)}
   finally{state.busy=false;button.classList.remove('loading');button.disabled=false}
 }
 
@@ -264,13 +282,17 @@ function dispatchPrint(badge){
 // allows from this kiosk for a few minutes.
 async function printBadge(retry,button){
   if(state.busy||!state.current||!state.badge)return;
-  const app=printerMode()==='app';
+  const app=printerMode()==='app',qr=state.current.person.qrId,flow=state.flow;
   state.busy=true;button.classList.add('loading');button.disabled=true;clearIdle();
   try{
     // Check the printer first, so a printer that is down does not use up the attendee's print.
     if(app){const p=(await appBridge.status())?.printer;if(!p?.connected||!p.ready)throw printerError(p?.problem||'The badge printer is not connected',state.printRecorded)}
-    await api('kiosk/print',{code:state.current.person.qrId,retry});
+    const request=pendingPrint(qr)||{code:qr,retry,requestId:crypto.randomUUID(),createdAt:Date.now()};
+    pendingPrints[qr]=request;savePendingPrints();
+    await api('kiosk/print',{code:request.code,retry:request.retry,requestId:request.requestId});
     state.printRecorded=true;
+    if(flow!==state.flow||state.paused)return;
+    delete pendingPrints[qr];savePendingPrints();
     if(app){
       show('printing');
       const r=await appBridge.print(state.badge);
@@ -287,6 +309,13 @@ async function printBadge(retry,button){
   }catch(err){
     if(err.status===401)return;
     if(err.code==='printer')return printerProblem(err.message,err.recorded);
+    if(err.status===0&&pendingPrint(qr)){
+      problem(err);
+      $('#problem-retry').hidden=false;
+      show('problem',IDLE.printer);
+      return;
+    }
+    delete pendingPrints[qr];savePendingPrints();
     problem(err);
   }finally{state.busy=false;button.classList.remove('loading');button.disabled=false}
 }

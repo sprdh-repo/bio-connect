@@ -95,7 +95,7 @@ func TestKioskPrintChecksInOnceAndLimitsReprints(t *testing.T) {
 	if rr := c.request(http.MethodPost, "/api/v1/ops/kiosk/scan", map[string]any{"code": unknown}); rr.Code != http.StatusNotFound {
 		t.Fatalf("unknown QR = %d", rr.Code)
 	}
-	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='check_in_denied' AND station='Kiosk 1'"); n != 1 {
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='check_in_denied' AND station='Kiosk 1'"); n != 4 {
 		t.Fatalf("denied kiosk scans logged = %d", n)
 	}
 

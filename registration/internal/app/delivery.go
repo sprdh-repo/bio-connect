@@ -153,9 +153,12 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 		return a.sendPassOTP(ctx, j, link)
 	}
 	var number, waDocID string
+	// A food pass names itself FOOD ONLY in every place the holder sees it:
+	// the email, the attachment's file name and, once approved, the template.
+	food, filename := false, "Bio-Connect-4.0-pass.pdf"
 	if j.Purpose == "pass" {
-		var cipher string
-		if e = a.DB.QueryRow(ctx, "SELECT download_cipher,number FROM passes WHERE id=$1 AND revoked_at IS NULL", j.PassID).Scan(&cipher, &number); e != nil {
+		var cipher, catID string
+		if e = a.DB.QueryRow(ctx, "SELECT p.download_cipher,p.number,r.category_id FROM passes p JOIN registrations r ON r.id=p.registration_id WHERE p.id=$1 AND p.revoked_at IS NULL", j.PassID).Scan(&cipher, &number, &catID); e != nil {
 			return sendResult{Status: "failed", Code: "pass_unavailable"}
 		}
 		token, e := a.unseal(cipher)
@@ -163,6 +166,9 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 			return sendResult{Status: "failed", Code: "token_decryption"}
 		}
 		link = passLink(a.Config.BaseURL, token)
+		if food = foodOnly(catID); food {
+			filename = "Bio-Connect-4.0-FOOD-ONLY-pass.pdf"
+		}
 		// Both channels carry the PDF itself: an email attachment, or a WhatsApp
 		// document header uploaded to the provider's media store. The link stays
 		// in the message body as the fallback.
@@ -172,9 +178,9 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 				return sendResult{Status: "failed", Code: "pdf_unavailable", Retry: true}
 			}
 			if j.Channel == "email" {
-				attachments = append(attachments, map[string]string{"Name": "Bio-Connect-4.0-pass.pdf", "Content": base64.StdEncoding.EncodeToString(b), "ContentType": "application/pdf"})
+				attachments = append(attachments, map[string]string{"Name": filename, "Content": base64.StdEncoding.EncodeToString(b), "ContentType": "application/pdf"})
 			} else {
-				waDocID, e = uploadWhatsAppMedia(ctx, a.Config, "Bio-Connect-4.0-pass.pdf", b)
+				waDocID, e = uploadWhatsAppMedia(ctx, a.Config, filename, b)
 				if e != nil {
 					return sendResult{Status: "failed", Code: "wa_media_upload", Retry: true}
 				}
@@ -226,6 +232,12 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 		heading := "Your pass is ready"
 		cta := "View your pass"
 		intro := "Your Bio Connect 4.0 pass is attached to this email. The event takes place on 8-9 October 2026 at Hyatt Regency Trivandrum. You can also open it any time from the link below."
+		if food {
+			subject = "Bio Connect 4.0 - your food pass (meals only)"
+			heading = "Your food pass is ready"
+			cta = "View your food pass"
+			intro = "Your Bio Connect 4.0 food pass is attached to this email. It is for food only: it covers meals at Hyatt Regency Trivandrum on 8-9 October 2026, and does not admit you to the sessions or the exhibition. Show it at the food counter. You can also open it any time from the link below."
+		}
 		switch j.Purpose {
 		case "pack":
 			subject = "Bio Connect 4.0 - your exhibitor pass pack"
@@ -307,9 +319,13 @@ func (a *App) send(ctx context.Context, j job) sendResult {
 	}
 	components := []any{map[string]any{"type": "body", "parameters": []any{map[string]string{"type": "text", "text": link}}}}
 	if waDocID != "" {
-		components = append([]any{map[string]any{"type": "header", "parameters": []any{map[string]any{"type": "document", "document": map[string]string{"id": waDocID, "filename": "Bio-Connect-4.0-pass.pdf"}}}}}, components...)
+		components = append([]any{map[string]any{"type": "header", "parameters": []any{map[string]any{"type": "document", "document": map[string]string{"id": waDocID, "filename": filename}}}}}, components...)
 	}
-	payload := map[string]any{"messaging_product": "whatsapp", "to": strings.TrimPrefix(j.Recipient, "+"), "type": "template", "biz_opaque_callback_data": j.ID, "template": map[string]any{"name": a.Config.MetaTemplate, "language": map[string]string{"code": a.Config.MetaLanguage}, "components": components}}
+	template := a.Config.MetaTemplate
+	if food && a.Config.MetaFoodTemplate != "" {
+		template = a.Config.MetaFoodTemplate
+	}
+	payload := map[string]any{"messaging_product": "whatsapp", "to": strings.TrimPrefix(j.Recipient, "+"), "type": "template", "biz_opaque_callback_data": j.ID, "template": map[string]any{"name": template, "language": map[string]string{"code": a.Config.MetaLanguage}, "components": components}}
 	return providerRequest(ctx, a.Config.MetaAPIBase+"/"+a.Config.MetaVersion+"/"+a.Config.MetaPhoneID+"/messages", "Authorization", "Bearer "+a.Config.MetaToken, payload, "whatsapp")
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -189,7 +190,7 @@ func (a *App) opsAPI(w http.ResponseWriter, r *http.Request) {
 	case path == "roster" && r.Method == http.MethodGet:
 		a.opsRoster(w, r)
 	case path == "lookup" && r.Method == http.MethodGet:
-		a.opsLookup(w, r)
+		a.opsLookup(w, r, p)
 	case path == "check-in" && r.Method == http.MethodPost:
 		a.opsCheckIn(w, r, p)
 	case path == "check-in/undo" && r.Method == http.MethodPost:
@@ -265,7 +266,7 @@ func (a *App) opsFind(ctx context.Context, value, day string) (opsPerson, error)
 	return scanOpsPerson(a.DB.QueryRow(ctx, opsPersonSQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3)`, day, opsScanCode(value), clean))
 }
 
-func (a *App) opsLookup(w http.ResponseWriter, r *http.Request) {
+func (a *App) opsLookup(w http.ResponseWriter, r *http.Request, principal opsPrincipal) {
 	day, err := opsDay(r.URL.Query().Get("day"))
 	if err != nil {
 		fail(w, 400, err.Error())
@@ -273,7 +274,19 @@ func (a *App) opsLookup(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := a.opsFind(r.Context(), r.URL.Query().Get("code"), day)
 	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			fail(w, 503, "lookup unavailable")
+			return
+		}
+		if err := a.opsLog(r.Context(), a.DB, "", day, "badge_lookup_denied", principal.Station, opsScanCode(r.URL.Query().Get("code"))+" | No approved pass matches that code."); err != nil {
+			fail(w, 503, "scan could not be recorded")
+			return
+		}
 		fail(w, 404, "no approved pass matches that code")
+		return
+	}
+	if err := a.opsLog(r.Context(), a.DB, p.AttendeeID, day, "badge_lookup", principal.Station, ""); err != nil {
+		fail(w, 503, "scan could not be recorded")
 		return
 	}
 	respond(w, 200, map[string]any{"person": p.json(), "qrUrl": "/api/v1/ops/qr/" + p.QRID})
@@ -307,8 +320,9 @@ func (a *App) opsRoster(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]any{"day": day, "people": people})
 }
 
-func (a *App) opsLog(ctx context.Context, attendee, day, kind, station, detail string) {
-	_, _ = a.DB.Exec(ctx, `INSERT INTO ops_activity(id,attendee_id,event_day,kind,station,detail) VALUES($1,NULLIF($2,''),NULLIF($3,'')::date,$4,$5,$6)`, id(), attendee, day, kind, station, detail)
+func (a *App) opsLog(ctx context.Context, db execer, attendee, day, kind, station, detail string) error {
+	_, err := db.Exec(ctx, `INSERT INTO ops_activity(id,attendee_id,event_day,kind,station,detail) VALUES($1,NULLIF($2,''),NULLIF($3,'')::date,$4,$5,$6)`, id(), attendee, day, kind, station, detail)
+	return err
 }
 
 func decodeOpsScan(w http.ResponseWriter, r *http.Request) (string, string, bool) {
@@ -331,21 +345,30 @@ func (a *App) opsCheckIn(w http.ResponseWriter, r *http.Request, principal opsPr
 	}
 	p, err := a.opsFind(r.Context(), code, day)
 	if err != nil {
-		a.opsLog(r.Context(), "", day, "check_in_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.")
+		if !errors.Is(err, pgx.ErrNoRows) || a.opsLog(r.Context(), a.DB, "", day, "check_in_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.") != nil {
+			fail(w, 503, "check-in unavailable")
+			return
+		}
 		fail(w, 404, "no approved pass matches that code")
 		return
 	}
-	tag, err := a.DB.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, p.AttendeeID, day, principal.Station)
+	repeat := false
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, p.AttendeeID, day, principal.Station)
+		if err != nil {
+			return err
+		}
+		kind := "check_in"
+		repeat = tag.RowsAffected() == 0
+		if repeat {
+			kind = "repeat_check_in"
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, kind, principal.Station, "")
+	})
 	if err != nil {
 		fail(w, 503, "check-in unavailable")
 		return
 	}
-	kind := "check_in"
-	repeat := tag.RowsAffected() == 0
-	if repeat {
-		kind = "repeat_check_in"
-	}
-	a.opsLog(r.Context(), p.AttendeeID, day, kind, principal.Station, "")
 	p, _ = a.opsFind(r.Context(), p.QRID, day)
 	respond(w, 200, map[string]any{"person": p.json(), "repeat": repeat, "qrUrl": "/api/v1/ops/qr/" + p.QRID})
 }
@@ -369,12 +392,26 @@ func (a *App) opsUndoCheckIn(w http.ResponseWriter, r *http.Request, principal o
 		fail(w, 404, "pass not found")
 		return
 	}
-	tag, err := a.DB.Exec(r.Context(), `DELETE FROM ops_attendance WHERE attendee_id=$1 AND event_day=$2`, p.AttendeeID, day)
-	if err != nil || tag.RowsAffected() != 1 {
+	changed := false
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(r.Context(), `DELETE FROM ops_attendance WHERE attendee_id=$1 AND event_day=$2`, p.AttendeeID, day)
+		if err != nil {
+			return err
+		}
+		changed = tag.RowsAffected() == 1
+		if !changed {
+			return nil
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, "undo_check_in", principal.Station, strings.TrimSpace(in.Reason))
+	})
+	if err != nil {
+		fail(w, 503, "undo unavailable")
+		return
+	}
+	if !changed {
 		fail(w, 409, "there is no check-in to undo")
 		return
 	}
-	a.opsLog(r.Context(), p.AttendeeID, day, "undo_check_in", principal.Station, strings.TrimSpace(in.Reason))
 	p, _ = a.opsFind(r.Context(), p.QRID, day)
 	respond(w, 200, map[string]any{"person": p.json()})
 }
@@ -386,26 +423,41 @@ func (a *App) opsCheckOut(w http.ResponseWriter, r *http.Request, principal opsP
 	}
 	p, err := a.opsFind(r.Context(), code, day)
 	if err != nil {
-		a.opsLog(r.Context(), "", day, "check_out_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.")
+		if !errors.Is(err, pgx.ErrNoRows) || a.opsLog(r.Context(), a.DB, "", day, "check_out_denied", principal.Station, opsScanCode(code)+" | No approved pass matches that code.") != nil {
+			fail(w, 503, "checkout unavailable")
+			return
+		}
 		fail(w, 404, "no approved pass matches that code")
 		return
 	}
-	if !p.CheckedIn {
-		a.opsLog(r.Context(), p.AttendeeID, day, "check_out_denied", principal.Station, p.Reference+" | This attendee has not checked in today.")
-		fail(w, 409, "this attendee has not checked in today")
-		return
-	}
-	tag, err := a.DB.Exec(r.Context(), `UPDATE ops_attendance SET checked_out_at=now(),checked_out_by=$3 WHERE attendee_id=$1 AND event_day=$2 AND checked_out_at IS NULL`, p.AttendeeID, day, principal.Station)
+	repeat, checkedIn := false, false
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		var checkedOut bool
+		err := tx.QueryRow(r.Context(), `SELECT checked_out_at IS NOT NULL FROM ops_attendance WHERE attendee_id=$1 AND event_day=$2 FOR UPDATE`, p.AttendeeID, day).Scan(&checkedOut)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return a.opsLog(r.Context(), tx, p.AttendeeID, day, "check_out_denied", principal.Station, p.Reference+" | This attendee has not checked in today.")
+		}
+		if err != nil {
+			return err
+		}
+		checkedIn, repeat = true, checkedOut
+		kind := "repeat_check_out"
+		if !repeat {
+			if _, err := tx.Exec(r.Context(), `UPDATE ops_attendance SET checked_out_at=now(),checked_out_by=$3 WHERE attendee_id=$1 AND event_day=$2`, p.AttendeeID, day, principal.Station); err != nil {
+				return err
+			}
+			kind = "check_out"
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, kind, principal.Station, "")
+	})
 	if err != nil {
 		fail(w, 503, "checkout unavailable")
 		return
 	}
-	repeat := tag.RowsAffected() == 0
-	kind := "check_out"
-	if repeat {
-		kind = "repeat_check_out"
+	if !checkedIn {
+		fail(w, 409, "this attendee has not checked in today")
+		return
 	}
-	a.opsLog(r.Context(), p.AttendeeID, day, kind, principal.Station, "")
 	p, _ = a.opsFind(r.Context(), p.QRID, day)
 	respond(w, 200, map[string]any{"person": p.json(), "repeat": repeat})
 }
@@ -429,12 +481,26 @@ func (a *App) opsUndoCheckOut(w http.ResponseWriter, r *http.Request, principal 
 		fail(w, 404, "pass not found")
 		return
 	}
-	tag, err := a.DB.Exec(r.Context(), `UPDATE ops_attendance SET checked_out_at=NULL,checked_out_by=NULL WHERE attendee_id=$1 AND event_day=$2 AND checked_out_at IS NOT NULL`, p.AttendeeID, day)
-	if err != nil || tag.RowsAffected() != 1 {
+	changed := false
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(r.Context(), `UPDATE ops_attendance SET checked_out_at=NULL,checked_out_by=NULL WHERE attendee_id=$1 AND event_day=$2 AND checked_out_at IS NOT NULL`, p.AttendeeID, day)
+		if err != nil {
+			return err
+		}
+		changed = tag.RowsAffected() == 1
+		if !changed {
+			return nil
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, "undo_check_out", principal.Station, strings.TrimSpace(in.Reason))
+	})
+	if err != nil {
+		fail(w, 503, "undo unavailable")
+		return
+	}
+	if !changed {
 		fail(w, 409, "there is no checkout to undo")
 		return
 	}
-	a.opsLog(r.Context(), p.AttendeeID, day, "undo_check_out", principal.Station, strings.TrimSpace(in.Reason))
 	p, _ = a.opsFind(r.Context(), p.QRID, day)
 	respond(w, 200, map[string]any{"person": p.json()})
 }
@@ -454,7 +520,16 @@ func (a *App) opsBadgePrinted(w http.ResponseWriter, r *http.Request, principal 
 		fail(w, 404, "pass not found")
 		return
 	}
-	a.opsLog(r.Context(), p.AttendeeID, day, "badge_print", principal.Station, "")
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(r.Context(), `SELECT 1 FROM attendees WHERE id=$1 FOR UPDATE`, p.AttendeeID); err != nil {
+			return err
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, "badge_print", principal.Station, "")
+	})
+	if err != nil {
+		fail(w, 503, "print could not be recorded")
+		return
+	}
 	respond(w, 200, map[string]bool{"ok": true})
 }
 
@@ -504,12 +579,16 @@ func (a *App) opsSpotRegister(w http.ResponseWriter, r *http.Request, principal 
 		return
 	}
 	p, _ := a.opsFind(r.Context(), qrID, day)
-	_, err = a.DB.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, p.AttendeeID, day, principal.Station)
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(r.Context(), `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, p.AttendeeID, day, principal.Station); err != nil {
+			return err
+		}
+		return a.opsLog(r.Context(), tx, p.AttendeeID, day, "spot_registration", principal.Station, in.Payment)
+	})
 	if err != nil {
 		fail(w, 503, "registration saved but check-in failed")
 		return
 	}
-	a.opsLog(r.Context(), p.AttendeeID, day, "spot_registration", principal.Station, in.Payment)
 	p, _ = a.opsFind(r.Context(), qrID, day)
 	out := map[string]any{"person": p.json(), "qrUrl": "/api/v1/ops/qr/" + qrID}
 	if downloadOnly(p.CategoryID) {
@@ -590,7 +669,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 		return
 	}
 	if rest == "" && r.Method == http.MethodPost {
-		a.opsCreatePoint(w, r)
+		a.opsCreatePoint(w, r, principal)
 		return
 	}
 	parts := strings.Split(rest, "/")
@@ -604,7 +683,16 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 		if !decode(w, r, &in) {
 			return
 		}
-		_, err = a.DB.Exec(r.Context(), `UPDATE access_points SET active=$2 WHERE id=$1`, p.ID, in.Active)
+		err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+			if _, err := tx.Exec(r.Context(), `UPDATE access_points SET active=$2 WHERE id=$1`, p.ID, in.Active); err != nil {
+				return err
+			}
+			kind := "gate_closed"
+			if in.Active {
+				kind = "gate_opened"
+			}
+			return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), kind, principal.Station, p.ID+" | "+p.Name)
+		})
 		if err != nil {
 			fail(w, 503, "gate update failed")
 			return
@@ -619,8 +707,12 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 			fail(w, 400, dayErr.Error())
 			return
 		}
-		inside, count := a.opsOccupancy(r.Context(), p.ID, day)
-		respond(w, 200, map[string]any{"inside": inside, "insideCount": count, "capacity": p.Capacity})
+		inside, count, err := a.opsOccupancy(r.Context(), a.DB, p.ID, day)
+		if err != nil {
+			fail(w, 503, "occupancy unavailable")
+			return
+		}
+		respond(w, 200, map[string]any{"inside": inside, "insideCount": count, "capacity": p.Capacity, "point": pointMap(p)})
 		return
 	}
 	if len(parts) == 2 && parts[1] == "scan" && r.Method == http.MethodPost {
@@ -634,7 +726,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 	fail(w, 404, "not found")
 }
 
-func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request) {
+func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request, principal opsPrincipal) {
 	var in struct {
 		Name, Mode, Direction                string
 		AllowedCategories, AllowedDays       []string
@@ -658,30 +750,43 @@ func (a *App) opsCreatePoint(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if in.AllowedCategories == nil {
+		in.AllowedCategories = []string{}
+	}
 	p := accessPoint{ID: id(), Name: in.Name, Mode: in.Mode, Direction: in.Direction, AllowedCategories: in.AllowedCategories, AllowedDays: in.AllowedDays, Capacity: in.Capacity, RequireCheckIn: in.RequireCheckIn, AllowMultipleEntries: in.AllowMultipleEntries, Active: true}
-	_, err := a.DB.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries)
+	err := pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(r.Context(), `INSERT INTO access_points(id,name,mode,direction,allowed_categories,allowed_days,capacity,require_check_in,allow_multiple_entries) VALUES($1,$2,$3,$4,$5,$6::date[],$7,$8,$9)`, p.ID, p.Name, p.Mode, p.Direction, p.AllowedCategories, p.AllowedDays, p.Capacity, p.RequireCheckIn, p.AllowMultipleEntries); err != nil {
+			return err
+		}
+		return a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_created", principal.Station, p.ID+" | "+p.Name)
+	})
 	if err != nil {
-		fail(w, 400, "a gate with that name may already exist")
+		fail(w, 503, "gate could not be created or recorded; check for a duplicate name")
 		return
 	}
 	respond(w, 201, map[string]any{"point": pointMap(p)})
 }
 
-func (a *App) opsOccupancy(ctx context.Context, point, day string) ([]map[string]any, int) {
-	rows, err := a.DB.Query(ctx, `WITH latest AS (SELECT DISTINCT ON(attendee_id) attendee_id,direction,created_at FROM access_scans WHERE access_point_id=$1 AND event_day=$2 AND decision='allow' AND voided_at IS NULL AND attendee_id IS NOT NULL ORDER BY attendee_id,created_at DESC) SELECT a.name,p.number,c.label,l.created_at FROM latest l JOIN attendees a ON a.id=l.attendee_id JOIN passes p ON p.attendee_id=a.id AND p.revoked_at IS NULL JOIN registrations r ON r.id=a.registration_id JOIN categories c ON c.id=r.category_id WHERE l.direction='entry' ORDER BY l.created_at DESC`, point, day)
+type opsQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func (a *App) opsOccupancy(ctx context.Context, db opsQuerier, point, day string) ([]map[string]any, int, error) {
+	rows, err := db.Query(ctx, `WITH latest AS (SELECT DISTINCT ON(attendee_id) attendee_id,reference,direction,created_at FROM access_scans WHERE access_point_id=$1 AND event_day=$2 AND decision='allow' AND voided_at IS NULL AND attendee_id IS NOT NULL ORDER BY attendee_id,created_at DESC,id DESC) SELECT a.name,l.reference,c.label,l.created_at FROM latest l JOIN attendees a ON a.id=l.attendee_id JOIN registrations r ON r.id=a.registration_id JOIN categories c ON c.id=r.category_id WHERE l.direction='entry' ORDER BY l.created_at DESC`, point, day)
 	if err != nil {
-		return []map[string]any{}, 0
+		return nil, 0, err
 	}
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
 		var n, ref, cat string
 		var at time.Time
-		if rows.Scan(&n, &ref, &cat, &at) == nil {
-			out = append(out, map[string]any{"name": n, "reference": ref, "category": cat, "enteredAt": at})
+		if err := rows.Scan(&n, &ref, &cat, &at); err != nil {
+			return nil, 0, err
 		}
+		out = append(out, map[string]any{"name": n, "reference": ref, "category": cat, "enteredAt": at})
 	}
-	return out, len(out)
+	return out, len(out), rows.Err()
 }
 
 func contains(values []string, value string) bool {
@@ -694,7 +799,7 @@ func contains(values []string, value string) bool {
 }
 
 func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsPrincipal, point accessPoint) {
-	var in struct{ Code, Day string }
+	var in struct{ Code, Day, RequestID string }
 	if !decode(w, r, &in) {
 		return
 	}
@@ -703,78 +808,138 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 		fail(w, 400, err.Error())
 		return
 	}
-	p, findErr := a.opsFind(r.Context(), in.Code, day)
-	inside := false
-	entries := 0
-	if findErr == nil {
-		_ = a.DB.QueryRow(r.Context(), `SELECT COALESCE((array_agg(direction ORDER BY created_at DESC))[1]='entry',false),count(*) FILTER(WHERE direction='entry') FROM access_scans WHERE access_point_id=$1 AND attendee_id=$2 AND event_day=$3 AND decision='allow' AND voided_at IS NULL`, point.ID, p.AttendeeID, day).Scan(&inside, &entries)
+	if len(in.RequestID) > 100 {
+		fail(w, 400, "invalid request identifier")
+		return
 	}
-	direction := point.Direction
-	if direction == "auto" {
-		if inside {
-			direction = "exit"
-		} else {
+	var out map[string]any
+	requestHash := hash(day + "|" + opsScanCode(in.Code))
+	err = pgx.BeginFunc(r.Context(), a.DB, func(tx pgx.Tx) error {
+		// One gate lock covers the current policy, every attendee and capacity.
+		// Re-read after taking the lock, so a concurrent close cannot be missed.
+		var err error
+		point, err = scanPoint(tx.QueryRow(r.Context(), pointSelect+` WHERE id=$1 FOR UPDATE`, point.ID))
+		if err != nil {
+			return err
+		}
+		if in.RequestID != "" {
+			var savedHash string
+			var saved []byte
+			err := tx.QueryRow(r.Context(), `SELECT request_hash,response FROM access_scans WHERE access_point_id=$1 AND station=$2 AND request_id=$3`, point.ID, principal.Station, in.RequestID).Scan(&savedHash, &saved)
+			if err == nil {
+				if savedHash != requestHash {
+					return errOpsRequestConflict
+				}
+				return json.Unmarshal(saved, &out)
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+		}
+		p, findErr := scanOpsPerson(tx.QueryRow(r.Context(), opsPersonSQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3)`, day, opsScanCode(in.Code), opsReference(in.Code)))
+		valid := findErr == nil
+		if findErr != nil && !errors.Is(findErr, pgx.ErrNoRows) {
+			return findErr
+		}
+		if !valid {
+			// Historical badges may identify an occupant for EXIT only.
+			historySQL := strings.Replace(opsPersonSQL, " AND p.revoked_at IS NULL", "", 1)
+			historySQL = strings.Replace(historySQL, "r.status='approved' AND a.removed_at IS NULL AND ", "", 1)
+			p, findErr = scanOpsPerson(tx.QueryRow(r.Context(), historySQL+`(p.qr_id=$2 OR replace(p.number,'-','')=$3) ORDER BY p.version DESC LIMIT 1`, day, opsScanCode(in.Code), opsReference(in.Code)))
+			if findErr != nil && !errors.Is(findErr, pgx.ErrNoRows) {
+				return findErr
+			}
+		}
+		inside, entries := false, 0
+		if findErr == nil {
+			if err := tx.QueryRow(r.Context(), `SELECT COALESCE((array_agg(direction ORDER BY created_at DESC,id DESC))[1]='entry',false),count(*) FILTER(WHERE direction='entry') FROM access_scans WHERE access_point_id=$1 AND attendee_id=$2 AND event_day=$3 AND decision='allow' AND voided_at IS NULL`, point.ID, p.AttendeeID, day).Scan(&inside, &entries); err != nil {
+				return err
+			}
+		}
+		direction := point.Direction
+		if direction == "auto" {
 			direction = "entry"
+			if inside {
+				direction = "exit"
+			}
 		}
-	}
-	reason := ""
-	if !point.Active {
-		reason = "Gate is closed."
-	} else if findErr != nil {
-		reason = "No approved pass matches that code."
-	} else if direction == "entry" && !contains(point.AllowedDays, day) {
-		reason = "This gate is not open for the selected day."
-	} else if direction == "entry" && len(point.AllowedCategories) > 0 && !contains(point.AllowedCategories, p.CategoryID) {
-		reason = "This badge category is not allowed here."
-	} else if direction == "entry" && point.RequireCheckIn && !p.CheckedIn {
-		reason = "Badge-desk check-in is required first."
-	} else if direction == "entry" && !point.AllowMultipleEntries && entries > 0 {
-		reason = "This gate allows one entry only."
-	} else if direction == "entry" && point.Capacity != nil {
-		_, n := a.opsOccupancy(r.Context(), point.ID, day)
-		if n >= *point.Capacity {
-			reason = "This area is at capacity."
+		reason := ""
+		if !point.Active {
+			reason = "Gate is closed."
+		} else if !valid {
+			reason = "No approved pass matches that code."
+		} else if direction == "entry" && !contains(point.AllowedDays, day) {
+			reason = "This gate is not open for the selected day."
+		} else if direction == "entry" && len(point.AllowedCategories) > 0 && !contains(point.AllowedCategories, p.CategoryID) {
+			reason = "This badge category is not allowed here."
+		} else if direction == "entry" && point.RequireCheckIn && !p.CheckedIn {
+			reason = "Badge-desk check-in is required first."
+		} else if direction == "entry" && !point.AllowMultipleEntries && entries > 0 {
+			reason = "This gate allows one entry only."
+		} else if direction == "entry" && point.Capacity != nil {
+			_, n, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
+			if err != nil {
+				return err
+			}
+			if n >= *point.Capacity {
+				reason = "This area is at capacity."
+			}
 		}
-	}
-	// Exits are always allowed for somebody already inside, regardless of changed rules.
-	if direction == "exit" && inside {
-		reason = ""
-	}
-	decision := "allow"
-	would := ""
-	if reason != "" {
-		if point.Mode == "log" {
-			would = reason
+		if direction == "exit" && inside {
 			reason = ""
-		} else {
-			decision = "deny"
 		}
+		decision, would := "allow", ""
+		if reason != "" {
+			if point.Mode == "log" {
+				would, reason = reason, ""
+			} else {
+				decision = "deny"
+			}
+		}
+		scanID, attendee, reference := id(), "", opsScanCode(in.Code)
+		var person any
+		if findErr == nil {
+			attendee, reference, person = p.AttendeeID, p.Reference, p.json()
+		}
+		// clock_timestamp follows lock acquisition; transaction-start now() could
+		// otherwise put a waiting scan before the scan it actually followed.
+		if _, err := tx.Exec(r.Context(), `INSERT INTO access_scans(id,access_point_id,attendee_id,event_day,reference,direction,decision,reason,would_deny,station,request_id,request_hash,created_at) VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,$10,NULLIF($11,''),$12,clock_timestamp())`, scanID, point.ID, attendee, day, reference, direction, decision, reason, would, principal.Station, in.RequestID, requestHash); err != nil {
+			return err
+		}
+		kind := "gate_allow"
+		if decision == "deny" {
+			kind = "gate_deny"
+		}
+		if err := a.opsLog(r.Context(), tx, attendee, day, kind, principal.Station, reference+" | "+point.Name+": "+reason+would); err != nil {
+			return err
+		}
+		_, count, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
+		if err != nil {
+			return err
+		}
+		out = map[string]any{"allowed": decision == "allow", "direction": direction, "reason": reason, "wouldDeny": would, "person": person, "insideCount": count, "capacity": point.Capacity, "scanId": scanID}
+		if in.RequestID != "" {
+			response, err := json.Marshal(out)
+			if err != nil {
+				return err
+			}
+			_, err = tx.Exec(r.Context(), `UPDATE access_scans SET response=$2 WHERE id=$1`, scanID, response)
+			return err
+		}
+		return nil
+	})
+	if errors.Is(err, errOpsRequestConflict) {
+		fail(w, 409, "request identifier already used for a different scan")
+		return
 	}
-	scanID := id()
-	attendee := ""
-	reference := opsScanCode(in.Code)
-	if findErr == nil {
-		attendee = p.AttendeeID
-		reference = p.Reference
-	}
-	_, err = a.DB.Exec(r.Context(), `INSERT INTO access_scans(id,access_point_id,attendee_id,event_day,reference,direction,decision,reason,would_deny,station) VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,$10)`, scanID, point.ID, attendee, day, reference, direction, decision, reason, would, principal.Station)
 	if err != nil {
 		fail(w, 503, "gate scan could not be recorded")
 		return
 	}
-	kind := "gate_allow"
-	if decision == "deny" {
-		kind = "gate_deny"
-	}
-	a.opsLog(r.Context(), attendee, day, kind, principal.Station, reference+" | "+point.Name+": "+reason+would)
-	insideRows, count := a.opsOccupancy(r.Context(), point.ID, day)
-	_ = insideRows
-	var person any
-	if findErr == nil {
-		person = p.json()
-	}
-	respond(w, 200, map[string]any{"allowed": decision == "allow", "direction": direction, "reason": reason, "wouldDeny": would, "person": person, "insideCount": count, "capacity": point.Capacity, "scanId": scanID})
+	respond(w, 200, out)
 }
+
+var errOpsRequestConflict = errors.New("request identifier already used")
 
 func (a *App) opsGateEntries(w http.ResponseWriter, r *http.Request, p accessPoint) {
 	rows, err := a.DB.Query(r.Context(), `SELECT s.id,s.created_at,s.reference,COALESCE(a.name,''),s.direction,s.decision,s.reason,s.would_deny,s.station FROM access_scans s LEFT JOIN attendees a ON a.id=s.attendee_id WHERE s.access_point_id=$1 ORDER BY s.created_at DESC LIMIT 500`, p.ID)
