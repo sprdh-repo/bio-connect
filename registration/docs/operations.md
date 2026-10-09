@@ -67,6 +67,7 @@ Gate decisions are serialised per gate so simultaneous stations cannot bypass ca
 In **Create access gate**, choose **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types** to set the entry filter when creating the gate.
 In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.
 In **Operate gate**, **Check-in requirement** turns **Require event check-in first** on or off for an existing gate; the change is audited.
+The same panel has **Also check in denied badges**: when on, a known current badge that this gate denies is still checked in for the day (once), for counters such as a kit desk that turn some attendees away but should still count them as on site.
 Existing gates allow every registration type; leaving all types unchecked also allows every type, like the category filter.
 The gate scan result labels the attendee's registration type, whether entry is granted or denied.
 This classification comes from the registration's complimentary/free-link records, not the badge category or fee amount.

@@ -889,3 +889,47 @@ func TestOpsGateCheckInRequirementCanBeTurnedOff(t *testing.T) {
 		t.Fatalf("requirement change audit rows = %d", n)
 	}
 }
+
+func TestOpsGateCanCheckInDeniedBadges(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Kit counter", "venue-passcode")
+	qr := seedOpsPass(t, a, "ops-denied-check-in@example.com")
+	day := opsDays[1].ID
+	rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{"name": "Delegate kits", "mode": "enforce", "direction": "entry", "allowedCategories": []string{"faculty"}, "allowMultipleEntries": true})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create gate: %s", rr.Body.String())
+	}
+	gate := decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	scan := func(code string) map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": code, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	attendance := func() int {
+		return count(t, a, "SELECT count(*) FROM ops_attendance WHERE event_day=$1", day)
+	}
+	if out := scan(qr); out["allowed"] != false || out["checkedIn"] != false || attendance() != 0 {
+		t.Fatalf("denied scan with the option off: %v", out)
+	}
+	rr = c.request(http.MethodPost, "/api/v1/ops/points/"+gate, map[string]any{"checkInDenied": true})
+	if rr.Code != http.StatusOK || decodeOpsResponse(t, rr)["point"].(map[string]any)["checkInDenied"] != true {
+		t.Fatalf("enable denied check-in: %d %s", rr.Code, rr.Body.String())
+	}
+	if out := scan(qr); out["allowed"] != false || out["checkedIn"] != true || attendance() != 1 {
+		t.Fatalf("denied scan with the option on: %v", out)
+	}
+	if out := scan(qr); out["checkedIn"] != false || attendance() != 1 {
+		t.Fatalf("repeat denied scan: %v", out)
+	}
+	scan("BC26NOPASS")
+	if attendance() != 1 {
+		t.Fatal("unknown code checked someone in")
+	}
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='gate_rules_updated' AND detail LIKE '%denied scans check in'"); n != 1 {
+		t.Fatalf("option change audit rows = %d", n)
+	}
+}

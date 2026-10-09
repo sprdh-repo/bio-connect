@@ -635,24 +635,24 @@ func (a *App) opsPassDownload(w http.ResponseWriter, r *http.Request, principal 
 }
 
 type accessPoint struct {
-	ID, Name, Mode, Direction, EntryGroup        string
-	AllowedCategories, AllowedDays               []string
-	AllowedRegistrationTypes                     []string
-	Capacity                                     *int
-	RequireCheckIn, AllowMultipleEntries, Active bool
+	ID, Name, Mode, Direction, EntryGroup                       string
+	AllowedCategories, AllowedDays                              []string
+	AllowedRegistrationTypes                                    []string
+	Capacity                                                    *int
+	RequireCheckIn, AllowMultipleEntries, CheckInDenied, Active bool
 }
 
 func pointMap(p accessPoint) map[string]any {
-	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "allowedRegistrationTypes": p.AllowedRegistrationTypes, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "entryGroup": p.EntryGroup, "active": p.Active}
+	return map[string]any{"id": p.ID, "name": p.Name, "mode": p.Mode, "direction": p.Direction, "allowedCategories": p.AllowedCategories, "allowedDays": p.AllowedDays, "allowedRegistrationTypes": p.AllowedRegistrationTypes, "capacity": p.Capacity, "requireCheckIn": p.RequireCheckIn, "allowMultipleEntries": p.AllowMultipleEntries, "entryGroup": p.EntryGroup, "checkInDenied": p.CheckInDenied, "active": p.Active}
 }
 
 func scanPoint(row pgx.Row) (accessPoint, error) {
 	var p accessPoint
-	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active, &p.AllowedRegistrationTypes, &p.EntryGroup)
+	err := row.Scan(&p.ID, &p.Name, &p.Mode, &p.Direction, &p.AllowedCategories, &p.AllowedDays, &p.Capacity, &p.RequireCheckIn, &p.AllowMultipleEntries, &p.Active, &p.AllowedRegistrationTypes, &p.EntryGroup, &p.CheckInDenied)
 	return p, err
 }
 
-const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group FROM access_points`
+const pointSelect = `SELECT id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group,check_in_denied FROM access_points`
 
 func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPrincipal, rest string) {
 	rest = strings.TrimPrefix(rest, "/")
@@ -691,12 +691,13 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 			AllowedRegistrationTypes *[]string
 			AllowMultipleEntries     *bool
 			RequireCheckIn           *bool
+			CheckInDenied            *bool
 			EntryGroup               *string
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		if in.Active == nil && in.AllowedRegistrationTypes == nil && in.AllowMultipleEntries == nil && in.RequireCheckIn == nil && in.EntryGroup == nil {
+		if in.Active == nil && in.AllowedRegistrationTypes == nil && in.AllowMultipleEntries == nil && in.RequireCheckIn == nil && in.CheckInDenied == nil && in.EntryGroup == nil {
 			fail(w, 400, "provide a gate change")
 			return
 		}
@@ -722,7 +723,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 				types = *in.AllowedRegistrationTypes
 			}
 			var err error
-			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types),allow_multiple_entries=COALESCE($4,allow_multiple_entries),entry_group=COALESCE($5,entry_group),require_check_in=COALESCE($6,require_check_in) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group`, p.ID, in.Active, types, in.AllowMultipleEntries, in.EntryGroup, in.RequireCheckIn))
+			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types),allow_multiple_entries=COALESCE($4,allow_multiple_entries),entry_group=COALESCE($5,entry_group),require_check_in=COALESCE($6,require_check_in),check_in_denied=COALESCE($7,check_in_denied) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group,check_in_denied`, p.ID, in.Active, types, in.AllowMultipleEntries, in.EntryGroup, in.RequireCheckIn, in.CheckInDenied))
 			if err != nil {
 				return err
 			}
@@ -740,10 +741,13 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 					return err
 				}
 			}
-			if in.RequireCheckIn != nil {
+			if in.RequireCheckIn != nil || in.CheckInDenied != nil {
 				rule := "check-in not required"
 				if p.RequireCheckIn {
 					rule = "check-in required"
+				}
+				if p.CheckInDenied {
+					rule += ", denied scans check in"
 				}
 				if err := a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | "+rule); err != nil {
 					return err
@@ -1041,7 +1045,7 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 			return err
 		}
 		checkedIn := false
-		if decision == "allow" && valid {
+		if valid && (decision == "allow" || point.CheckInDenied) {
 			if checkedIn, err = a.opsGateCheckIn(r.Context(), tx, p.AttendeeID, day, principal.Station, point.Name); err != nil {
 				return err
 			}
@@ -1074,8 +1078,9 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 
 var errOpsRequestConflict = errors.New("request identifier already used")
 
-// opsGateCheckIn records the day's check-in for an attendee a gate admits, so
-// attendance counts everyone on site even where the badge desk is optional.
+// opsGateCheckIn records the day's check-in for an attendee a gate admits, or
+// denies where the gate checks in denied scans, so attendance counts everyone
+// on site even where the badge desk is optional.
 // It reports whether this scan created the check-in; later scans leave it.
 func (a *App) opsGateCheckIn(ctx context.Context, tx pgx.Tx, attendee, day, station, gate string) (bool, error) {
 	tag, err := tx.Exec(ctx, `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, attendee, day, station)
