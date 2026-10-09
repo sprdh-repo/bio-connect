@@ -1030,11 +1030,17 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 		if err := a.opsLog(r.Context(), tx, attendee, day, kind, principal.Station, reference+" | "+point.Name+": "+reason+would); err != nil {
 			return err
 		}
+		checkedIn := false
+		if decision == "allow" && valid {
+			if checkedIn, err = a.opsGateCheckIn(r.Context(), tx, p.AttendeeID, day, principal.Station, point.Name); err != nil {
+				return err
+			}
+		}
 		_, count, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
 		if err != nil {
 			return err
 		}
-		out = map[string]any{"allowed": decision == "allow", "direction": direction, "reason": reason, "wouldDeny": would, "person": person, "insideCount": count, "capacity": point.Capacity, "scanId": scanID}
+		out = map[string]any{"allowed": decision == "allow", "direction": direction, "reason": reason, "wouldDeny": would, "person": person, "insideCount": count, "capacity": point.Capacity, "scanId": scanID, "checkedIn": checkedIn}
 		if in.RequestID != "" {
 			response, err := json.Marshal(out)
 			if err != nil {
@@ -1057,6 +1063,17 @@ func (a *App) opsGateScan(w http.ResponseWriter, r *http.Request, principal opsP
 }
 
 var errOpsRequestConflict = errors.New("request identifier already used")
+
+// opsGateCheckIn records the day's check-in for an attendee a gate admits, so
+// attendance counts everyone on site even where the badge desk is optional.
+// It reports whether this scan created the check-in; later scans leave it.
+func (a *App) opsGateCheckIn(ctx context.Context, tx pgx.Tx, attendee, day, station, gate string) (bool, error) {
+	tag, err := tx.Exec(ctx, `INSERT INTO ops_attendance(attendee_id,event_day,checked_in_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, attendee, day, station)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	return true, a.opsLog(ctx, tx, attendee, day, "check_in", station, "Auto check-in at gate "+gate)
+}
 
 // opsGateOverride admits an attendee whose scan the gate denied. Staff give a
 // reason, and the admission is a separate allowed scan linked to the denial, so
@@ -1128,11 +1145,15 @@ func (a *App) opsGateOverride(w http.ResponseWriter, r *http.Request, principal 
 		if err := a.opsLog(r.Context(), tx, attendee, day, "gate_override", principal.Station, reference+" | "+point.Name+": denied for "+denied+" | "+reason); err != nil {
 			return err
 		}
+		checkedIn, err := a.opsGateCheckIn(r.Context(), tx, attendee, day, principal.Station, point.Name)
+		if err != nil {
+			return err
+		}
 		_, count, err := a.opsOccupancy(r.Context(), tx, point.ID, day)
 		if err != nil {
 			return err
 		}
-		out = map[string]any{"allowed": true, "override": true, "direction": direction, "reason": reason, "wouldDeny": "", "person": p.json(), "insideCount": count, "capacity": point.Capacity, "scanId": scanID}
+		out = map[string]any{"allowed": true, "override": true, "direction": direction, "reason": reason, "wouldDeny": "", "person": p.json(), "insideCount": count, "capacity": point.Capacity, "scanId": scanID, "checkedIn": checkedIn}
 		response, err := json.Marshal(out)
 		if err != nil {
 			return err

@@ -61,6 +61,8 @@ The session lasts 12 hours and all writes carry CSRF protection.
 - Access gates can enforce or only log category, day, prior check-in, capacity and single-entry rules. An attendee already recorded inside is always permitted to exit even if gate rules subsequently change.
 - Reports show registered, unique attendance, daily attendance and checkout totals by category. CSV exports neutralise spreadsheet formulas.
 
+Any admitted gate scan (including a log-only admission or a manual override) also records that day's check-in if the attendee has none yet, so attendance counts everyone on site even when the badge desk is optional.
+The first such scan shows **Checked in for the day.** and is audited as a check-in with the detail "Auto check-in at gate <name>"; later scans and denied scans leave attendance unchanged.
 Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
 In **Create access gate**, choose **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types** to set the entry filter when creating the gate.
 In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.

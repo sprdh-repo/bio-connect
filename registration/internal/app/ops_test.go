@@ -778,6 +778,9 @@ func TestOpsGateManualOverrideAdmitsDeniedAttendee(t *testing.T) {
 	if rr := override(allowed["scanId"].(string), "again"); rr.Code != http.StatusConflict {
 		t.Fatalf("override of an allowed scan: %d %s", rr.Code, rr.Body.String())
 	}
+	if allowed["checkedIn"] != true || count(t, a, "SELECT count(*) FROM ops_attendance WHERE event_day=$1", day) != 1 {
+		t.Fatalf("override did not check the attendee in: %v", allowed)
+	}
 	// The overridden entry counts: the auto gate now lets the attendee out.
 	if out := scan(qr); out["allowed"] != true || out["direction"] != "exit" {
 		t.Fatalf("exit after override: %v", out)
@@ -799,5 +802,56 @@ func TestOpsGateManualOverrideAdmitsDeniedAttendee(t *testing.T) {
 	unknown := scan("BC26NOPASS")
 	if rr := override(unknown["scanId"].(string), "no pass"); rr.Code != http.StatusConflict {
 		t.Fatalf("override without a pass: %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestOpsGateEntryChecksInOncePerDay(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Hall gate", "venue-passcode")
+	qr := seedOpsPass(t, a, "ops-auto-check-in@example.com")
+	day := opsDays[1].ID
+	create := func(name, mode string) string {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{"name": name, "mode": mode, "direction": "auto", "allowMultipleEntries": true, "allowedCategories": []string{"faculty"}})
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("create gate: %s", rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	}
+	hall, foyer := create("Hall", "enforce"), create("Foyer", "log")
+	scan := func(gate, code string) map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": code, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	attendance := func() int {
+		return count(t, a, "SELECT count(*) FROM ops_attendance WHERE event_day=$1", day)
+	}
+
+	// A denied scan and an unknown code never check anyone in.
+	if out := scan(hall, qr); out["allowed"] != false || out["checkedIn"] != false || attendance() != 0 {
+		t.Fatalf("denied scan: %v", out)
+	}
+	scan(foyer, "BC26NOPASS")
+	if attendance() != 0 {
+		t.Fatal("unknown code checked someone in")
+	}
+	// A log-only gate admits despite the rule, so the entry is the check-in.
+	if out := scan(foyer, qr); out["allowed"] != true || out["checkedIn"] != true {
+		t.Fatalf("first admission: %v", out)
+	}
+	for _, out := range []map[string]any{scan(foyer, qr), scan(foyer, qr)} {
+		if out["allowed"] != true || out["checkedIn"] != false {
+			t.Fatalf("later scan: %v", out)
+		}
+	}
+	if attendance() != 1 || count(t, a, "SELECT count(*) FROM ops_attendance WHERE event_day=$1", opsDays[0].ID) != 0 {
+		t.Fatal("check-in not recorded once for the scanned day only")
+	}
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='check_in' AND station='Hall gate' AND detail='Auto check-in at gate Foyer'"); n != 1 {
+		t.Fatalf("auto check-in audit rows = %d", n)
 	}
 }
