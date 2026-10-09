@@ -66,6 +66,7 @@ The first such scan shows **Checked in for the day.** and is audited as a check-
 Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
 In **Create access gate**, choose **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types** to set the entry filter when creating the gate.
 In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.
+A one-entry gate's limit resets each event day; tick **One entry for the whole event, not per day** under **Entry limit** (or when creating the gate) for a counter such as the delegate kit desk, where the denial names the gate and day of the earlier entry.
 In **Operate gate**, **Check-in requirement** turns **Require event check-in first** on or off for an existing gate; the change is audited.
 The same panel has **Also check in denied badges**: when on, a known current badge that this gate denies is still checked in for the day (once), for counters such as a kit desk that turn some attendees away but should still count them as on site.
 Existing gates allow every registration type; leaving all types unchecked also allows every type, like the category filter.

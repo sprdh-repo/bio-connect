@@ -933,3 +933,43 @@ func TestOpsGateCanCheckInDeniedBadges(t *testing.T) {
 		t.Fatalf("option change audit rows = %d", n)
 	}
 }
+
+func TestOpsGateOneEntryForWholeEvent(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Kit counter", "venue-passcode")
+	first, second := seedOpsPass(t, a, "ops-kit-one@example.com"), seedOpsPass(t, a, "ops-kit-two@example.com")
+	rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{"name": "Delegate Kit", "mode": "enforce", "direction": "entry", "allowMultipleEntries": false})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create gate: %s", rr.Body.String())
+	}
+	gate := decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	scan := func(code, day string) map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": code, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	// By default the one-entry limit resets each day.
+	scan(first, opsDays[0].ID)
+	if out := scan(first, opsDays[1].ID); out["allowed"] != true {
+		t.Fatalf("per-day limit on day two: %v", out)
+	}
+	if rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate, map[string]any{"allowMultipleEntries": true, "entryOncePerEvent": true}); rr.Code != http.StatusBadRequest {
+		t.Fatalf("whole-event limit with repeat entry: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = c.request(http.MethodPost, "/api/v1/ops/points/"+gate, map[string]any{"entryOncePerEvent": true})
+	if rr.Code != http.StatusOK || decodeOpsResponse(t, rr)["point"].(map[string]any)["entryOncePerEvent"] != true {
+		t.Fatalf("enable whole-event limit: %d %s", rr.Code, rr.Body.String())
+	}
+	scan(second, opsDays[0].ID)
+	out := scan(second, opsDays[1].ID)
+	if out["allowed"] != false || !strings.Contains(out["reason"].(string), "whole event") || !strings.Contains(out["reason"].(string), opsDays[0].Label) {
+		t.Fatalf("whole-event limit on day two: %v", out)
+	}
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='gate_rules_updated' AND detail LIKE '%one entry for the whole event'"); n != 1 {
+		t.Fatalf("limit change audit rows = %d", n)
+	}
+}
