@@ -855,3 +855,37 @@ func TestOpsGateEntryChecksInOncePerDay(t *testing.T) {
 		t.Fatalf("auto check-in audit rows = %d", n)
 	}
 }
+
+func TestOpsGateCheckInRequirementCanBeTurnedOff(t *testing.T) {
+	a := mustApp(t)
+	a.Config.OpsKey = "venue-passcode"
+	c := &opsTestClient{t: t, h: a.Handler()}
+	c.login("Hall gate", "venue-passcode")
+	qr := seedOpsPass(t, a, "ops-require-off@example.com")
+	day := opsDays[1].ID
+	rr := c.request(http.MethodPost, "/api/v1/ops/points", map[string]any{"name": "Hall", "mode": "enforce", "direction": "auto", "requireCheckIn": true, "allowMultipleEntries": true})
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create gate: %s", rr.Body.String())
+	}
+	gate := decodeOpsResponse(t, rr)["point"].(map[string]any)["id"].(string)
+	scan := func() map[string]any {
+		rr := c.request(http.MethodPost, "/api/v1/ops/points/"+gate+"/scan", map[string]any{"code": qr, "day": day})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("scan: %d %s", rr.Code, rr.Body.String())
+		}
+		return decodeOpsResponse(t, rr)
+	}
+	if out := scan(); out["allowed"] != false {
+		t.Fatalf("scan before check-in: %v", out)
+	}
+	rr = c.request(http.MethodPost, "/api/v1/ops/points/"+gate, map[string]any{"requireCheckIn": false})
+	if rr.Code != http.StatusOK || decodeOpsResponse(t, rr)["point"].(map[string]any)["requireCheckIn"] != false {
+		t.Fatalf("turn off check-in requirement: %d %s", rr.Code, rr.Body.String())
+	}
+	if out := scan(); out["allowed"] != true || out["checkedIn"] != true {
+		t.Fatalf("scan after requirement removed: %v", out)
+	}
+	if n := count(t, a, "SELECT count(*) FROM ops_activity WHERE kind='gate_rules_updated' AND detail LIKE '%check-in not required'"); n != 1 {
+		t.Fatalf("requirement change audit rows = %d", n)
+	}
+}

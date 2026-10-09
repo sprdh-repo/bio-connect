@@ -66,6 +66,7 @@ The first such scan shows **Checked in for the day.** and is audited as a check-
 Gate decisions are serialised per gate so simultaneous stations cannot bypass capacity or single-entry limits.
 In **Create access gate**, choose **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types** to set the entry filter when creating the gate.
 In **Operate gate**, select **Paid**, **Complimentary**, and/or **Free link** under **Allowed registration types**, then save the registration filter.
+In **Operate gate**, **Check-in requirement** turns **Require event check-in first** on or off for an existing gate; the change is audited.
 Existing gates allow every registration type; leaving all types unchecked also allows every type, like the category filter.
 The gate scan result labels the attendee's registration type, whether entry is granted or denied.
 This classification comes from the registration's complimentary/free-link records, not the badge category or fee amount.

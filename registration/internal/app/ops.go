@@ -690,12 +690,13 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 			Active                   *bool
 			AllowedRegistrationTypes *[]string
 			AllowMultipleEntries     *bool
+			RequireCheckIn           *bool
 			EntryGroup               *string
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		if in.Active == nil && in.AllowedRegistrationTypes == nil && in.AllowMultipleEntries == nil && in.EntryGroup == nil {
+		if in.Active == nil && in.AllowedRegistrationTypes == nil && in.AllowMultipleEntries == nil && in.RequireCheckIn == nil && in.EntryGroup == nil {
 			fail(w, 400, "provide a gate change")
 			return
 		}
@@ -721,7 +722,7 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 				types = *in.AllowedRegistrationTypes
 			}
 			var err error
-			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types),allow_multiple_entries=COALESCE($4,allow_multiple_entries),entry_group=COALESCE($5,entry_group) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group`, p.ID, in.Active, types, in.AllowMultipleEntries, in.EntryGroup))
+			p, err = scanPoint(tx.QueryRow(r.Context(), `UPDATE access_points SET active=COALESCE($2,active),allowed_registration_types=COALESCE($3::text[],allowed_registration_types),allow_multiple_entries=COALESCE($4,allow_multiple_entries),entry_group=COALESCE($5,entry_group),require_check_in=COALESCE($6,require_check_in) WHERE id=$1 RETURNING id,name,mode,direction,allowed_categories,allowed_days::text[],capacity,require_check_in,allow_multiple_entries,active,allowed_registration_types,entry_group`, p.ID, in.Active, types, in.AllowMultipleEntries, in.EntryGroup, in.RequireCheckIn))
 			if err != nil {
 				return err
 			}
@@ -736,6 +737,15 @@ func (a *App) opsPoints(w http.ResponseWriter, r *http.Request, principal opsPri
 			}
 			if in.AllowedRegistrationTypes != nil {
 				if err := a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | registration types: "+strings.Join(p.AllowedRegistrationTypes, ",")); err != nil {
+					return err
+				}
+			}
+			if in.RequireCheckIn != nil {
+				rule := "check-in not required"
+				if p.RequireCheckIn {
+					rule = "check-in required"
+				}
+				if err := a.opsLog(r.Context(), tx, "", opsToday(a.Now()), "gate_rules_updated", principal.Station, p.ID+" | "+p.Name+" | "+rule); err != nil {
 					return err
 				}
 			}
