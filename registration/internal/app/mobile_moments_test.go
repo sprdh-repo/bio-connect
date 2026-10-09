@@ -34,12 +34,18 @@ func TestMobileMomentsJourneyUsesConfiguredAlbumAndOpaqueAttendee(t *testing.T) 
 			if r.FormValue("album_id") != "42" || r.FormValue("external_user_id") != externalID {
 				t.Errorf("upload fields: album=%q external=%q", r.FormValue("album_id"), r.FormValue("external_user_id"))
 			}
-			file, _, err := r.FormFile("photo")
+			file, header, err := r.FormFile("photo")
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Moments rejects any photo part not labelled image/jpeg or image/png.
+			if got := header.Header.Get("Content-Type"); got != "image/jpeg" {
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"Invalid file type"}`))
+				return
+			}
 			body, _ := io.ReadAll(file)
-			if !bytes.Equal(body, []byte("jpeg-data")) {
+			if !bytes.Equal(body, testJPEG) {
 				t.Errorf("photo = %q", body)
 			}
 			w.WriteHeader(http.StatusCreated)
@@ -85,29 +91,37 @@ func TestMobileMomentsJourneyUsesConfiguredAlbumAndOpaqueAttendee(t *testing.T) 
 		t.Fatalf("photos: %d %s", photos.Code, photos.Body.String())
 	}
 
-	var upload bytes.Buffer
-	mw := multipart.NewWriter(&upload)
-	part, err := mw.CreateFormFile("photo", "selfie.jpg")
-	if err != nil {
-		t.Fatal(err)
+	uploadSelfie := func(photo []byte) *httptest.ResponseRecorder {
+		var upload bytes.Buffer
+		mw := multipart.NewWriter(&upload)
+		part, err := mw.CreateFormFile("photo", "selfie.jpg")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = part.Write(photo)
+		if err := mw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/mobile/moments/selfie?pass_id="+passID, &upload)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+		rr := httptest.NewRecorder()
+		a.Handler().ServeHTTP(rr, req)
+		return rr
 	}
-	_, _ = part.Write([]byte("jpeg-data"))
-	if err := mw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/mobile/moments/selfie?pass_id="+passID, &upload)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	a.Handler().ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
+	if rr := uploadSelfie(testJPEG); rr.Code != http.StatusCreated {
 		t.Fatalf("upload: %d %s", rr.Code, rr.Body.String())
+	}
+	if rr := uploadSelfie([]byte("not an image")); rr.Code != http.StatusBadRequest || !strings.Contains(rr.Body.String(), "JPEG or PNG") {
+		t.Fatalf("non-image upload: %d %s", rr.Code, rr.Body.String())
 	}
 	removed := mobileRequest(a, http.MethodDelete, "/api/v1/mobile/moments/selfie?pass_id="+passID, nil, token)
 	if removed.Code != http.StatusNoContent {
 		t.Fatalf("remove: %d %s", removed.Code, removed.Body.String())
 	}
 }
+
+var testJPEG = []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00jpeg-data")
 
 func TestMobileMomentsRejectsUnverifiedSession(t *testing.T) {
 	a := mustApp(t)

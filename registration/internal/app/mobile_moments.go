@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
+	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"path/filepath"
 	"strings"
@@ -104,6 +107,7 @@ func momentsJSON(w http.ResponseWriter, response *http.Response, allowed ...int)
 		ok = ok || response.StatusCode == status
 	}
 	if !ok {
+		slog.Error("moments upstream rejected request", "method", response.Request.Method, "status", response.StatusCode)
 		fail(w, http.StatusBadGateway, "Moments is temporarily unavailable; try again")
 		return
 	}
@@ -169,11 +173,26 @@ func (a *App) mobileMoments(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer photo.Close()
+		data, err := io.ReadAll(io.LimitReader(photo, momentsUploadLimit+1))
+		if err != nil || len(data) > momentsUploadLimit {
+			fail(w, http.StatusBadRequest, "could not read the selfie")
+			return
+		}
+		// Moments accepts only image/jpeg or image/png parts, and
+		// CreateFormFile would label every file application/octet-stream.
+		photoType := http.DetectContentType(data)
+		if photoType != "image/jpeg" && photoType != "image/png" {
+			fail(w, http.StatusBadRequest, "choose a JPEG or PNG selfie")
+			return
+		}
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
-		part, err := writer.CreateFormFile("photo", filepath.Base(header.Filename))
+		partHeader := textproto.MIMEHeader{}
+		partHeader.Set("Content-Disposition", mime.FormatMediaType("form-data", map[string]string{"name": "photo", "filename": filepath.Base(header.Filename)}))
+		partHeader.Set("Content-Type", photoType)
+		part, err := writer.CreatePart(partHeader)
 		if err == nil {
-			_, err = io.Copy(part, io.LimitReader(photo, momentsUploadLimit+1))
+			_, err = part.Write(data)
 		}
 		if err == nil {
 			err = writer.WriteField("album_id", albumID)
@@ -191,6 +210,12 @@ func (a *App) mobileMoments(w http.ResponseWriter, r *http.Request) {
 		response, err := a.momentsUpstream(r, http.MethodPost, "/photos/compare", albumID, &body, writer.FormDataContentType())
 		if err != nil {
 			fail(w, http.StatusBadGateway, "Could not upload the selfie; try again")
+			return
+		}
+		if response.StatusCode == http.StatusBadRequest {
+			response.Body.Close()
+			slog.Error("moments rejected selfie", "status", response.StatusCode)
+			fail(w, http.StatusBadRequest, "Moments could not accept this selfie; retake it and try again")
 			return
 		}
 		momentsJSON(w, response, http.StatusOK, http.StatusCreated)
