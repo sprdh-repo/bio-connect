@@ -399,11 +399,18 @@ html.intro-on, html.intro-on body { overflow: hidden; }
 
    Everything the page says about registration is written in both states and
    switched from data-registration on <body>: "soon" while submissions are
-   closed, "open" once they are. Flipping that one attribute flips the header,
-   the hero, all three panels and the section foot together, so the page can
-   never contradict the registration app. */
+   not open yet, "open" once they are, and "closed" for good after the event.
+   Flipping that one attribute flips the header, the hero, all three panels,
+   the section foot and every page's closing band together, so the site can
+   never contradict the registration app (REGISTRATION_CLOSED there).
+   .unless-closed is a Register link that only makes sense before the close;
+   .when-closed is what takes its place. */
 [data-registration="soon"] .when-open,
-[data-registration="open"] .when-soon { display: none; }
+[data-registration="open"] .when-soon,
+[data-registration="closed"] .when-open,
+[data-registration="closed"] .when-soon,
+[data-registration="closed"] .unless-closed,
+body:not([data-registration="closed"]) .when-closed { display: none; }
 .reg-actions { flex-shrink: 0; margin-top: 6px; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
 .reg-actions .status-pill { margin: 0; }
 .reg-actions-note { max-width: 240px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; text-align: right; }
@@ -411,6 +418,8 @@ html.intro-on, html.intro-on body { overflow: hidden; }
    the panel: what you can do should always outweigh what you must wait for. */
 .reg-actions-status { margin: 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 9px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
 .reg-actions-status i { flex-shrink: 0; width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2.6s ease-in-out infinite; }
+/* Closed is settled, not pending, so its dot holds still. */
+.reg-actions-status-closed i { animation: none; opacity: 0.55; }
 
 .reg-card { background: var(--paper); border: 1px solid var(--line); }
 /* position: relative keeps the absolutely positioned .sr-only cell text inside the
