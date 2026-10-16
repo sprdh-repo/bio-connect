@@ -88,7 +88,7 @@ func (a *App) Handler() http.Handler {
 			fail(w, 503, "fees unavailable")
 			return
 		}
-		respond(w, 200, map[string]any{"categories": c, "registration_enabled": a.Config.RegistrationEnabled, "server_time": a.Now().In(india), "cutoff": cutoff, "sbi_url": a.Config.SBIURL})
+		respond(w, 200, map[string]any{"categories": c, "registration_enabled": a.Config.RegistrationEnabled, "registration_closed": a.Config.RegistrationClosed, "server_time": a.Now().In(india), "cutoff": cutoff, "sbi_url": a.Config.SBIURL})
 	})
 	m.HandleFunc("POST /api/v1/coupons", a.checkCoupon)
 	m.HandleFunc("POST /api/v1/free-registration/validate", a.validateFreeLink)
@@ -103,6 +103,10 @@ func (a *App) Handler() http.Handler {
 			return
 		}
 		rid, t, e := a.Create(r.Context(), in, r.Header.Get("Idempotency-Key"), logo)
+		if errors.Is(e, ErrRegistrationClosed) {
+			fail(w, 410, e.Error())
+			return
+		}
 		if e != nil {
 			fail(w, 400, publicError(e))
 			return
@@ -244,6 +248,12 @@ func (a *App) registrationAPI(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "use your private management link or recover by email")
 		return
 	}
+	// Once closed, a registration can still be viewed and its passes
+	// downloaded, but nothing new is submitted against it.
+	if r.Method == "POST" && a.Config.RegistrationClosed {
+		fail(w, 410, ErrRegistrationClosed.Error())
+		return
+	}
 	switch {
 	case r.Method == "POST" && strings.HasSuffix(r.URL.Path, "/payments"):
 		var in PaymentInput
@@ -331,6 +341,10 @@ func (a *App) addAttendee(w http.ResponseWriter, r *http.Request, rid, staff str
 // checkCoupon lets the form show the offer price before saving. Create
 // validates the code again, so this is a convenience, never the authority.
 func (a *App) checkCoupon(w http.ResponseWriter, r *http.Request) {
+	if a.Config.RegistrationClosed {
+		fail(w, 410, ErrRegistrationClosed.Error())
+		return
+	}
 	if a.limited(r.Context(), "coupon:"+a.clientPeer(r), 60, time.Hour) {
 		fail(w, 429, "too many attempts; try again later")
 		return

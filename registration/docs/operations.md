@@ -29,6 +29,20 @@ Losing `ENCRYPTION_KEY` makes stored TOTP secrets and pass tokens unrecoverable.
 Rotate it by changing the master environment and deploying; existing 12-hour on-site sessions remain valid until they expire or staff end the shift.
 
 `REGISTRATION_ENABLED` stays `false` until launch.
+
+## Closing registration after the event
+
+Set `REGISTRATION_ENABLED=false` and `REGISTRATION_CLOSED=true` in the master environment and deploy; the app refuses to start with both true.
+Closed is final, unlike disabled, which reads as "opens soon".
+The public forms at `/delegates` and `/exhibitors` show a "Registration has closed" page instead of the form, and free registration links stop working.
+The API refuses new registrations, free-link checks, coupons, payment evidence and added attendees with `410 Gone`.
+A registrant's private link still opens the registration, read only, and recovery by email still works.
+Staff payment reminders and exhibitor roster notices are refused too, since both link back to forms that no longer accept anything.
+The staff console and the `/ops` portal are unaffected: staff can still register people, record a payment found in SBI, approve and send passes.
+`GET /api/v1/categories` reports `registration_closed: true` and `registration_enabled: false`, so the mobile app's in-app registration turns itself off without a release.
+
+The marketing site has a matching switch.
+Set `data-registration="closed"` on the `<body>` of every page; that hides each Register link (`.unless-closed`) and shows its closed replacement (`.when-closed`).
 `LIVE_DELIVERY` stays `false` until the Zinvos senders, webhook credentials, and WhatsApp template are confirmed; the app refuses to start with `LIVE_DELIVERY=true` unless every provider and webhook value is set, and refuses live registration unless the SBI URL is set too.
 
 ## Deploy

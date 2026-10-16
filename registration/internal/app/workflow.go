@@ -12,12 +12,22 @@ import (
 
 var ErrConflict = errors.New("registration changed or action is not allowed in this state")
 
+// ErrRegistrationClosed refuses public changes once REGISTRATION_CLOSED is set,
+// which ends public registration for good after the event: no new or
+// free-link registrations, coupons, payment evidence, added attendees, or
+// reminders that link back to those forms. Existing registrations stay
+// viewable and their passes downloadable; staff and ops are unaffected.
+var ErrRegistrationClosed = errors.New("registration for Bio Connect 4.0 has closed")
+
 // reminderLinkLifetime bounds the single-use link in a payment reminder email.
 const reminderLinkLifetime = 7 * 24 * time.Hour
 
 const consentText = "I have permission to send this attendee their Bio Connect 4.0 pass and delivery updates by WhatsApp."
 
 func (a *App) Create(ctx context.Context, in RegistrationInput, key string, logo []byte) (string, string, error) {
+	if a.Config.RegistrationClosed {
+		return "", "", ErrRegistrationClosed
+	}
 	if len(key) < 32 || len(key) > 128 {
 		return "", "", errors.New("a 32-128 character Idempotency-Key is required")
 	}
@@ -446,6 +456,10 @@ func (a *App) Review(ctx context.Context, rid, staff string, in ReviewInput) err
 	case "payment_reminder":
 		if status != "awaiting_payment" {
 			return ErrConflict
+		}
+		// The reminder's link leads to a payment form that no longer accepts evidence.
+		if a.Config.RegistrationClosed {
+			return ErrRegistrationClosed
 		}
 		var recent bool
 		if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM delivery_jobs WHERE registration_id=$1 AND purpose='payment_reminder' AND created_at>now()-interval '24 hours')", rid).Scan(&recent); e != nil {

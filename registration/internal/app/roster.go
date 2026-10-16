@@ -106,6 +106,10 @@ func (a *App) rosterNotice(ctx context.Context, tx pgx.Tx, rid, status, cat, ema
 	if status == "rejected" || status == "cancelled" {
 		return ErrConflict
 	}
+	// The notice's link leads to a roster that no longer accepts new people.
+	if a.Config.RegistrationClosed {
+		return ErrRegistrationClosed
+	}
 	c, e := category(ctx, tx, cat)
 	if e != nil {
 		return e

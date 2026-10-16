@@ -38,6 +38,10 @@ func (a *App) validFreeLink(ctx context.Context, tx pgx.Tx, token string) (strin
 }
 
 func (a *App) validateFreeLink(w http.ResponseWriter, r *http.Request) {
+	if a.Config.RegistrationClosed {
+		fail(w, 410, ErrRegistrationClosed.Error())
+		return
+	}
 	var in struct {
 		Token string `json:"token"`
 	}
