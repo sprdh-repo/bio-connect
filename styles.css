@@ -1044,8 +1044,102 @@ body.dialog-open { overflow: hidden; }
   .leader-tag { padding: 6px 9px; font-size: 8.5px; letter-spacing: 0.06em; }
 }
 
+/* Post-event thank-you on the home page. The art grows in behind a lime rule,
+   motes drift up off the seedling, and the copy rises line by line in the
+   same masked way as the intro curtain. */
+.thanks-dialog { width: min(920px, calc(100vw - 40px)); max-width: none; max-height: calc(100dvh - 40px); padding: 0; overflow: auto; display: none; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); color: var(--ink); background: var(--paper); border: 0; box-shadow: 0 40px 120px rgba(2, 14, 11, 0.5); overscroll-behavior: contain; }
+.thanks-dialog[open] { display: grid; animation: thanks-in 0.9s cubic-bezier(.16,1,.3,1) both; }
+.thanks-dialog:focus { outline: none; }
+.thanks-dialog::backdrop { background: rgba(2, 14, 11, 0.8); backdrop-filter: blur(8px); }
+.thanks-dialog[open]::backdrop { animation: speaker-backdrop-in 0.5s ease-out; }
+.thanks-dialog.is-closing { animation: thanks-out 0.38s cubic-bezier(.4,0,1,1) forwards; }
+.thanks-dialog.is-closing::backdrop { animation: thanks-fade-out 0.38s ease-in forwards; }
+@keyframes thanks-in { from { opacity: 0; transform: translateY(32px) scale(0.97); clip-path: inset(8% 5% 8% 5%); } to { clip-path: inset(0); } }
+@keyframes thanks-out { to { opacity: 0; transform: translateY(18px) scale(0.98); } }
+@keyframes thanks-fade-out { to { opacity: 0; } }
+
+.thanks-art { position: relative; min-height: 580px; overflow: hidden; isolation: isolate; background: var(--forest-deep); }
+.thanks-art img { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 62%; animation: thanks-art-in 2.4s cubic-bezier(.2,.8,.2,1) both; }
+/* A warm pulse over the seedling, and a fade into the deep green at the foot
+   so the lime rule has something dark to sit on. */
+.thanks-art::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 50%, rgba(228, 173, 84, 0.32), transparent 42%), linear-gradient(180deg, rgba(5, 28, 23, 0.1) 55%, rgba(5, 28, 23, 0.7)); mix-blend-mode: screen; animation: thanks-glow 4.5s ease-in-out 1.6s infinite alternate; }
+.thanks-art::after { content: ""; position: absolute; inset: auto 0 0; height: 3px; background: var(--lime); transform: scaleX(0); transform-origin: left; animation: intro-fill 1.1s cubic-bezier(.4,0,.2,1) 0.55s forwards; }
+@keyframes thanks-art-in { from { transform: scale(1.16); filter: brightness(0.45) saturate(0.7); } to { transform: scale(1.02); filter: none; } }
+@keyframes thanks-glow { from { opacity: 0.55; } to { opacity: 1; } }
+
+.thanks-motes { position: absolute; inset: 0; pointer-events: none; }
+.thanks-motes i { --x: 50%; --size: 5px; --drift: 12px; --time: 6s; --delay: 0s; position: absolute; top: 56%; left: var(--x); width: var(--size); height: var(--size); background: var(--gold); border-radius: 50%; box-shadow: 0 0 10px 2px rgba(228, 173, 84, 0.6); opacity: 0; animation: thanks-mote var(--time) cubic-bezier(.3,.1,.6,1) calc(1s + var(--delay)) infinite; }
+.thanks-motes i:nth-child(3n) { background: var(--lime); box-shadow: 0 0 10px 2px rgba(185, 220, 114, 0.55); }
+.thanks-motes i:nth-child(1) { --x: 46%; --size: 4px; --drift: -18px; --time: 6.5s; }
+.thanks-motes i:nth-child(2) { --x: 53%; --size: 6px; --drift: 22px; --time: 7s; --delay: 0.6s; }
+.thanks-motes i:nth-child(3) { --x: 40%; --size: 3px; --drift: -30px; --time: 5.5s; --delay: 1.3s; }
+.thanks-motes i:nth-child(4) { --x: 58%; --size: 4px; --drift: 26px; --time: 6s; --delay: 2s; }
+.thanks-motes i:nth-child(5) { --x: 49%; --size: 7px; --drift: -8px; --time: 8s; --delay: 2.6s; }
+.thanks-motes i:nth-child(6) { --x: 35%; --size: 3px; --drift: -36px; --time: 7.5s; --delay: 3.1s; }
+.thanks-motes i:nth-child(7) { --x: 63%; --size: 5px; --drift: 34px; --time: 6.8s; --delay: 3.7s; }
+.thanks-motes i:nth-child(8) { --x: 51%; --size: 3px; --drift: 10px; --time: 5.2s; --delay: 4.3s; }
+.thanks-motes i:nth-child(9) { --x: 44%; --size: 5px; --drift: -24px; --time: 7.2s; --delay: 4.9s; }
+.thanks-motes i:nth-child(10) { --x: 56%; --size: 4px; --drift: 18px; --time: 6.2s; --delay: 5.4s; }
+@keyframes thanks-mote {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  15% { opacity: 0.95; }
+  70% { opacity: 0.7; }
+  100% { opacity: 0; transform: translate(var(--drift), -300px) scale(1); }
+}
+
+.thanks-body { min-width: 0; padding: 72px 60px 44px 56px; display: flex; flex-direction: column; justify-content: center; }
+.thanks-body > :not(.thanks-title, .thanks-close) { opacity: 0; animation: thanks-rise 0.7s cubic-bezier(.2,.8,.2,1) var(--in, 0s) forwards; }
+@keyframes thanks-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.thanks-eyebrow { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: #4f7f3b; font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; font-variant-numeric: tabular-nums; --in: 0.35s; }
+.thanks-eyebrow i { width: 5px; height: 5px; background: var(--lime); border-radius: 50%; }
+.thanks-title { margin: 22px 0 0; font: 600 clamp(34px, 4.1vw, 50px)/1.04 Manrope, sans-serif; letter-spacing: -0.05em; }
+.thanks-line { display: block; overflow: hidden; padding-bottom: 0.08em; }
+.thanks-line > span { display: block; transform: translateY(110%); animation: intro-rise 0.9s cubic-bezier(.2,.8,.2,1) 0.45s forwards; }
+.thanks-line:nth-child(2) > span { animation-delay: 0.55s; }
+.thanks-line:nth-child(3) > span { animation-delay: 0.65s; }
+/* A highlighter stroke drawn under the event name once the line has landed. */
+.thanks-title em { position: relative; z-index: 0; color: var(--forest); font-style: normal; white-space: nowrap; }
+.thanks-title em::after { content: ""; position: absolute; inset: auto -0.06em 0.08em 0; z-index: -1; height: 0.32em; background: var(--lime); transform: scaleX(0); transform-origin: left; animation: intro-fill 0.75s cubic-bezier(.4,0,.2,1) 1.15s forwards; }
+.thanks-copy { max-width: 46ch; margin: 24px 0 0; color: var(--muted); font-size: 16px; line-height: 1.7; --in: 0.8s; }
+.thanks-actions { margin-top: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 30px; --in: 0.92s; }
+/* An address reads wrong in capitals, so this one keeps its case. */
+.thanks-actions .button-primary { font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.thanks-dismiss { padding: 10px 0; color: var(--forest); font-size: 14px; font-weight: 600; background: transparent; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; transition: border-color 0.25s; }
+.thanks-dismiss:hover { border-color: var(--forest); }
+.thanks-signoff { margin: 40px 0 0; padding-top: 22px; border-top: 1px solid var(--line); color: var(--forest); font: 600 15px/1.5 Manrope, sans-serif; letter-spacing: -0.01em; --in: 1.05s; }
+.thanks-close { position: absolute; top: 14px; right: 14px; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 50%; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.3s cubic-bezier(.2,.8,.2,1); }
+.thanks-close:hover { background: var(--cream); border-color: var(--line); transform: rotate(90deg); }
+
+/* Phones get a bottom sheet with the art as a banner, like the speaker profile. */
+@media (max-width: 760px) {
+  .thanks-dialog { width: 100%; max-height: min(94dvh, 780px); margin: auto 0 0; grid-template-columns: 1fr; }
+  .thanks-dialog[open] { animation-name: thanks-sheet-in; animation-duration: 0.6s; }
+  .thanks-dialog.is-closing { animation-name: thanks-sheet-out; }
+  @keyframes thanks-sheet-in { from { transform: translateY(100%); } }
+  @keyframes thanks-sheet-out { to { transform: translateY(100%); } }
+  .thanks-art { min-height: 0; height: clamp(170px, 30dvh, 240px); }
+  .thanks-art img { object-position: 50% 55%; }
+  .thanks-motes i { top: 70%; }
+  @keyframes thanks-mote {
+    0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+    15% { opacity: 0.95; }
+    100% { opacity: 0; transform: translate(var(--drift), -150px) scale(1); }
+  }
+  .thanks-body { padding: 26px 20px calc(22px + env(safe-area-inset-bottom)); }
+  .thanks-title { margin-top: 16px; font-size: clamp(28px, 8.4vw, 36px); }
+  .thanks-copy { margin-top: 16px; font-size: 15px; line-height: 1.65; }
+  .thanks-actions { margin-top: 24px; gap: 8px; }
+  .thanks-actions .button-primary { flex: 1 1 100%; }
+  .thanks-dismiss { margin-inline: auto; }
+  .thanks-signoff { margin-top: 22px; padding-top: 16px; font-size: 14px; text-align: center; }
+  .thanks-close { top: 12px; right: 12px; color: white; background: rgba(5, 28, 23, 0.45); backdrop-filter: blur(6px); }
+  .thanks-close:hover { background: rgba(5, 28, 23, 0.7); border-color: transparent; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .thanks-motes { display: none; }
+  .thanks-dialog *, .thanks-dialog *::before, .thanks-dialog *::after { animation-delay: 0s !important; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .reveal { opacity: 1; transform: none; }
   .hero-media { transform: none; }

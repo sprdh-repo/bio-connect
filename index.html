@@ -1458,6 +1458,38 @@
       </section>
     </main>
 
+    <!-- Post-event thank-you, opened on every load by script.js after the intro.
+         Without script it never opens. Remove this block to retire it. -->
+    <dialog class="thanks-dialog" data-thanks-dialog aria-labelledby="thanks-title" aria-describedby="thanks-copy" tabindex="-1">
+      <div class="thanks-art" aria-hidden="true">
+        <img src="assets/thanks-seedling.webp" alt="" width="720" height="1080" decoding="async" />
+        <span class="thanks-motes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      </div>
+      <div class="thanks-body">
+        <p class="thanks-eyebrow"><span>That's a wrap</span><i aria-hidden="true"></i><span>08-09 October 2026</span></p>
+        <h2 class="thanks-title" id="thanks-title">
+          <span class="thanks-line"><span>Thank you</span></span>
+          <span class="thanks-line"><span>for being part of</span></span>
+          <span class="thanks-line"><span><em>Bio Connect&nbsp;4.0</em></span></span>
+        </h2>
+        <p class="thanks-copy" id="thanks-copy">
+          Two days of ideas, research and new partnerships in Thiruvananthapuram, made possible by every
+          delegate, speaker, exhibitor and partner who joined us.
+          For queries and collaboration opportunities, write to the KLIP team.
+        </p>
+        <div class="thanks-actions">
+          <a class="button button-primary" href="mailto:klip@bio360.in?subject=Bio%20Connect%204.0%20-%20Query%20or%20collaboration">
+            klip@bio360.in<span class="button-arrow" aria-hidden="true">&#8594;</span>
+          </a>
+          <button class="thanks-dismiss" type="button" data-thanks-close>Continue to site</button>
+        </div>
+        <p class="thanks-signoff">Until next time, keep connecting and keep innovating.</p>
+        <button class="thanks-close" type="button" data-thanks-close aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+        </button>
+      </div>
+    </dialog>
+
     <dialog class="video-dialog" data-video-dialog aria-label="Event highlights video">
       <button class="dialog-close" type="button" data-dialog-close aria-label="Close video">×</button>
       <div class="dialog-frame" data-dialog-frame></div>

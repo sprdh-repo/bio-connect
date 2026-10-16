@@ -302,6 +302,52 @@ if (videoDialog) {
   videoDialog.addEventListener("cancel", () => dialogFrame.replaceChildren());
 }
 
+/* The post-event thank-you only exists on the home page. It opens on every
+   load, after the intro has lifted, and plays its exit before closing. */
+const thanksDialog = document.querySelector("[data-thanks-dialog]");
+
+if (thanksDialog) {
+  const closeThanks = () => {
+    if (!thanksDialog.open || thanksDialog.classList.contains("is-closing")) return;
+    if (reduceMotion) {
+      thanksDialog.close();
+      return;
+    }
+    thanksDialog.classList.add("is-closing");
+    /* Children animate too, and their ends bubble up here. */
+    const finish = (event) => {
+      if (event.target !== thanksDialog) return;
+      thanksDialog.removeEventListener("animationend", finish);
+      thanksDialog.close();
+    };
+    thanksDialog.addEventListener("animationend", finish);
+  };
+
+  thanksDialog.querySelectorAll("[data-thanks-close]").forEach((button) => button.addEventListener("click", closeThanks));
+  /* A click on the backdrop lands on the dialog element itself. */
+  thanksDialog.addEventListener("click", (event) => event.target === thanksDialog && closeThanks());
+  thanksDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeThanks();
+  });
+  thanksDialog.addEventListener("close", () => {
+    thanksDialog.classList.remove("is-closing");
+    document.body.classList.remove("dialog-open");
+  });
+
+  introDone.then(() => {
+    setTimeout(() => {
+      /* Never stack on top of a dialog the visitor already opened. */
+      if (document.querySelector("dialog[open]")) return;
+      thanksDialog.showModal();
+      /* Focus the dialog, not the email link, so it opens without a ring
+         and a screen reader starts at the heading. Tab reaches the actions. */
+      thanksDialog.focus();
+      document.body.classList.add("dialog-open");
+    }, reduceMotion ? 0 : 600);
+  });
+}
+
 /* Speaker search only exists on the speakers page. Without script every card
    simply shows, so the field stays hidden until it can work. */
 const speakerGrid = document.querySelector("[data-speaker-grid]");
