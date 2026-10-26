@@ -1,0 +1,6 @@
+[Unit]
+Description=Refresh the CloudFront origin-facing allow-list for the Bio Connect vhost
+OnFailure=bioconnect-alert.service
+[Service]
+Type=oneshot
+ExecStart=/opt/bioconnect-ops/cloudfront-ips.sh

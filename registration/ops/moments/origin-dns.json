@@ -1,0 +1,1 @@
+{"Comment": "Bio Connect registration origin on the Moments host", "Changes": [{"Action": "CREATE", "ResourceRecordSet": {"Name": "bioconnect-origin.zinvos.com.", "Type": "A", "TTL": 300, "ResourceRecords": [{"Value": "185.62.36.59"}]}}]}

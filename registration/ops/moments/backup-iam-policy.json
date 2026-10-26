@@ -1,0 +1,8 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid": "PutDumps", "Effect": "Allow", "Action": ["s3:PutObject", "s3:AbortMultipartUpload"], "Resource": "arn:aws:s3:::bioconnect4-registration-backups-179341475851/postgres/*"},
+    {"Sid": "EncryptWithBackupKey", "Effect": "Allow", "Action": ["kms:GenerateDataKey", "kms:Decrypt"], "Resource": "arn:aws:kms:ap-south-1:179341475851:key/ad5f280f-97ff-413c-949e-d6cc6d34d76a", "Condition": {"StringEquals": {"kms:ViaService": "s3.ap-south-1.amazonaws.com"}}},
+    {"Sid": "Alert", "Effect": "Allow", "Action": "sns:Publish", "Resource": "arn:aws:sns:ap-south-1:179341475851:bioconnect-registration-alerts"}
+  ]
+}

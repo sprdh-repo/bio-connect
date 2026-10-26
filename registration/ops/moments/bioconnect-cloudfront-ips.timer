@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily refresh of the CloudFront origin-facing allow-list
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=1h
+[Install]
+WantedBy=timers.target

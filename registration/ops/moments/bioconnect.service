@@ -1,0 +1,26 @@
+[Unit]
+Description=Bio Connect registration backend
+After=network-online.target bioconnect-db.service
+Wants=network-online.target
+Requires=bioconnect-db.service
+[Service]
+User=bioconnect
+Group=bioconnect
+EnvironmentFile=/etc/bioconnect/app.env
+# Apache on this host is the only proxy; it sets X-BioConnect-Client-IP.
+Environment=APP_ENV=production LISTEN_ADDR=127.0.0.1:8090 TRUSTED_PROXY_CIDR=127.0.0.1/32 GOMEMLIMIT=768MiB STORAGE_DIR=/srv/bioconnect/files
+WorkingDirectory=/srv/bioconnect
+ExecStart=/srv/bioconnect/bin/bioconnect
+Restart=always
+RestartSec=3
+MemoryLimit=1G
+CPUQuota=200%
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+CapabilityBoundingSet=
+[Install]
+WantedBy=multi-user.target
