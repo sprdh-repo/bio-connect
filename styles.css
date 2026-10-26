@@ -1165,7 +1165,7 @@ body.dialog-open { overflow: hidden; }
 .directory-count { color: var(--muted); font-size: 13px; }
 .directory-state { padding: 44px 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
 .directory-state p { margin: 0; }
-.directory-retry, .directory-clear { cursor: pointer; background: none; border: 0; border-bottom: 1px solid var(--line); margin-bottom: 30px; }
+.directory-clear { cursor: pointer; background: none; border: 0; border-bottom: 1px solid var(--line); margin-bottom: 30px; }
 .exhibitor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; padding: 36px 0 0; margin: 0; list-style: none; align-items: start; }
 .exhibitor-card { min-width: 0; overflow-wrap: anywhere; }
 .exhibitor-logo { aspect-ratio: 1.65; padding: 40px; display: grid; place-items: center; border: 1px solid var(--line); background: white; }
